@@ -224,4 +224,28 @@ function nav(){
   window.addEventListener('scroll',()=>$('#top').classList.toggle('solid',scrollY>30),{passive:true})
 }
 function keyPage(){const v=$('#view');v.innerHTML=`<section class="page" style="max-width:520px;margin:auto"><h1>Conecta TMDB</h1><p style="color:var(--mute);line-height:1.6;margin-bottom:16px">Necesitas una API key v3 de <a style="color:var(--ac)" href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org/settings/api</a>. Se guarda solo en este navegador.</p><form id="kf" style="display:flex;gap:8px"><input id="kv" style="flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px" placeholder="API key v3"><button class="btn">Guardar</button></form></section>`;$('#kf').onsubmit=e=>{e.preventDefault();const v=$('#kv').value.trim();if(v){KEY=v;store.set('mz_key',v);location.reload()}}}
+n
+/* Mobile UI (solo ≤900px; no altera PC) */
+(function loadMobileUi(){
+  if (document.getElementById('mz-mobile-ui-js')) return;
+  var s = document.createElement('script');
+  s.id = 'mz-mobile-ui-js';
+  s.defer = true;
+  try {
+    var scripts = document.getElementsByTagName('script');
+    var base = 'js/mobile-ui.js';
+    for (var i = 0; i < scripts.length; i++) {
+      var src = scripts[i].src || '';
+      if (/common\.js/i.test(src)) {
+        base = src.replace(/common\.js(\?.*)?$/i, 'mobile-ui.js');
+        break;
+      }
+    }
+    s.src = base;
+  } catch (_) {
+    s.src = (location.pathname.indexOf('/pages/') !== -1) ? '../js/mobile-ui.js' : 'js/mobile-ui.js';
+  }
+  document.head.appendChild(s);
+})();
+
 nav();
