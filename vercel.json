@@ -2,21 +2,16 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "cleanUrls": true,
-  "trailingSlash": false,
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "^/peliculas/?$", "dest": "/pages/peliculas.html" },
-    { "src": "^/series/?$", "dest": "/pages/series.html" },
-    { "src": "^/anime/?$", "dest": "/pages/anime.html" },
-    { "src": "^/jk/?$", "dest": "/pages/jk.html" },
-    { "src": "^/buscar/?$", "dest": "/pages/buscar.html" },
-    { "src": "^/favoritos/?$", "dest": "/pages/favoritos.html" },
-    { "src": "^/historial/?$", "dest": "/pages/historial.html" },
-    { "src": "^/perfil/?$", "dest": "/pages/perfil.html" },
-    { "src": "^/reproductor/?$", "dest": "/pages/reproductor.html" },
-    { "src": "^/trailer/?$", "dest": "/pages/trailer.html" },
-    { "src": "^/pelicula/([^/]+)/?$", "dest": "/pages/detalle-pelicula.html?id=$1" },
-    { "src": "^/serie/([^/]+)/?$", "dest": "/pages/detalle-serie.html?id=$1" },
-    { "src": "^/$", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/peliculas", "destination": "/pages/peliculas.html" },
+    { "source": "/series", "destination": "/pages/series.html" },
+    { "source": "/anime", "destination": "/pages/anime.html" },
+    { "source": "/jk", "destination": "/pages/jk.html" },
+    { "source": "/buscar", "destination": "/pages/buscar.html" },
+    { "source": "/favoritos", "destination": "/pages/favoritos.html" },
+    { "source": "/historial", "destination": "/pages/historial.html" },
+    { "source": "/perfil", "destination": "/pages/perfil.html" },
+    { "source": "/reproductor", "destination": "/pages/reproductor.html" },
+    { "source": "/trailer", "destination": "/pages/trailer.html" }
   ]
 }
