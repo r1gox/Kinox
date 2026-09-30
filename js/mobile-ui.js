@@ -1,6 +1,6 @@
 /**
- * Kinox mobile UI — solo se activa en viewport ≤ 900px
- * No cambia el layout de escritorio.
+ * Kinox mobile UI — reordena el header para que las secciones se vean
+ * Solo viewport ≤ 900px. PC no se toca.
  */
 (function () {
   var MQ = window.matchMedia("(max-width: 900px)");
@@ -11,22 +11,28 @@
       for (var i = 0; i < scripts.length; i++) {
         var src = scripts[i].src || "";
         if (/common\.js|mobile-ui\.js/i.test(src)) {
-          return src.replace(/\/js\/[^/]+$/i, "/css/mobile.css");
+          return src.replace(/\/js\/[^/?]+(\?.*)?$/i, "/css/mobile.css");
         }
       }
     } catch (_) {}
-    // fallbacks
     if (location.pathname.indexOf("/pages/") !== -1) return "../css/mobile.css";
     return "css/mobile.css";
   }
 
   function ensureCss() {
-    if (document.getElementById("mz-mobile-css")) return;
-    var link = document.createElement("link");
-    link.id = "mz-mobile-css";
-    link.rel = "stylesheet";
-    link.href = cssHref();
-    document.head.appendChild(link);
+    var href = cssHref() + (hrefHasBust() ? "" : "?v=3");
+    var link = document.getElementById("mz-mobile-css");
+    if (!link) {
+      link = document.createElement("link");
+      link.id = "mz-mobile-css";
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    if (link.getAttribute("href") !== href) link.href = href;
+  }
+
+  function hrefHasBust() {
+    return false;
   }
 
   function linkTo(path) {
@@ -46,9 +52,75 @@
     if (path.includes("/jk") || path.includes("jk.html")) return "jk";
     if (path.includes("favoritos")) return "favoritos";
     if (path.includes("historial")) return "historial";
-    if (path.includes("perfil") || path.includes("buscar") || path.includes("reproductor") || path.includes("trailer"))
+    if (
+      path.includes("perfil") ||
+      path.includes("buscar") ||
+      path.includes("reproductor") ||
+      path.includes("trailer")
+    )
       return "";
     return "inicio";
+  }
+
+  /**
+   * Reordena #top:
+   *   [ .mz-m-top: logo | buscar | perfil ]
+   *   [ nav: Inicio Películas Series … ]
+   * En PC se deshace y queda el orden original.
+   */
+  function layoutHeader() {
+    var header = document.getElementById("top") || document.querySelector("header");
+    if (!header) return;
+
+    var logo = header.querySelector(".logo");
+    var nav = header.querySelector("nav");
+    var sf = header.querySelector("#sf");
+    var prof = header.querySelector("#prof");
+
+    if (!MQ.matches) {
+      // Restaurar orden PC: logo, nav, sf, prof
+      var wrap = header.querySelector(".mz-m-top");
+      if (wrap) {
+        while (wrap.firstChild) header.insertBefore(wrap.firstChild, wrap);
+        wrap.remove();
+      }
+      if (logo) header.appendChild(logo);
+      if (nav) header.appendChild(nav);
+      if (sf) header.appendChild(sf);
+      if (prof) header.appendChild(prof);
+      header.classList.remove("mz-m-header");
+      // limpiar estilos inline
+      header.removeAttribute("style");
+      if (nav) nav.removeAttribute("style");
+      return;
+    }
+
+    if (!logo || !nav || !sf || !prof) return;
+
+    header.classList.add("mz-m-header");
+
+    var topRow = header.querySelector(".mz-m-top");
+    if (!topRow) {
+      topRow = document.createElement("div");
+      topRow.className = "mz-m-top";
+      header.insertBefore(topRow, header.firstChild);
+    }
+
+    // Fila superior
+    topRow.appendChild(logo);
+    topRow.appendChild(sf);
+    topRow.appendChild(prof);
+    // Nav debajo del top row
+    if (nav.parentNode !== header || topRow.nextSibling !== nav) {
+      header.insertBefore(nav, topRow.nextSibling);
+    }
+
+    // Asegurar visibles
+    nav.style.display = "flex";
+    nav.style.visibility = "visible";
+    nav.style.opacity = "1";
+    nav.style.width = "100%";
+    nav.style.overflowX = "auto";
   }
 
   function ensureBottomNav() {
@@ -66,7 +138,7 @@
     var nav = document.createElement("nav");
     nav.id = "mz-bottom-nav";
     nav.className = "mz-bottom-nav";
-    nav.setAttribute("aria-label", "Navegación principal");
+    nav.setAttribute("aria-label", "Navegación rápida");
     var items = [
       { id: "inicio", href: "/", ico: "⌂", lbl: "Inicio" },
       { id: "peliculas", href: "/peliculas", ico: "🎬", lbl: "Películas" },
@@ -98,17 +170,34 @@
     nav.querySelectorAll("a").forEach(function (a) {
       a.classList.toggle("on", a.getAttribute("data-section") === sec);
     });
+    // también marca el nav superior
+    try {
+      var topNav = document.querySelector("header nav");
+      if (topNav) {
+        topNav.querySelectorAll("a").forEach(function (a) {
+          a.classList.toggle("on", a.getAttribute("data-section") === sec);
+        });
+      }
+    } catch (_) {}
   }
 
   function apply() {
     ensureCss();
+    layoutHeader();
     ensureBottomNav();
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", apply);
-  } else {
+  function boot() {
     apply();
+    // nav() de common puede correr justo antes; reaplicar
+    setTimeout(apply, 0);
+    setTimeout(apply, 100);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
   }
 
   if (MQ.addEventListener) MQ.addEventListener("change", apply);
