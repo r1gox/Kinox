@@ -500,42 +500,7 @@ body.kx-trailer-open{overflow:hidden}
 .card .badge-rating-empty{display:none!important}
 
 
-/* Detalle: backdrop detrás, contenido opaco, solo header se funde */
-.det{position:relative}
-.det .bd{
-  position:absolute;inset:0 0 auto;height:70vh;
-  background-size:cover;background-position:center 20%;
-  opacity:.32;z-index:0;pointer-events:none;
-}
-.det .bd:after{
-  content:"";position:absolute;inset:0;
-  background:linear-gradient(transparent, var(--bg,#0a0611) 90%);
-}
-
-/* Contenido del detalle SIEMPRE opaco (episodios, info, etc.) */
-.det .dw,
-.det .info,
-.det .pos,
-.seasons,
-.seasons .ep,
-#eps,
-#eps .ep{
-  position:relative;
-  z-index:2;
-  opacity:1 !important;
-}
-.seasons{
-  background:var(--panel,#150e22);
-  border:1px solid var(--line,#2a1f3d);
-  border-radius:12px;
-}
-.seasons .ep,
-#eps .ep{
-  background:transparent;
-  opacity:1 !important;
-}
-
-/* Botón volver: burbuja */
+/* Detalle: solo burbuja Volver + header fundido. NO tocar .seasons ni .ep */
 .det .det-back,
 a.det-back.kx-back{
   position:relative;z-index:3;
@@ -546,7 +511,7 @@ a.det-back.kx-back{
   color:#f4f0fa !important;
   text-decoration:none !important;
   font-weight:700;font-size:.88rem;
-  background:rgba(21,14,34,.88);
+  background:rgba(21,14,34,.9);
   border:1px solid rgba(255,255,255,.14);
   border-radius:999px;
   box-shadow:0 4px 14px rgba(0,0,0,.25);
@@ -560,32 +525,17 @@ a.det-back.kx-back:hover{
   transform:translateY(-1px);
 }
 
-/* SOLO la barra de arriba (header) se funde con el fondo en detalle */
 body.mz-on-detail > header,
 body.mz-on-detail header#top{
-  background:linear-gradient(
-    180deg,
-    rgba(10,6,17,.55) 0%,
-    rgba(10,6,17,.25) 70%,
-    transparent 100%
-  ) !important;
+  background:linear-gradient(180deg, rgba(10,6,17,.5) 0%, rgba(10,6,17,.2) 80%, transparent 100%) !important;
   border-bottom-color:transparent !important;
   box-shadow:none !important;
-  backdrop-filter:blur(8px);
-  -webkit-backdrop-filter:blur(8px);
 }
 body.mz-on-detail header.solid{
-  background:linear-gradient(
-    180deg,
-    rgba(10,6,17,.55) 0%,
-    rgba(10,6,17,.25) 70%,
-    transparent 100%
-  ) !important;
+  background:linear-gradient(180deg, rgba(10,6,17,.5) 0%, rgba(10,6,17,.2) 80%, transparent 100%) !important;
   border-color:transparent !important;
 }
 body.mz-on-detail header.mz-detail-scrolled{
   background:rgba(10,6,17,.92) !important;
-  backdrop-filter:blur(12px) !important;
-  -webkit-backdrop-filter:blur(12px) !important;
-  border-bottom:1px solid rgba(42,31,61,.5) !important;
+  border-bottom:1px solid rgba(42,31,61,.45) !important;
 }
