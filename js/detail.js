@@ -26,14 +26,18 @@ function workerPlayHref(hit, type, id, season, episode) {
   }
   var sid = hit.source_id || null;
   var slug = hit.slug || '';
-  var urlVid = hit.url_vid || null;
-  // Series: url_vid base + /temporada/episodio
+  var urlVid = hit.url_vid || hit.url || null;
   if (type === 'tv' && urlVid && season && episode) {
-    urlVid = urlVid.replace(/\/$/, '') + '/' + season + '/' + episode;
+    urlVid = String(urlVid).replace(/\/$/, '');
+    if (!/\/\d+\/\d+\/?$/.test(urlVid)) {
+      urlVid = urlVid + '/' + season + '/' + episode;
+    } else {
+      urlVid = urlVid.replace(/\/\d+\/\d+\/?$/, '/' + season + '/' + episode);
+    }
   }
   return pageHref('reproductor.html', {
     type: type === 'tv' ? 'tv' : 'movie',
-    id: id,
+    id: id || undefined,
     season: season,
     episode: episode,
     slug: slug,
@@ -42,14 +46,194 @@ function workerPlayHref(hit, type, id, season, episode) {
   });
 }
 
+async function fetchWorkerDetail(slug, type, sourceId) {
+  var sid = sourceId || (typeof MZ_SOURCE !== 'undefined' ? MZ_SOURCE : '9');
+  var path =
+    '/' +
+    sid +
+    '/' +
+    (type === 'tv' ? 'serie' : 'pelicula') +
+    '/' +
+    encodeURIComponent(slug);
+  var r = await fetch(MZ_WORKER + path, { headers: { Accept: 'application/json' } });
+  if (!r.ok) throw new Error('Worker: HTTP ' + r.status);
+  var data = await r.json();
+  if (data && data.success === false) {
+    throw new Error(data.error || data.message || 'No encontrado en el worker');
+  }
+  return data;
+}
+
+/** Detalle solo con slug del worker (buscador → detalle, no al ep. 1) */
+async function loadDetailFromWorker(type, params) {
+  var slug = params.slug;
+  var sourceId = params.source_id || params.source || null;
+  var titleHint = params.title || slug.replace(/-/g, ' ');
+  var portadaHint = params.portada || '';
+
+  $('#view').innerHTML = '<div class="load">Cargando detalle…</div>';
+  var data = await fetchWorkerDetail(slug, type, sourceId);
+  var title = data.titulo || data.title || titleHint;
+  var original = data.titulo_original || '';
+  var year = data.year || '';
+  var rating = data.rating != null ? data.rating : data.calificacion;
+  var overview = data.descripcion || data.overview || 'Sin sinopsis.';
+  var portada = data.portada || portadaHint || '';
+  var backdrop = data.backdrop || '';
+  var generos = data.generos || [];
+  if (typeof generos === 'string') {
+    try { generos = JSON.parse(generos); } catch (_) { generos = generos.split(','); }
+  }
+  var hit = {
+    slug: data.slug || slug,
+    source_id: data.source_id || sourceId,
+    source: data.fuente || data.source,
+    url_vid: data.url_extract || data.link || null,
+    title: title
+  };
+  document.title = title + ' — Kinox';
+
+  var run =
+    type === 'movie'
+      ? data.duracion_texto || (data.duracion ? data.duracion + ' min' : '')
+      : data.total_temporadas
+        ? data.total_temporadas + ' temporadas'
+        : data.total_episodios
+          ? data.total_episodios + ' episodios'
+          : '';
+
+  var playHref =
+    type === 'tv'
+      ? workerPlayHref(hit, 'tv', null, 1, 1)
+      : workerPlayHref(hit, 'movie', null);
+
+  var temps = Array.isArray(data.temporadas) ? data.temporadas : [];
+
+  $('#view').innerHTML =
+    '<section class="det">' +
+    (backdrop
+      ? '<div class="bd" style="background-image:url(' + esc(backdrop) + ')"></div>'
+      : '') +
+    '<div class="dw">' +
+    (portada ? '<img class="pos" src="' + esc(portada) + '" alt="">' : '') +
+    '<div class="info"><h1>' +
+    esc(title) +
+    '</h1>' +
+    (original && original !== title
+      ? '<p style="color:var(--mute);margin:0 0 8px">Título original: ' + esc(original) + '</p>'
+      : '') +
+    '<div class="meta">' +
+    esc(year) +
+    (rating != null && rating !== ''
+      ? ' · <span class="r">★ ' + esc(String(rating)) + '</span>'
+      : '') +
+    (run ? ' · ' + esc(run) : '') +
+    (data.estado ? ' · ' + esc(data.estado) : '') +
+    '</div><div class="tags">' +
+    (Array.isArray(generos) ? generos : [])
+      .map(function (g) {
+        return '<span>' + esc(typeof g === 'string' ? g : g.name || '') + '</span>';
+      })
+      .join('') +
+    '</div><h3>Sinopsis</h3><p>' +
+    esc(overview) +
+    '</p><div class="btns">' +
+    '<a class="btn play" id="btnPlay" href="' +
+    playHref +
+    '">' +
+    (type === 'tv' ? '▶ Comenzar E1' : '▶ Reproducir') +
+    '</a>' +
+    '</div>' +
+    '<p style="color:var(--mute);font-size:.85rem;margin-top:8px">Fuente: ' +
+    esc(hit.source || hit.source_id || '') +
+    ' · ' +
+    esc(hit.slug || '') +
+    '</p></div></div></section>' +
+    (type === 'tv' && temps.length
+      ? '<section class="seasons"><h2>Temporadas y capítulos</h2><select id="sel">' +
+        temps
+          .map(function (t, i) {
+            var n = t.temporada != null ? t.temporada : i + 1;
+            var label = 'Temporada ' + n;
+            if (t.episodios != null && !Array.isArray(t.episodios)) {
+              label += ' (' + t.episodios + ' eps)';
+            } else if (Array.isArray(t.lista)) {
+              label += ' (' + t.lista.length + ' eps)';
+            }
+            return (
+              '<option value="' +
+              n +
+              '"' +
+              (i === 0 ? ' selected' : '') +
+              '>' +
+              esc(label) +
+              '</option>'
+            );
+          })
+          .join('') +
+        '</select><div id="eps"></div></section>'
+      : '');
+
+  if (type === 'tv' && temps.length) {
+    var renderEps = function () {
+      var want = parseInt($('#sel').value, 10) || 1;
+      var block =
+        temps.find(function (t) {
+          return parseInt(t.temporada != null ? t.temporada : 0, 10) === want;
+        }) || temps[0];
+      var lista = (block && (block.lista || block.episodios)) || [];
+      if (!Array.isArray(lista)) lista = [];
+      $('#eps').innerHTML = lista.length
+        ? lista
+            .map(function (e) {
+              var en = e.episodio != null ? e.episodio : e.episode != null ? e.episode : e.episode_number;
+              var sn = e.temporada != null ? e.temporada : want;
+              var name = e.titulo || e.name || e.title || 'Episodio ' + en;
+              var still = e.back_img || e.still || e.image || '';
+              var href = workerPlayHref(hit, 'tv', null, sn, en);
+              return (
+                '<a class="ep" href="' +
+                href +
+                '">' +
+                (still
+                  ? '<img loading="lazy" src="' + esc(still) + '" alt="">'
+                  : '<div class="ph"></div>') +
+                '<div><b>' +
+                en +
+                '. ' +
+                esc(name) +
+                '</b></div></a>'
+              );
+            })
+            .join('')
+        : '<p style="color:var(--mute)">Sin episodios en esta temporada.</p>';
+    };
+    $('#sel').onchange = renderEps;
+    renderEps();
+  }
+}
+
 async function loadDetail(type) {
   try {
+    var params = new URL(location.href).searchParams;
+    var id = params.get('id');
+    var slug = params.get('slug');
+
+    // Buscador / worker: solo slug → detalle del worker (NO saltar al ep. 1)
+    if (!id && slug) {
+      return await loadDetailFromWorker(type, {
+        slug: slug,
+        source_id: params.get('source_id') || params.get('source'),
+        title: params.get('title'),
+        portada: params.get('portada')
+      });
+    }
+
     if (!KEY) return keyPage();
-    var id = new URL(location.href).searchParams.get('id');
     if (!id) throw Error('Falta el ID del título');
     var x = await tmdb('/' + type + '/' + id, { append_to_response: 'videos,watch/providers,recommendations' });
     var it = norm(x, type);
-    document.title = it.title + ' — MovieZone';
+    document.title = it.title + ' — Kinox';
     store.set(pk('hist'), [it].concat(hist().filter(function (h) { return !(h.id === it.id && h.type === type); })).slice(0, 40));
 
     var mx = (x['watch/providers'] && x['watch/providers'].results && x['watch/providers'].results.MX) || {};
@@ -67,7 +251,6 @@ async function loadDetail(type) {
     var seasons = (x.seasons || []).filter(function (s) { return s.season_number > 0; });
     var hasTrailer = (x.videos && x.videos.results || []).some(function (v) { return v.site === 'YouTube'; });
 
-    // Resolver slug/url_vid reales del Worker (no slugify de TMDB)
     var hit = null;
     try {
       hit = await resolveWorkerHit(it.title, type);
@@ -142,7 +325,6 @@ async function loadDetail(type) {
       $('#favBtn').classList.toggle('on', !has);
     };
 
-    // Series: lista de episodios al estilo Kinox, enlaces con url_vid del worker
     if (type === 'tv' && seasons.length) {
       var go = async function () {
         var s = await tmdb('/tv/' + id + '/season/' + $('#sel').value);

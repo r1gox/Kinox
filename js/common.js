@@ -50,11 +50,15 @@ function workerCard(it){
   const isTv=/serie|tv|anime|dorama/.test(tipo);
   const type=isTv?'tv':'movie';
   const slug=it.slug||slugify(it.title||it.titulo||'');
-  const href=pageHref('reproductor.html',{type,slug,season:isTv?'1':undefined,episode:isTv?'1':undefined});
-  const img=it.portada||it.poster||'';
+  const sid=it.source_id||it.sourceId||'';
   const title=it.title||it.titulo||'Sin título';
+  const img=it.portada||it.poster||'';
   const year=it.year||'';
   const src=it.source||it.fuente||'';
+  // Buscador → DETALLE (no al episodio 1)
+  const href=isTv
+    ? pageHref('detalle-serie.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined})
+    : pageHref('detalle-pelicula.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined});
   return `<a class="card" href="${href}"><div class="im">${img?`<img loading="lazy" src="${esc(img)}" alt="">`:''}</div>${src?`<span class="badge">${esc(src)}</span>`:''}<b>${esc(title)}</b><small>${esc(year)}${isTv?' · Serie':' · Película'}</small></a>`;
 }
 function rowHtml(t,items){return items?.length?`<section class="row"><h2>${esc(t)}</h2><div class="track">${items.map(card).join('')}</div></section>`:''}
