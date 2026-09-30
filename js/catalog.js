@@ -67,14 +67,33 @@
     return '<span class="r">★ ' + n.toFixed(1) + "</span>";
   }
 
+  function tipoLabel(item, kind) {
+    var t = String(item.type || item.tipo || item.formato || item.category || "").trim();
+    if (!t) t = kind === "peliculas" ? "Película" : "Serie";
+    // normalizar
+    var low = t.toLowerCase();
+    if (/ova/.test(low)) return "OVA";
+    if (/ona/.test(low)) return "ONA";
+    if (/especial|special/.test(low)) return "Especial";
+    if (/peli|movie|film/.test(low)) return "Película";
+    if (/serie|tv|dorama/.test(low)) return "Serie";
+    if (/anime/.test(low)) return "Anime";
+    // capitalizar
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
   function cardWorker(item, kind, cardId) {
     var title = item.title || item.titulo || item.nombre || item.slug || "Sin título";
     var img = item.portada || item.poster || item.image || "";
     var year = item.year || item.anio || "";
-    var tipo = item.type || item.tipo || (kind === "peliculas" ? "Película" : "Serie");
+    var tipo = tipoLabel(item, kind);
     var href = detailHref(item, kind);
-    var sid = item.source_id || sourceId();
     var idAttr = cardId ? ' data-card="' + esc(cardId) + '"' : "";
+    var r = item.rating_tmdb != null ? item.rating_tmdb : item.rating;
+    var ratingTop =
+      r != null && !isNaN(Number(r)) && Number(r) > 0
+        ? '<span class="badge badge-rating">★ ' + Number(r).toFixed(1) + "</span>"
+        : '<span class="badge badge-rating badge-rating-empty"></span>';
     return (
       '<a class="card"' +
       idAttr +
@@ -85,17 +104,16 @@
       (img
         ? '<img loading="lazy" src="' + esc(img) + '" alt="" onerror="this.style.opacity=.25">'
         : "") +
+      '<span class="badge badge-type">' +
+      esc(tipo) +
+      "</span>" +
+      ratingTop +
       "</div>" +
-      (sid ? '<span class="badge">' + esc(sid) + "</span>" : "") +
       "<b>" +
       esc(title) +
       "</b>" +
       "<small>" +
       esc(year) +
-      (year ? " · " : "") +
-      ratingHtml(item) +
-      (ratingHtml(item) ? " · " : "") +
-      esc(tipo) +
       "</small></a>"
     );
   }
@@ -105,22 +123,10 @@
     var el = document.querySelector('[data-card="' + cardId + '"]');
     if (!el) return;
     if (rating != null && !isNaN(Number(rating)) && Number(rating) > 0) {
-      var small = el.querySelector("small");
-      if (small) {
-        var star = "★ " + Number(rating).toFixed(1);
-        if (small.innerHTML.indexOf("★") === -1) {
-          // insertar rating después del año si hay
-          var txt = small.textContent || "";
-          if (txt.indexOf("·") !== -1) {
-            small.innerHTML = small.innerHTML.replace(
-              " · ",
-              ' · <span class="r">' + star + "</span> · "
-            );
-          } else {
-            small.innerHTML =
-              '<span class="r">' + star + "</span> · " + small.innerHTML;
-          }
-        }
+      var badge = el.querySelector(".badge-rating");
+      if (badge) {
+        badge.textContent = "★ " + Number(rating).toFixed(1);
+        badge.classList.remove("badge-rating-empty");
       }
     }
     if (posterUrl) {
@@ -203,9 +209,6 @@
         "<h1>" +
         esc(label) +
         "</h1>" +
-        '<p style="color:var(--mute);font-size:.9rem;margin:-8px 0 14px">Fuente worker · id ' +
-        esc(sid) +
-        " · ★ calificación TMDB</p>" +
         '<form id="mz-cat-sf" class="search-form" style="display:flex;gap:8px;margin-bottom:16px;max-width:520px">' +
         '<input id="mz-cat-q" type="search" placeholder="Buscar en ' +
         esc(label) +
