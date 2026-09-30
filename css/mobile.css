@@ -1,98 +1,140 @@
 /**
- * Kinox móvil — extras (barra inferior, grids).
- * El header de secciones lo arregla styles.css @media 700px con flex+order.
+ * Kinox móvil
+ * - Header compacto (solo logo + buscar + perfil)
+ * - #mz-sec-bar = barra de secciones FIJA (inyectada por JS)
+ * - Barra inferior
  */
 @media (max-width: 900px) {
   :root {
+    --mz-header-h: 52px;
+    --mz-sec-h: 44px;
     --mz-bottom-h: 58px;
   }
 
+  body.mz-has-sec-bar {
+    padding-top: 0;
+  }
   body.mz-has-bottom-nav {
     padding-bottom: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px));
   }
 
-  /* Refuerzo: secciones siempre visibles arriba */
+  /* Header: solo logo, buscar, perfil */
+  header#top,
   header {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 60 !important;
     display: flex !important;
-    flex-wrap: wrap !important;
+    flex-wrap: nowrap !important;
     align-items: center !important;
-    gap: 6px 8px !important;
-    min-height: 0 !important;
-    height: auto !important;
-    padding: 8px 12px !important;
-    padding-top: max(8px, env(safe-area-inset-top, 0px)) !important;
+    gap: 8px !important;
+    min-height: var(--mz-header-h) !important;
+    height: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px)) !important;
+    padding: 0 10px !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    box-sizing: border-box !important;
     background: rgba(10, 6, 17, 0.98) !important;
+    border-bottom: 1px solid transparent !important;
   }
+
   header .logo {
-    order: 1 !important;
     flex: 0 0 auto !important;
+    font-size: 1.1rem !important;
+    order: 1 !important;
   }
   header #sf {
-    order: 2 !important;
     flex: 1 1 auto !important;
     min-width: 0 !important;
     margin: 0 !important;
-    width: auto !important;
+    order: 2 !important;
   }
   header #q,
   header #q:focus {
     width: 100% !important;
-    max-width: none !important;
-    height: 36px !important;
+    height: 34px !important;
     font-size: 16px !important;
   }
   header #prof {
-    order: 3 !important;
     flex: 0 0 auto !important;
+    width: 32px !important;
+    height: 32px !important;
+    order: 3 !important;
   }
+
+  /* Ocultar nav original del header (lo reemplaza #mz-sec-bar) */
   header nav {
-    order: 4 !important;
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    flex: 1 0 100% !important;
-    width: 100% !important;
-    min-height: 38px !important;
-    height: auto !important;
-    max-height: none !important;
-    overflow-x: auto !important;
-    gap: 2px !important;
-    scrollbar-width: none !important;
-  }
-  header nav::-webkit-scrollbar {
     display: none !important;
   }
-  header nav a {
+
+  /* ===== BARRA DE SECCIONES (siempre visible) ===== */
+  #mz-sec-bar.mz-sec-bar,
+  .mz-sec-bar {
+    position: fixed !important;
+    top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px)) !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 59 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 4px !important;
+    height: var(--mz-sec-h) !important;
+    min-height: var(--mz-sec-h) !important;
+    padding: 0 8px !important;
+    margin: 0 !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    background: #120b1c !important;
+    border-bottom: 1px solid #2a1f3d !important;
+    box-sizing: border-box !important;
+  }
+  .mz-sec-bar::-webkit-scrollbar {
+    display: none !important;
+  }
+  .mz-sec-bar a {
     display: inline-flex !important;
     flex: 0 0 auto !important;
-    padding: 8px 12px !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 32px !important;
+    padding: 0 12px !important;
+    border-radius: 8px !important;
     font-size: 0.8rem !important;
-    color: #c4b8d9 !important;
+    font-weight: 600 !important;
+    color: #b7a9cc !important;
+    text-decoration: none !important;
     white-space: nowrap !important;
   }
-  header nav a.on {
+  .mz-sec-bar a.on {
     color: #fff !important;
-    background: rgba(166, 107, 255, 0.2) !important;
+    background: rgba(166, 107, 255, 0.28) !important;
+  }
+
+  /* Contenido debajo de header + sec bar */
+  .page,
+  .det,
+  .player-page {
+    padding-top: calc(
+      var(--mz-header-h) + var(--mz-sec-h) + env(safe-area-inset-top, 0px) + 10px
+    ) !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .hero {
+    padding-top: calc(
+      var(--mz-header-h) + var(--mz-sec-h) + env(safe-area-inset-top, 0px) + 4px
+    ) !important;
+    min-height: 52vh !important;
   }
 
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 12px 8px !important;
-  }
-
-  .server-list {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  .mz-cal-card {
-    flex-basis: 128px !important;
-  }
-  .mz-anime-search {
-    flex-direction: column !important;
-  }
-  .mz-anime-search .btn {
-    width: 100% !important;
   }
 
   .mz-bottom-nav {
@@ -105,9 +147,7 @@
     height: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: rgba(12, 8, 20, 0.98);
-    border-top: 1px solid var(--line, #2a1f3d);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid #2a1f3d;
   }
   .mz-bottom-nav a {
     flex: 1;
@@ -117,8 +157,7 @@
     justify-content: center;
     gap: 2px;
     min-width: 0;
-    padding: 6px 2px;
-    color: var(--mute, #9a8fb0);
+    color: #9a8fb0;
     font-size: 0.6rem;
     font-weight: 600;
     text-decoration: none;
@@ -130,17 +169,13 @@
     color: #fff;
   }
   .mz-bottom-nav a.on .ico {
-    color: var(--ac, #a66bff);
-  }
-  .mz-bottom-nav a .lbl {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    color: #a66bff;
   }
 }
 
 @media (min-width: 901px) {
+  #mz-sec-bar,
+  .mz-sec-bar,
   .mz-bottom-nav {
     display: none !important;
   }
