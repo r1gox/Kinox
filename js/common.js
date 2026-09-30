@@ -323,52 +323,54 @@ function mzEnsureMobileBottomNav(active){
     return;
   }
   document.body.classList.add('mz-has-bottom-nav');
-  // CSS crítico inline por si mobile.css no carga
   if(!document.getElementById('mz-bottom-critical-css')){
-    var st=document.createElement('style');
-    st.id='mz-bottom-critical-css';
-    st.textContent=[
+    var st = document.createElement('style');
+    st.id = 'mz-bottom-critical-css';
+    st.textContent = [
       '@media (max-width:900px){',
       'header nav{display:none!important}',
-      'header#top,header{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:8px!important;min-height:56px!important;height:auto!important;padding:8px 10px!important}',
-      'header #sf{flex:1;min-width:0;margin:0}',
-      'header #q,header #q:focus{width:100%;font-size:16px}',
-      '.page,.det,.player-page{padding-top:70px!important;padding-bottom:80px!important}',
-      '#mz-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:flex;flex-direction:row;align-items:stretch;overflow-x:auto;-webkit-overflow-scrolling:touch;height:calc(62px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:rgba(12,8,20,.98);border-top:1px solid #2a1f3d;scrollbar-width:none}',
-      '#mz-bottom-nav::-webkit-scrollbar{display:none}',
-      '#mz-bottom-nav a{flex:1 0 auto;min-width:64px;max-width:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 8px;color:#9a8fb0;font-size:.58rem;font-weight:600;text-decoration:none}',
-      '#mz-bottom-nav a .ico{font-size:1.15rem;line-height:1}',
-      '#mz-bottom-nav a.on{color:#fff}',
-      '#mz-bottom-nav a.on .ico{color:#a66bff}',
+      'body.mz-has-bottom-nav{padding-bottom:calc(58px + env(safe-area-inset-bottom,0px))}',
+      '#mz-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;justify-content:space-around;align-items:stretch;padding:0 0 env(safe-area-inset-bottom,0px);background:rgba(10,6,17,.98);border-top:1px solid #2a1f3d}',
+      '#mz-bottom-nav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:9px 2px 7px;min-height:54px;color:#9a8fb0;font-size:.64rem;font-weight:600;text-decoration:none}',
+      '#mz-bottom-nav a svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}',
+      '#mz-bottom-nav a.on{color:#a66bff;box-shadow:inset 0 2px 0 #a66bff}',
       '}',
       '@media (min-width:901px){#mz-bottom-nav{display:none!important}header nav{display:flex!important}}'
     ].join('');
     document.head.appendChild(st);
   }
   if(!bar){
-    bar=document.createElement('nav');
-    bar.id='mz-bottom-nav';
-    bar.setAttribute('aria-label','Secciones');
+    bar = document.createElement('nav');
+    bar.id = 'mz-bottom-nav';
+    bar.setAttribute('aria-label', 'Secciones');
     document.body.appendChild(bar);
   }
-  var items=[
-    {id:'inicio',href:appLink('/'),ico:'⌂',lbl:'Inicio'},
-    {id:'peliculas',href:appLink('/peliculas'),ico:'🎬',lbl:'Películas'},
-    {id:'series',href:appLink('/series'),ico:'📺',lbl:'Series'},
-    {id:'anime',href:appLink('/anime'),ico:'✦',lbl:'Anime'},
-    {id:'jk',href:appLink('/jk'),ico:'JK',lbl:'JK'},
-    {id:'favoritos',href:appLink('/favoritos'),ico:'♥',lbl:'Favoritos'},
-    {id:'historial',href:appLink('/historial'),ico:'◷',lbl:'Historial'}
+  var I = {
+    inicio: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>',
+    peliculas: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>',
+    series: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+    anime: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5l-5.4 3 1.2-6L3.3 9.3l6.1-.7z"/></svg>',
+    favoritos: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z"/></svg>',
+    historial: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+  };
+  var items = [
+    { id: 'inicio', href: appLink('/'), label: 'Inicio' },
+    { id: 'peliculas', href: appLink('/peliculas'), label: 'Películas' },
+    { id: 'series', href: appLink('/series'), label: 'Series' },
+    { id: 'anime', href: appLink('/anime'), label: 'Anime' },
+    { id: 'favoritos', href: appLink('/favoritos'), label: 'Favoritos' },
+    { id: 'historial', href: appLink('/historial'), label: 'Historial' }
   ];
-  bar.innerHTML=items.map(function(it){
-    return '<a data-section="'+it.id+'" href="'+it.href+'"><span class="ico">'+it.ico+'</span><span class="lbl">'+it.lbl+'</span></a>';
+  bar.innerHTML = items.map(function (it) {
+    return '<a data-section="' + it.id + '" href="' + it.href + '">' + I[it.id] + '<span>' + it.label + '</span></a>';
   }).join('');
-  if(active){
-    bar.querySelectorAll('a').forEach(function(a){
-      a.classList.toggle('on', a.getAttribute('data-section')===active);
+  if (active) {
+    bar.querySelectorAll('a').forEach(function (a) {
+      a.classList.toggle('on', a.getAttribute('data-section') === active);
     });
   }
 }
+
 
 function keyPage(){const v=$('#view');v.innerHTML=`<section class="page" style="max-width:520px;margin:auto"><h1>Conecta TMDB</h1><p style="color:var(--mute);line-height:1.6;margin-bottom:16px">Necesitas una API key v3 de <a style="color:var(--ac)" href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org/settings/api</a>. Se guarda solo en este navegador.</p><form id="kf" style="display:flex;gap:8px"><input id="kv" style="flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px" placeholder="API key v3"><button class="btn">Guardar</button></form></section>`;$('#kf').onsubmit=e=>{e.preventDefault();const v=$('#kv').value.trim();if(v){KEY=v;store.set('mz_key',v);location.reload()}}}
 
