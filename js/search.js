@@ -12,7 +12,25 @@
     const r = await fetch(base + '/?q=' + encodeURIComponent(q), { headers: { Accept: 'application/json' } });
     if (!r.ok) throw new Error('Worker HTTP ' + r.status);
     const data = await r.json();
-    const items = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : [];
+    let items = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : [];
+
+    // Enriquecer con id TMDB → mismo detalle que el catálogo (id=108978, etc.)
+    if (typeof resolveTmdbIdForTitle === 'function' && KEY) {
+      items = await Promise.all(
+        items.map(async function (it) {
+          try {
+            const tipo = String(it.type || it.tipo || '').toLowerCase();
+            const isTv = /serie|tv|anime|dorama/.test(tipo);
+            const title = it.title || it.titulo || '';
+            const year = it.year || '';
+            const tid = await resolveTmdbIdForTitle(title, isTv ? 'tv' : 'movie', year);
+            if (tid) it.tmdb_id = tid;
+          } catch (_) {}
+          return it;
+        })
+      );
+    }
+
     $('#view').innerHTML =
       '<section class="page"><h1>Resultados para “' + esc(q) + '”</h1>' +
       (items.length ? '<div class="grid">' + items.map(workerCard).join('') + '</div>' : '<div class="empty">No se encontraron resultados.</div>') +

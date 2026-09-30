@@ -224,12 +224,33 @@ async function loadDetail(type) {
     var params = new URL(location.href).searchParams;
     var id = params.get('id');
     var slug = params.get('slug');
+    var sourceIdParam = params.get('source_id') || params.get('source') || null;
 
-    // Buscador / worker: solo slug → detalle del worker (NO saltar al ep. 1)
+    // Solo slug: intentar resolver id TMDB y usar la misma UI que /detalle-serie?id=…
     if (!id && slug) {
+      var titleHint = params.get('title') || String(slug).replace(/-/g, ' ');
+      var yearHint = params.get('year') || '';
+      if (KEY && typeof resolveTmdbIdForTitle === 'function') {
+        try {
+          var tid = await resolveTmdbIdForTitle(titleHint, type, yearHint);
+          if (tid) {
+            var dest = pageHref(
+              type === 'tv' ? 'detalle-serie.html' : 'detalle-pelicula.html',
+              {
+                id: tid,
+                slug: slug,
+                source_id: sourceIdParam || undefined
+              }
+            );
+            location.replace(dest);
+            return;
+          }
+        } catch (_) {}
+      }
+      // Sin TMDB key o sin match → detalle worker
       return await loadDetailFromWorker(type, {
         slug: slug,
-        source_id: params.get('source_id') || params.get('source'),
+        source_id: sourceIdParam,
         title: params.get('title'),
         portada: params.get('portada')
       });
@@ -258,9 +279,20 @@ async function loadDetail(type) {
     var hasTrailer = (x.videos && x.videos.results || []).some(function (v) { return v.site === 'YouTube'; });
 
     var hit = null;
-    try {
-      hit = await resolveWorkerHit(it.title, type);
-    } catch (_) {}
+    // Si venimos del buscador, ya traemos slug/source_id del worker
+    if (slug) {
+      hit = {
+        slug: slug,
+        source_id: sourceIdParam,
+        source: sourceIdParam,
+        title: it.title
+      };
+    }
+    if (!hit || !hit.slug) {
+      try {
+        hit = await resolveWorkerHit(it.title, type);
+      } catch (_) {}
+    }
 
     var playMovieHref = workerPlayHref(hit, 'movie', id);
     var playTvHref = workerPlayHref(hit, 'tv', id, 1, 1);

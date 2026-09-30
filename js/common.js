@@ -48,6 +48,32 @@ async function tmdb(path,params={}){if(!KEY)return keyPage();const u=new URL(API
 function slugify(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' y ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
 function detailLink(it){return appLink(`/${it.type==='movie'?'pelicula':'serie'}/${it.id}`)}
 function card(it){return `<a class="card" href="${detailLink(it)}"><div class="im">${it.poster?`<img loading="lazy" src="${IMG}w342${it.poster}" alt="">`:''}</div>${it.rating?`<span class="badge">★ ${it.rating.toFixed(1)}</span>`:''}<b>${esc(it.title)}</b><small>${it.year||''}</small></a>`}
+async function resolveTmdbIdForTitle(title, type, year) {
+  if (!KEY || !title) return null;
+  try {
+    const path = type === 'tv' ? '/search/tv' : '/search/movie';
+    const params = { query: title };
+    if (year) {
+      if (type === 'tv') params.first_air_date_year = year;
+      else params.year = year;
+    }
+    const r = await tmdb(path, params);
+    const results = (r && r.results) || [];
+    if (!results.length) return null;
+    const y = year ? String(year).slice(0, 4) : '';
+    if (y) {
+      const hit = results.find(function (x) {
+        const d = (x.first_air_date || x.release_date || '').slice(0, 4);
+        return d === y;
+      });
+      if (hit) return hit.id;
+    }
+    return results[0].id;
+  } catch (_) {
+    return null;
+  }
+}
+
 function workerCard(it){
   const tipo=String(it.type||it.tipo||'').toLowerCase();
   const isTv=/serie|tv|anime|dorama/.test(tipo);
@@ -58,10 +84,15 @@ function workerCard(it){
   const img=it.portada||it.poster||'';
   const year=it.year||'';
   const src=it.source||it.fuente||'';
-  // Buscador → DETALLE (no al episodio 1)
+  // Preferir id TMDB (misma UI que catálogo); slug+source para el worker
+  const tmdbId=it.tmdb_id||it.tmdbId||it.id||null;
   const href=isTv
-    ? pageHref('detalle-serie.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined})
-    : pageHref('detalle-pelicula.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined});
+    ? (tmdbId
+        ? pageHref('detalle-serie.html',{id:tmdbId,slug,source_id:sid||undefined})
+        : pageHref('detalle-serie.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined}))
+    : (tmdbId
+        ? pageHref('detalle-pelicula.html',{id:tmdbId,slug,source_id:sid||undefined})
+        : pageHref('detalle-pelicula.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined}));
   return `<a class="card" href="${href}"><div class="im">${img?`<img loading="lazy" src="${esc(img)}" alt="">`:''}</div>${src?`<span class="badge">${esc(src)}</span>`:''}<b>${esc(title)}</b><small>${esc(year)}${isTv?' · Serie':' · Película'}</small></a>`;
 }
 function rowHtml(t,items){return items?.length?`<section class="row"><h2>${esc(t)}</h2><div class="track">${items.map(card).join('')}</div></section>`:''}
