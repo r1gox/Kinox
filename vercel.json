@@ -1,8 +1,8 @@
 {
-  "version": 2,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/", "destination": "/index.html" },
     { "source": "/peliculas", "destination": "/pages/peliculas.html" },
     { "source": "/series", "destination": "/pages/series.html" },
     { "source": "/anime", "destination": "/pages/anime.html" },
