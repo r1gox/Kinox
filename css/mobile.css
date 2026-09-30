@@ -1,172 +1,105 @@
 /**
- * Kinox móvil — header reordenado por mobile-ui.js
- * .mz-m-header > .mz-m-top (logo buscar perfil) + nav (secciones)
+ * Kinox móvil — extras (barra inferior, grids).
+ * El header de secciones lo arregla styles.css @media 700px con flex+order.
  */
 @media (max-width: 900px) {
   :root {
     --mz-bottom-h: 58px;
-    --mz-header-h: 96px;
   }
 
   body.mz-has-bottom-nav {
     padding-bottom: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px));
   }
 
-  header.mz-m-header,
-  header#top.mz-m-header {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 50 !important;
+  /* Refuerzo: secciones siempre visibles arriba */
+  header {
     display: flex !important;
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 0 !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 6px 8px !important;
     min-height: 0 !important;
     height: auto !important;
-    max-height: none !important;
-    padding: 0 !important;
-    padding-top: env(safe-area-inset-top, 0px) !important;
+    padding: 8px 12px !important;
+    padding-top: max(8px, env(safe-area-inset-top, 0px)) !important;
     background: rgba(10, 6, 17, 0.98) !important;
-    border-bottom: 1px solid var(--line, #2a1f3d) !important;
-    grid-template-columns: none !important;
-    grid-template-rows: none !important;
   }
-
-  header.mz-m-header .mz-m-top {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    gap: 8px !important;
-    padding: 8px 10px 4px !important;
-    min-height: 48px !important;
-  }
-
-  header.mz-m-header .mz-m-top .logo {
+  header .logo {
+    order: 1 !important;
     flex: 0 0 auto !important;
-    font-size: 1.12rem !important;
   }
-
-  header.mz-m-header .mz-m-top #sf {
+  header #sf {
+    order: 2 !important;
     flex: 1 1 auto !important;
     min-width: 0 !important;
     margin: 0 !important;
     width: auto !important;
   }
-
-  header.mz-m-header .mz-m-top #q,
-  header.mz-m-header .mz-m-top #q:focus {
+  header #q,
+  header #q:focus {
     width: 100% !important;
     max-width: none !important;
     height: 36px !important;
     font-size: 16px !important;
-    box-sizing: border-box !important;
   }
-
-  header.mz-m-header .mz-m-top #prof {
+  header #prof {
+    order: 3 !important;
     flex: 0 0 auto !important;
-    width: 34px !important;
-    height: 34px !important;
   }
-
-  /* Secciones: fila completa, scroll horizontal */
-  header.mz-m-header > nav {
+  header nav {
+    order: 4 !important;
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    align-items: center !important;
+    flex: 1 0 100% !important;
     width: 100% !important;
-    min-height: 40px !important;
-    height: 40px !important;
-    padding: 0 6px 6px !important;
-    margin: 0 !important;
-    gap: 2px !important;
+    min-height: 38px !important;
+    height: auto !important;
+    max-height: none !important;
     overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch !important;
+    gap: 2px !important;
     scrollbar-width: none !important;
-    background: transparent !important;
   }
-  header.mz-m-header > nav::-webkit-scrollbar {
+  header nav::-webkit-scrollbar {
     display: none !important;
   }
-  header.mz-m-header > nav a {
+  header nav a {
     display: inline-flex !important;
     flex: 0 0 auto !important;
-    align-items: center !important;
     padding: 8px 12px !important;
     font-size: 0.8rem !important;
-    font-weight: 600 !important;
-    border-radius: 8px !important;
     color: #c4b8d9 !important;
     white-space: nowrap !important;
   }
-  header.mz-m-header > nav a.on {
+  header nav a.on {
     color: #fff !important;
     background: rgba(166, 107, 255, 0.2) !important;
   }
-
-  /* Contenido bajo header (~96px) */
-  .page {
-    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 6px) !important;
-    padding-left: 12px !important;
-    padding-right: 12px !important;
-  }
-  .det,
-  .player-page {
-    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 6px) !important;
-    padding-left: 12px !important;
-    padding-right: 12px !important;
-  }
-  .hero {
-    min-height: 56vh !important;
-    padding: 0 12px 28px !important;
-    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px)) !important;
-  }
-  .hero h1 { font-size: 1.55rem !important; }
-  .hero p { font-size: 0.84rem !important; }
-
-  .row { padding: 12px 12px 0 !important; }
-  .track { grid-auto-columns: 110px !important; gap: 10px !important; }
-  .track .card { width: 110px !important; }
 
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 12px 8px !important;
   }
 
-  .filters {
-    display: grid !important;
-    grid-template-columns: 1fr 1fr !important;
-    gap: 8px !important;
-  }
-  .filters select { width: 100% !important; min-width: 0 !important; }
-
-  .dw { flex-direction: column !important; gap: 14px !important; }
-  .pos { width: min(170px, 40vw) !important; margin: 0 auto !important; }
-  .info h1 { font-size: 1.4rem !important; text-align: center !important; }
-  .btns { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
-  .btns .btn { width: 100% !important; min-width: 0 !important; }
-
   .server-list {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px !important;
   }
-  .server-btn { width: 100% !important; }
 
-  .mz-cal-card { flex-basis: 128px !important; }
-  .mz-anime-search { flex-direction: column !important; max-width: none !important; }
-  .mz-anime-search .btn { width: 100% !important; }
-
-  footer { padding: 20px 12px 8px !important; font-size: 0.7rem !important; }
+  .mz-cal-card {
+    flex-basis: 128px !important;
+  }
+  .mz-anime-search {
+    flex-direction: column !important;
+  }
+  .mz-anime-search .btn {
+    width: 100% !important;
+  }
 
   .mz-bottom-nav {
     position: fixed;
-    left: 0; right: 0; bottom: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 80;
     display: flex;
     height: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px));
@@ -190,9 +123,15 @@
     font-weight: 600;
     text-decoration: none;
   }
-  .mz-bottom-nav a .ico { font-size: 1.1rem; }
-  .mz-bottom-nav a.on { color: #fff; }
-  .mz-bottom-nav a.on .ico { color: var(--ac, #a66bff); }
+  .mz-bottom-nav a .ico {
+    font-size: 1.1rem;
+  }
+  .mz-bottom-nav a.on {
+    color: #fff;
+  }
+  .mz-bottom-nav a.on .ico {
+    color: var(--ac, #a66bff);
+  }
   .mz-bottom-nav a .lbl {
     max-width: 100%;
     overflow: hidden;
@@ -202,10 +141,13 @@
 }
 
 @media (min-width: 901px) {
-  .mz-bottom-nav { display: none !important; }
-  .mz-m-top { display: contents !important; }
+  .mz-bottom-nav {
+    display: none !important;
+  }
 }
 
 @media (max-width: 390px) {
-  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
 }
