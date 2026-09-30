@@ -1,39 +1,43 @@
 /**
- * Solo MÓVIL (≤900px). PC no se toca: menú de secciones sigue arriba.
- * Móvil: secciones en barra INFERIOR.
+ * Interfaz móvil estilo MovieZone (attachment) — datos Kinox.
+ * Solo ≤900px. PC no se toca.
  */
 @media (max-width: 900px) {
   :root {
+    --cw: 112px;
     --mz-header-h: 56px;
-    --mz-bottom-h: 62px;
+    --mz-bottom-h: 58px;
   }
 
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
   body.mz-has-bottom-nav {
     padding-bottom: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px)) !important;
   }
 
-  /* Header compacto: logo + buscar + perfil */
+  /* Header: logo + buscar + perfil */
   header#top,
   header {
     position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 50 !important;
+    inset: 0 0 auto !important;
+    z-index: 40 !important;
     display: flex !important;
     flex-wrap: nowrap !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 10px !important;
     min-height: var(--mz-header-h) !important;
-    height: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px)) !important;
-    padding: 0 10px !important;
-    padding-top: env(safe-area-inset-top, 0px) !important;
-    box-sizing: border-box !important;
-    background: rgba(10, 6, 17, 0.98) !important;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 4vw 10px !important;
+    background: rgba(10, 6, 17, 0.94) !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
   }
   header .logo {
+    font-size: 1.2rem !important;
     flex: 0 0 auto !important;
-    font-size: 1.12rem !important;
+  }
+  header nav {
+    display: none !important; /* secciones abajo */
   }
   header #sf {
     flex: 1 1 auto !important;
@@ -43,126 +47,245 @@
   header #q,
   header #q:focus {
     width: 100% !important;
-    height: 36px !important;
     font-size: 16px !important;
+    padding: 10px 16px !important;
+    border-radius: 999px !important;
   }
   header #prof {
-    flex: 0 0 auto !important;
-    width: 34px !important;
-    height: 34px !important;
-  }
-  /* Secciones del header ocultas: van ABAJO */
-  header nav {
-    display: none !important;
+    width: 38px !important;
+    height: 38px !important;
+    flex: none !important;
   }
 
-  /* Quitar barra superior de secciones si quedó de versiones viejas */
-  #mz-sec-bar,
-  .mz-sec-bar {
-    display: none !important;
-  }
-
-  .page,
-  .det,
-  .player-page {
-    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 12px) !important;
-    padding-bottom: 16px !important;
-    padding-left: 12px !important;
-    padding-right: 12px !important;
-  }
-  .hero {
-    min-height: 54vh !important;
-    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 4px) !important;
-  }
-
-  .grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 12px 8px !important;
-  }
-
-  /* ===== BARRA INFERIOR = cambiar de sección ===== */
-  #mz-bottom-nav.mz-bottom-nav,
-  .mz-bottom-nav {
+  /* Barra inferior con iconos (como attachment) */
+  #mz-bottom-nav {
     position: fixed !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    z-index: 90 !important;
+    inset: auto 0 0 !important;
+    z-index: 50 !important;
     display: flex !important;
     flex-direction: row !important;
-    flex-wrap: nowrap !important;
     align-items: stretch !important;
-    justify-content: flex-start !important;
+    justify-content: space-around !important;
     gap: 0 !important;
-    height: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px)) !important;
-    min-height: var(--mz-bottom-h) !important;
-    padding: 0 2px env(safe-area-inset-bottom, 0px) !important;
-    margin: 0 !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch !important;
+    height: auto !important;
+    min-height: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 0 0 env(safe-area-inset-bottom, 0px) !important;
+    background: rgba(10, 6, 17, 0.98) !important;
+    border-top: 1px solid var(--line, #2a1f3d) !important;
+    overflow: visible !important;
     scrollbar-width: none !important;
-    background: rgba(12, 8, 20, 0.98) !important;
-    border-top: 1px solid #2a1f3d !important;
-    backdrop-filter: blur(14px) !important;
-    -webkit-backdrop-filter: blur(14px) !important;
   }
-  .mz-bottom-nav::-webkit-scrollbar {
+  #mz-bottom-nav::-webkit-scrollbar {
     display: none !important;
   }
-  .mz-bottom-nav a {
-    flex: 1 0 auto !important;
+  #mz-bottom-nav a {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 2px !important;
-    min-width: 64px !important;
-    max-width: 88px !important;
-    padding: 6px 8px !important;
-    color: #9a8fb0 !important;
-    font-size: 0.58rem !important;
+    gap: 3px !important;
+    text-align: center !important;
+    font-size: 0.64rem !important;
     font-weight: 600 !important;
+    padding: 9px 2px 7px !important;
+    min-height: 54px !important;
+    color: var(--mute, #9a8fb0) !important;
     text-decoration: none !important;
-    -webkit-tap-highlight-color: transparent !important;
+    border-radius: 0 !important;
   }
-  .mz-bottom-nav a .ico {
-    font-size: 1.15rem !important;
-    line-height: 1 !important;
+  #mz-bottom-nav a svg {
+    display: block !important;
+    width: 22px !important;
+    height: 22px !important;
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 1.8 !important;
+    stroke-linecap: round !important;
+    stroke-linejoin: round !important;
   }
-  .mz-bottom-nav a.on {
-    color: #ffffff !important;
+  #mz-bottom-nav a .ico {
+    display: none !important; /* usamos SVG */
   }
-  .mz-bottom-nav a.on .ico {
-    color: #a66bff !important;
+  #mz-bottom-nav a.on {
+    color: var(--ac, #a66bff) !important;
+    box-shadow: inset 0 2px 0 var(--ac, #a66bff) !important;
   }
-  .mz-bottom-nav a .lbl {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-}
 
-/* PC: sin barra inferior ni sec-bar */
-@media (min-width: 901px) {
-  #mz-bottom-nav,
-  .mz-bottom-nav,
-  #mz-sec-bar,
-  .mz-sec-bar {
-    display: none !important;
+  footer {
+    padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
   }
-  header nav {
+
+  /* Catálogo / páginas */
+  .page {
+    padding: calc(76px + env(safe-area-inset-top)) 4vw 20px !important;
+  }
+  .page h1 {
+    font-size: 1.5rem !important;
+  }
+  .grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 16px 10px !important;
+    justify-content: stretch !important;
+  }
+  .grid .card {
+    width: auto !important;
+  }
+  .filters {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+    margin: 0 -4vw 18px !important;
+    padding: 0 4vw !important;
+  }
+  .filters select {
+    flex: 0 0 auto !important;
+    font-size: 16px !important;
+    min-height: 44px !important;
+  }
+
+  /* Rows / tracks */
+  .row {
+    padding-top: 18px !important;
+  }
+  .row h2 {
+    font-size: 1.05rem !important;
+  }
+  .track {
+    margin: 0 -4vw !important;
+    padding: 0 4vw 10px !important;
+    scroll-snap-type: x proximity !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .track .card {
+    scroll-snap-align: start !important;
+    width: var(--cw) !important;
+    flex: 0 0 var(--cw) !important;
+  }
+
+  /* Hero inicio */
+  .hero {
+    min-height: 74dvh !important;
+    padding: 0 4vw 5vh !important;
+    background-position: center top !important;
+  }
+  .hero:after {
+    background: linear-gradient(
+      0deg,
+      var(--bg) 8%,
+      rgba(10, 6, 17, 0.55) 50%,
+      rgba(10, 6, 17, 0.1)
+    ) !important;
+  }
+  .hero > div {
+    max-width: none !important;
+    width: 100% !important;
+  }
+  .hero h1 {
+    font-size: 2rem !important;
+  }
+  .hero .btn,
+  .btns .btn {
+    flex: 1 !important;
+    text-align: center !important;
+    min-height: 46px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* Detalle */
+  .det {
+    padding-top: calc(72px + env(safe-area-inset-top)) !important;
+    padding-left: 4vw !important;
+    padding-right: 4vw !important;
+  }
+  .bd {
+    opacity: 0.5 !important;
+    height: 55vh !important;
+  }
+  .dw {
+    gap: 16px !important;
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+  .pos {
+    width: 150px !important;
+    align-self: center !important;
+  }
+  .info {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+  .info h1 {
+    text-align: center !important;
+    font-size: 1.6rem !important;
+  }
+  .info .meta,
+  .tags {
+    justify-content: center !important;
+    text-align: center !important;
+  }
+  .tags {
     display: flex !important;
   }
+  .btns {
+    justify-content: center !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+  }
+  .btns .btn {
+    flex: 1 1 40% !important;
+    min-height: 46px !important;
+  }
+  .det-back,
+  .back {
+    min-height: 40px !important;
+  }
+  .seasons {
+    padding: 10px 4vw !important;
+  }
+  .seasons select {
+    font-size: 16px !important;
+    min-height: 44px !important;
+    width: 100% !important;
+  }
+  .ep {
+    gap: 10px !important;
+  }
+  .ep img,
+  .ep .ph {
+    width: 112px !important;
+  }
+  .ep small {
+    font-size: 0.75rem !important;
+  }
+
+  /* Player */
+  .player-page {
+    padding-top: calc(70px + env(safe-area-inset-top)) !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+  }
 }
 
-@media (max-width: 390px) {
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+@media (max-width: 360px) {
+  :root {
+    --cw: 104px;
   }
-  .mz-bottom-nav a {
-    min-width: 56px !important;
-    font-size: 0.55rem !important;
+  .grid {
+    gap: 14px 8px !important;
+  }
+  .hero h1 {
+    font-size: 1.7rem !important;
+  }
+}
+
+@media (hover: none) {
+  .card:hover img {
+    transform: none !important;
   }
 }
