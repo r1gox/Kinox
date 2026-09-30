@@ -37,7 +37,60 @@ main{flex:1;width:100%;min-width:0}footer{color:var(--mute);font-size:.78rem;tex
 
 /* DETAILS */
 .det{position:relative;width:min(var(--max),100%);margin:0 auto;padding:105px max(18px,4vw) 30px}.bd{position:absolute;inset:0 0 auto;height:70vh;background-size:cover;background-position:center 20%;opacity:.32;z-index:-1}.bd:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent,var(--bg) 90%)}.dw{display:flex;gap:32px;flex-wrap:wrap}.pos{width:260px;aspect-ratio:2/3;object-fit:cover;border-radius:12px;align-self:flex-start;background:var(--panel)}.info{flex:1;min-width:280px;max-width:760px}.info h1{font-size:clamp(1.8rem,4vw,2.8rem);letter-spacing:-.04em;line-height:1.08}.meta{color:var(--mute);margin:8px 0 12px}.r{color:#ffd166;font-weight:600}.tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.tags span{border:1px solid var(--line);border-radius:999px;padding:3px 12px;font-size:.8rem}.info h3{margin:22px 0 8px;font-size:1rem}.info p{line-height:1.7;color:#d8d0e6}.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.prov{display:flex;gap:8px;flex-wrap:wrap}.prov img{width:46px;height:46px;border-radius:10px}
-.ep{display:flex;gap:14px;padding:12px;border-bottom:1px solid var(--line);border-radius:8px;transition:.18s}.ep:hover{background:rgba(255,255,255,.025)}.ep img,.ep .ph{width:150px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:var(--panel);flex:none}.ep small{color:var(--mute);display:block;margin-top:4px;line-height:1.5}.seasons{padding:10px max(18px,4vw);max-width:980px;margin:0 auto}.seasons h2{margin-bottom:12px;font-size:1.15rem}
+.ep{display:flex;gap:14px;padding:12px;border-bottom:1px solid var(--line);border-radius:8px;transition:.18s}.ep:hover{background:rgba(255,255,255,.025)}.ep img,.ep .ph{width:150px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;background:var(--panel);flex:none}.ep small{color:var(--mute);display:block;margin-top:4px;line-height:1.5}.seasons{
+  padding:18px max(18px,4vw) 40px;
+  max-width:980px;
+  margin:0;
+  margin-right:auto;
+  text-align:left;
+}
+.seasons h2{
+  margin:0 0 14px;
+  font-size:1.2rem;
+  font-weight:800;
+  color:#f1f5f9;
+  text-align:left;
+  letter-spacing:0.01em;
+}
+.seasons select,
+.seasons #sel{
+  display:block;
+  width:100%;
+  max-width:360px;
+  margin:0 0 18px;
+  padding:12px 40px 12px 14px;
+  border-radius:12px;
+  border:1px solid rgba(139,92,246,0.45);
+  background:#1e1b2e url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23a78bfa' d='M1 1l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 14px center;
+  color:#f8fafc;
+  font-weight:700;
+  font-size:0.95rem;
+  appearance:none;
+  -webkit-appearance:none;
+  cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,0.25);
+}
+.seasons select:hover,
+.seasons #sel:hover{
+  border-color:#a78bfa;
+  background-color:#2a2540;
+}
+.seasons select:focus,
+.seasons #sel:focus{
+  outline:none;
+  border-color:#8b5cf6;
+  box-shadow:0 0 0 3px rgba(139,92,246,0.25);
+}
+.seasons select option,
+.seasons #sel option{
+  background:#1e1b2e;
+  color:#f8fafc;
+  font-weight:600;
+  padding:10px;
+}
+.seasons #eps{
+  text-align:left;
+}
 
 /* PLAYER / TRAILER */
 .player-page{padding-top:90px;width:min(1200px,100%);margin:auto;padding-left:18px;padding-right:18px}.player-wrap{background:#000;border:1px solid var(--line);border-radius:12px;overflow:hidden}.player-wrap iframe{display:block;width:100%;aspect-ratio:16/9;border:0}.player-title{padding:15px 2px}.player-title h1{font-size:1.2rem}.pl{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px}.pl button{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 16px}.pl button.cur{border-color:var(--ac)}
