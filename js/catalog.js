@@ -1,8 +1,7 @@
 /**
  * Catálogo Películas / Series — estilo MovieZone
- * - Listado y búsqueda desde el worker (source 3 o 9)
- * - TMDB solo rellena meta si hay KEY (no bloquea ni define el catálogo)
- * - Anime sigue en anime.js (source 4)
+ * - Listado/búsqueda desde worker
+ * - TMDB rellena rating (y portada si falta) sin bloquear el listado
  */
 (function () {
   var WORKER =
@@ -60,15 +59,26 @@
     return "../pages/" + page + "?" + ps.toString();
   }
 
-  function cardWorker(item, kind) {
+  function ratingHtml(item) {
+    var r = item.rating_tmdb != null ? item.rating_tmdb : item.rating;
+    if (r == null || r === "" || isNaN(Number(r))) return "";
+    var n = Number(r);
+    if (n <= 0) return "";
+    return '<span class="r">★ ' + n.toFixed(1) + "</span>";
+  }
+
+  function cardWorker(item, kind, cardId) {
     var title = item.title || item.titulo || item.nombre || item.slug || "Sin título";
     var img = item.portada || item.poster || item.image || "";
     var year = item.year || item.anio || "";
     var tipo = item.type || item.tipo || (kind === "peliculas" ? "Película" : "Serie");
     var href = detailHref(item, kind);
     var sid = item.source_id || sourceId();
+    var idAttr = cardId ? ' data-card="' + esc(cardId) + '"' : "";
     return (
-      '<a class="card" href="' +
+      '<a class="card"' +
+      idAttr +
+      ' href="' +
       esc(href) +
       '">' +
       '<div class="im">' +
@@ -83,33 +93,87 @@
       "<small>" +
       esc(year) +
       (year ? " · " : "") +
+      ratingHtml(item) +
+      (ratingHtml(item) ? " · " : "") +
       esc(tipo) +
       "</small></a>"
     );
   }
 
+  /** Actualiza el ★ en el DOM cuando llega TMDB */
+  function patchCardRating(cardId, rating, posterUrl) {
+    var el = document.querySelector('[data-card="' + cardId + '"]');
+    if (!el) return;
+    if (rating != null && !isNaN(Number(rating)) && Number(rating) > 0) {
+      var small = el.querySelector("small");
+      if (small) {
+        var star = "★ " + Number(rating).toFixed(1);
+        if (small.innerHTML.indexOf("★") === -1) {
+          // insertar rating después del año si hay
+          var txt = small.textContent || "";
+          if (txt.indexOf("·") !== -1) {
+            small.innerHTML = small.innerHTML.replace(
+              " · ",
+              ' · <span class="r">' + star + "</span> · "
+            );
+          } else {
+            small.innerHTML =
+              '<span class="r">' + star + "</span> · " + small.innerHTML;
+          }
+        }
+      }
+    }
+    if (posterUrl) {
+      var img = el.querySelector("img");
+      if (img && (!img.getAttribute("src") || img.style.opacity === "0.25")) {
+        img.src = posterUrl;
+        img.style.opacity = "1";
+      }
+    }
+  }
+
+  var enrichCache = Object.create(null);
+
   function softEnrichTmdb(items, kind) {
     if (typeof KEY === "undefined" || !KEY) return;
     if (typeof tmdb !== "function") return;
     var type = kind === "peliculas" ? "movie" : "tv";
-    (items || []).slice(0, 8).forEach(function (it) {
+    var base = typeof IMG !== "undefined" ? IMG : "https://image.tmdb.org/t/p/";
+
+    (items || []).forEach(function (it, idx) {
       var title = it.title || it.titulo;
-      if (!title || it.portada) return;
-      tmdb("/search/" + type, { query: title, include_adult: false })
-        .then(function (res) {
-          var hit = (res.results || [])[0];
-          if (!hit || !hit.poster_path) return;
-          var base = typeof IMG !== "undefined" ? IMG : "https://image.tmdb.org/t/p/";
-          it.portada = base + "w342" + hit.poster_path;
-        })
-        .catch(function () {});
+      if (!title) return;
+      var cardId = it._cardId;
+      if (!cardId) return;
+
+      var cacheKey = type + ":" + title.toLowerCase();
+      if (enrichCache[cacheKey]) {
+        var hit = enrichCache[cacheKey];
+        it.rating_tmdb = hit.rating;
+        if (hit.poster && !it.portada) it.portada = hit.poster;
+        patchCardRating(cardId, hit.rating, hit.poster);
+        return;
+      }
+
+      // limitar concurrencia suave: delay por índice
+      setTimeout(function () {
+        tmdb("/search/" + type, { query: title, include_adult: false })
+          .then(function (res) {
+            var hit = (res.results || [])[0];
+            if (!hit) return;
+            var rating = hit.vote_average != null ? Number(hit.vote_average) : null;
+            var poster =
+              hit.poster_path ? base + "w342" + hit.poster_path : null;
+            enrichCache[cacheKey] = { rating: rating, poster: poster };
+            if (rating != null) it.rating_tmdb = rating;
+            if (poster && !it.portada) it.portada = poster;
+            patchCardRating(cardId, rating, !it.portada ? poster : null);
+          })
+          .catch(function () {});
+      }, Math.min(idx * 40, 400));
     });
   }
 
-  /**
-   * kind: 'peliculas' | 'series' | 'anime' | 'jk'
-   * anime/jk se delegan a anime.js si existe
-   */
   async function loadCatalog(kind) {
     try {
       if (kind === "anime" && typeof loadAnimePage === "function") {
@@ -121,7 +185,6 @@
         return;
       }
       if (kind === "jk") {
-        // JK tiene su propia página si existe
         if (typeof loadJkPage === "function") return loadJkPage();
         location.href = typeof appLink === "function" ? appLink("/jk") : "jk.html";
         return;
@@ -140,9 +203,9 @@
         "<h1>" +
         esc(label) +
         "</h1>" +
-        '<p class="mz-cat-sub" style="color:var(--mute);font-size:.9rem;margin:-8px 0 14px">Fuente worker · id ' +
+        '<p style="color:var(--mute);font-size:.9rem;margin:-8px 0 14px">Fuente worker · id ' +
         esc(sid) +
-        " · TMDB solo rellena datos</p>" +
+        " · ★ calificación TMDB</p>" +
         '<form id="mz-cat-sf" class="search-form" style="display:flex;gap:8px;margin-bottom:16px;max-width:520px">' +
         '<input id="mz-cat-q" type="search" placeholder="Buscar en ' +
         esc(label) +
@@ -155,8 +218,9 @@
       var page = 0;
       var busy = false;
       var done = false;
-      var mode = "catalog"; // catalog | search
+      var mode = "catalog";
       var searchQ = "";
+      var cardSeq = 0;
 
       async function next() {
         if (busy || done) return;
@@ -172,7 +236,6 @@
             data = await workerGet("/" + sid + "/" + pathKind + "?page=" + page);
           }
           var results = data.results || data.resultados || [];
-          // filtrar por tipo si la búsqueda mezcla
           if (mode === "search") {
             results = results.filter(function (r) {
               var t = String(r.type || r.tipo || "").toLowerCase();
@@ -191,15 +254,20 @@
             busy = false;
             return;
           }
+          results.forEach(function (it) {
+            cardSeq++;
+            it._cardId = "c" + cardSeq;
+          });
           if (grid)
             grid.insertAdjacentHTML(
               "beforeend",
-              results.map(function (it) {
-                return cardWorker(it, kind);
-              }).join("")
+              results
+                .map(function (it) {
+                  return cardWorker(it, kind, it._cardId);
+                })
+                .join("")
             );
           softEnrichTmdb(results, kind);
-          // si trajo menos de 12, probablemente fin
           if (results.length < 12) {
             done = true;
             if (sent) sent.textContent = "";
