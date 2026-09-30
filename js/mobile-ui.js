@@ -1,6 +1,6 @@
 /**
- * Kinox mobile UI — reordena el header para que las secciones se vean
- * Solo viewport ≤ 900px. PC no se toca.
+ * Kinox mobile — barra inferior + carga mobile.css
+ * El menú superior lo arregla CSS (flex + order). No reordena el DOM.
  */
 (function () {
   var MQ = window.matchMedia("(max-width: 900px)");
@@ -11,16 +11,16 @@
       for (var i = 0; i < scripts.length; i++) {
         var src = scripts[i].src || "";
         if (/common\.js|mobile-ui\.js/i.test(src)) {
-          return src.replace(/\/js\/[^/?]+(\?.*)?$/i, "/css/mobile.css");
+          return src.replace(/\/js\/[^/?]+(\?.*)?$/i, "/css/mobile.css") + "?v=4";
         }
       }
     } catch (_) {}
-    if (location.pathname.indexOf("/pages/") !== -1) return "../css/mobile.css";
-    return "css/mobile.css";
+    if (location.pathname.indexOf("/pages/") !== -1) return "../css/mobile.css?v=4";
+    return "css/mobile.css?v=4";
   }
 
   function ensureCss() {
-    var href = cssHref() + (hrefHasBust() ? "" : "?v=3");
+    var href = cssHref();
     var link = document.getElementById("mz-mobile-css");
     if (!link) {
       link = document.createElement("link");
@@ -28,11 +28,7 @@
       link.rel = "stylesheet";
       document.head.appendChild(link);
     }
-    if (link.getAttribute("href") !== href) link.href = href;
-  }
-
-  function hrefHasBust() {
-    return false;
+    link.href = href;
   }
 
   function linkTo(path) {
@@ -60,67 +56,6 @@
     )
       return "";
     return "inicio";
-  }
-
-  /**
-   * Reordena #top:
-   *   [ .mz-m-top: logo | buscar | perfil ]
-   *   [ nav: Inicio Películas Series … ]
-   * En PC se deshace y queda el orden original.
-   */
-  function layoutHeader() {
-    var header = document.getElementById("top") || document.querySelector("header");
-    if (!header) return;
-
-    var logo = header.querySelector(".logo");
-    var nav = header.querySelector("nav");
-    var sf = header.querySelector("#sf");
-    var prof = header.querySelector("#prof");
-
-    if (!MQ.matches) {
-      // Restaurar orden PC: logo, nav, sf, prof
-      var wrap = header.querySelector(".mz-m-top");
-      if (wrap) {
-        while (wrap.firstChild) header.insertBefore(wrap.firstChild, wrap);
-        wrap.remove();
-      }
-      if (logo) header.appendChild(logo);
-      if (nav) header.appendChild(nav);
-      if (sf) header.appendChild(sf);
-      if (prof) header.appendChild(prof);
-      header.classList.remove("mz-m-header");
-      // limpiar estilos inline
-      header.removeAttribute("style");
-      if (nav) nav.removeAttribute("style");
-      return;
-    }
-
-    if (!logo || !nav || !sf || !prof) return;
-
-    header.classList.add("mz-m-header");
-
-    var topRow = header.querySelector(".mz-m-top");
-    if (!topRow) {
-      topRow = document.createElement("div");
-      topRow.className = "mz-m-top";
-      header.insertBefore(topRow, header.firstChild);
-    }
-
-    // Fila superior
-    topRow.appendChild(logo);
-    topRow.appendChild(sf);
-    topRow.appendChild(prof);
-    // Nav debajo del top row
-    if (nav.parentNode !== header || topRow.nextSibling !== nav) {
-      header.insertBefore(nav, topRow.nextSibling);
-    }
-
-    // Asegurar visibles
-    nav.style.display = "flex";
-    nav.style.visibility = "visible";
-    nav.style.opacity = "1";
-    nav.style.width = "100%";
-    nav.style.overflowX = "auto";
   }
 
   function ensureBottomNav() {
@@ -170,35 +105,19 @@
     nav.querySelectorAll("a").forEach(function (a) {
       a.classList.toggle("on", a.getAttribute("data-section") === sec);
     });
-    // también marca el nav superior
-    try {
-      var topNav = document.querySelector("header nav");
-      if (topNav) {
-        topNav.querySelectorAll("a").forEach(function (a) {
-          a.classList.toggle("on", a.getAttribute("data-section") === sec);
-        });
-      }
-    } catch (_) {}
   }
 
   function apply() {
     ensureCss();
-    layoutHeader();
     ensureBottomNav();
   }
 
-  function boot() {
-    apply();
-    // nav() de common puede correr justo antes; reaplicar
-    setTimeout(apply, 0);
-    setTimeout(apply, 100);
-  }
-
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
+    document.addEventListener("DOMContentLoaded", apply);
   } else {
-    boot();
+    apply();
   }
+  setTimeout(apply, 50);
 
   if (MQ.addEventListener) MQ.addEventListener("change", apply);
   else if (MQ.addListener) MQ.addListener(apply);
