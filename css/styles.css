@@ -93,7 +93,7 @@ main{flex:1;width:100%;min-width:0}footer{color:var(--mute);font-size:.78rem;tex
 }
 
 /* PLAYER / TRAILER */
-.player-page{padding-top:90px;width:min(1200px,100%);margin:auto;padding-left:18px;padding-right:18px}.player-wrap{background:#000;border:1px solid var(--line);border-radius:12px;overflow:hidden}.player-wrap iframe{display:block;width:100%;aspect-ratio:16/9;border:0}.player-title{padding:15px 2px}.player-title h1{font-size:1.2rem}.pl{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px}.pl button{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 16px}.pl button.cur{border-color:var(--ac)}
+.player-page{padding-top:110px;width:min(1200px,100%);margin:auto;padding-left:18px;padding-right:18px}.player-wrap{background:#000;border:1px solid var(--line);border-radius:12px;overflow:hidden}.player-wrap iframe{display:block;width:100%;aspect-ratio:16/9;border:0}.player-title{padding:15px 2px}.player-title h1{font-size:1.2rem}.pl{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px}.pl button{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 16px}.pl button.cur{border-color:var(--ac)}
 
 /* FORMS / PROFILE */
 .profile-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}.profile-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;text-align:center}.profile-card .avatar{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;margin:0 auto 10px;background:linear-gradient(135deg,var(--ac),var(--ac2));font-size:1.3rem;font-weight:800}.profile-card form{display:flex;gap:8px;margin-top:12px}.profile-card input{min-width:0;flex:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}.profile-card button{background:var(--ac);border-radius:8px;padding:8px 11px}.search-form{display:flex;gap:8px;margin-bottom:24px}.search-form input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px 13px;outline:none}.search-form button{background:var(--ac);border-radius:8px;padding:0 18px}
@@ -187,8 +187,17 @@ main{flex:1;width:100%;min-width:0}footer{color:var(--mute);font-size:.78rem;tex
   gap:16px;
   align-items:start;
   padding:0 4%;
-  margin-top:8px;
+  margin-top:18px;
   box-sizing:border-box;
+}
+.kx-ep-view .kx-topbar{
+  margin-bottom:10px;
+}
+.kx-ep-view .kx-stage{
+  margin-top:12px;
+}
+.kx-ep-side{
+  max-height:calc(100vh - 140px);
 }
 .kx-hero{min-width:0}
 .kx-player,.kx-ep-view .mz-player{
