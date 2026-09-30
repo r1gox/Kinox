@@ -246,7 +246,30 @@ async function fetchWorkerDetail(slug, type, sourceId) {
 }
 
 /** Detalle solo con slug del worker (buscador → detalle, no al ep. 1) */
+
+function mzSetDetailChrome(on) {
+  try {
+    document.body.classList.toggle('mz-on-detail', !!on);
+    var h = document.getElementById('top') || document.querySelector('header');
+    if (!on && h) h.classList.remove('mz-detail-scrolled');
+    if (on && !window.__mzDetailScrollBound) {
+      window.__mzDetailScrollBound = true;
+      window.addEventListener(
+        'scroll',
+        function () {
+          if (!document.body.classList.contains('mz-on-detail')) return;
+          var hd = document.getElementById('top') || document.querySelector('header');
+          if (!hd) return;
+          hd.classList.toggle('mz-detail-scrolled', window.scrollY > 40);
+        },
+        { passive: true }
+      );
+    }
+  } catch (_) {}
+}
+
 async function loadDetailFromWorker(type, params) {
+  mzSetDetailChrome(true);
   var slug = params.slug;
   var sourceId = params.source_id || params.source || null;
   var titleHint = params.title || slug.replace(/-/g, ' ');
@@ -494,6 +517,7 @@ if (type === 'tv' && temps.length) {
 }
 
 async function loadDetail(type) {
+  mzSetDetailChrome(true);
   try {
     var params = new URL(location.href).searchParams;
     var id = params.get('id');
