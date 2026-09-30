@@ -29,8 +29,15 @@
   }
 
   function serverLabel(p) {
-    var n = (p && (p.name || p.provider || p.servidor || p.server)) || "Servidor";
-    return String(n).replace(/\s*NO\s*ADS\s*/gi, "").trim() || "Servidor";
+    var url = String((p && (p.url || p.link)) || "").toLowerCase();
+    if (url.indexOf("uns.bio") !== -1 || url.indexOf("upnshare") !== -1) {
+      return "UPNShare";
+    }
+    var n =
+      (p && (p.name || p.provider || p.servidor || p.server)) || "Servidor";
+    n = String(n).replace(/\s*NO\s*ADS\s*/gi, "").trim() || "Servidor";
+    if (/^upn/i.test(n)) return "UPNShare";
+    return n;
   }
 
   function langLabel(p) {
@@ -524,12 +531,12 @@
         (epMeta && epMeta.__tmdb_season) ||
         (epMeta && epMeta.season_number) ||
         (isAnimeSourceId(sourceId) ? "1" : season);
-      // Formato compacto: T1E2 / T23E1180 + nombre del episodio
+      // Formato como en detalle: T23 E1179 — Nombre del episodio
       var epTitle =
         type === "tv"
           ? "T" +
             labelSea +
-            "E" +
+            " E" +
             episode +
             (epMeta && epMeta.name ? " — " + epMeta.name : "")
           : "Película";
@@ -736,8 +743,10 @@
             "</div>" +
             '<div class="kx-ep-info"><div class="kx-ep-name">' +
             "T" +
-            (e.season_number || (isAnimeSourceId(sourceId) ? "1" : season)) +
-            "E" +
+            (e.season_number ||
+              e.__tmdb_season ||
+              (isAnimeSourceId(sourceId) ? "1" : season)) +
+            " E" +
             n +
             " — " +
             esc(e.name || "Episodio " + n) +
@@ -935,15 +944,23 @@
           var px = list[ui];
           var lab = serverLabel(px).toLowerCase();
           var pr = String(
-            (px && (px.provider || px.servidor || px.server || px.name)) || ""
+            (px &&
+              (px.provider ||
+                px.servidor ||
+                px.server ||
+                px.name ||
+                px.servidor)) ||
+              ""
           ).toLowerCase();
-          var url = String((px && px.url) || "").toLowerCase();
+          var url = String((px && (px.url || px.link)) || "").toLowerCase();
           if (
             lab.indexOf("upnshare") !== -1 ||
+            lab === "upn" ||
             lab.indexOf("upn") !== -1 ||
             pr.indexOf("upnshare") !== -1 ||
             pr.indexOf("upn") !== -1 ||
             url.indexOf("uns.bio") !== -1 ||
+            url.indexOf("animeav1.uns") !== -1 ||
             url.indexOf("upnshare") !== -1
           ) {
             return px;
