@@ -376,7 +376,14 @@ async function loadDetailFromWorker(type, params) {
   }
 
 if (type === 'tv' && temps.length) {
-    var renderEps = function () {
+    var tmdbIdWorker = null;
+    if (KEY && typeof resolveTmdbIdForTitle === 'function') {
+      resolveTmdbIdForTitle(title, type, year).then(function (tid) {
+        tmdbIdWorker = tid;
+        renderEps();
+      }).catch(function () {});
+    }
+    var renderEps = async function () {
       var want = parseInt($('#sel').value, 10) || 1;
       var block =
         temps.find(function (t) {
@@ -384,14 +391,59 @@ if (type === 'tv' && temps.length) {
         }) || temps[0];
       var lista = (block && (block.lista || block.episodios)) || [];
       if (!Array.isArray(lista)) lista = [];
+      var tmdbByEp = {};
+      var tid = tmdbIdWorker;
+      if (!tid && KEY && typeof resolveTmdbIdForTitle === 'function') {
+        try {
+          tid = await resolveTmdbIdForTitle(title, type, year);
+          tmdbIdWorker = tid;
+        } catch (_) {}
+      }
+      if (tid && KEY && typeof tmdb === 'function') {
+        try {
+          var s = await tmdb('/tv/' + tid + '/season/' + want);
+          (s.episodes || []).forEach(function (ep) {
+            tmdbByEp[ep.episode_number] = ep;
+          });
+          var missing = (s.episodes || []).some(function (ep) {
+            return !ep.name || !ep.overview;
+          });
+          if (missing) {
+            try {
+              var sEn = await tmdb('/tv/' + tid + '/season/' + want, { language: 'en-US' });
+              (sEn.episodes || []).forEach(function (ep) {
+                var prev = tmdbByEp[ep.episode_number] || {};
+                tmdbByEp[ep.episode_number] = Object.assign({}, prev, {
+                  name: prev.name || ep.name,
+                  overview: prev.overview || ep.overview,
+                  still_path: prev.still_path || ep.still_path,
+                  runtime: prev.runtime || ep.runtime
+                });
+              });
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
       $('#eps').innerHTML = lista.length
         ? lista
             .map(function (e) {
               var en = e.episodio != null ? e.episodio : e.episode != null ? e.episode : e.episode_number;
               var sn = e.temporada != null ? e.temporada : want;
-              var name = e.titulo || e.name || e.title || 'Episodio ' + en;
-              var still = e.back_img || e.still || e.image || '';
-              var href = workerPlayHref(hit, 'tv', null, sn, en);
+              var tm = tmdbByEp[en] || {};
+              var name = e.titulo || e.name || e.title || tm.name || ('Episodio ' + en);
+              var overview = e.descripcion || e.overview || tm.overview || '';
+              var still =
+                e.back_img ||
+                e.still ||
+                e.image ||
+                (tm.still_path ? IMG + 'w300' + tm.still_path : '');
+              var href = workerPlayHref(
+                Object.assign({}, hit || {}, { source_id: (data && data.source_id) || sourceId }),
+                'tv',
+                tid || null,
+                sn,
+                en
+              );
               return (
                 '<a class="ep" href="' +
                 href +
@@ -405,13 +457,17 @@ if (type === 'tv' && temps.length) {
                 en +
                 ' — ' +
                 esc(name) +
-                '</b></div></a>'
+                '</b><small>' +
+                esc((overview || 'Sin sinopsis.').slice(0, 220)) +
+                '</small></div></a>'
               );
             })
             .join('')
         : '<p style="color:var(--mute)">Sin episodios en esta temporada.</p>';
     };
-    $('#sel').onchange = renderEps;
+    $('#sel').onchange = function () {
+      renderEps();
+    };
     renderEps();
   }
 }
@@ -595,8 +651,32 @@ async function loadDetail(type) {
 
     if (type === 'tv' && seasons.length) {
       var go = async function () {
-        var s = await tmdb('/tv/' + id + '/season/' + $('#sel').value);
-        $('#eps').innerHTML = (s.episodes || [])
+        var sn = $('#sel').value;
+        var s = await tmdb('/tv/' + id + '/season/' + sn);
+        var eps = s.episodes || [];
+        var needFill = eps.some(function (e) {
+          return !e.name || !e.overview;
+        });
+        if (needFill) {
+          try {
+            var sEn = await tmdb('/tv/' + id + '/season/' + sn, { language: 'en-US' });
+            var byN = {};
+            (sEn.episodes || []).forEach(function (e) {
+              byN[e.episode_number] = e;
+            });
+            eps = eps.map(function (e) {
+              var m = byN[e.episode_number];
+              if (!m) return e;
+              return Object.assign({}, e, {
+                name: e.name || m.name,
+                overview: e.overview || m.overview,
+                still_path: e.still_path || m.still_path,
+                runtime: e.runtime || m.runtime
+              });
+            });
+          } catch (_) {}
+        }
+        $('#eps').innerHTML = eps
           .map(function (e) {
             var href = workerPlayHref(hit, 'tv', id, e.season_number, e.episode_number);
             return (
@@ -611,7 +691,7 @@ async function loadDetail(type) {
               ' E' +
               e.episode_number +
               ' — ' +
-              esc(e.name) +
+              esc(e.name || ('Episodio ' + e.episode_number)) +
               '</b><small>' +
               esc((e.overview || 'Sin sinopsis.').slice(0, 220)) +
               '</small></div></a>'

@@ -428,19 +428,66 @@
     }
   }
 
+  /** Rellena nombre/sinopsis/still desde TMDB sin cambiar la lista del worker */
+  async function enrichEpsWithTmdb(eps, tvId, seasonNum) {
+    if (!eps || !eps.length || !tvId || typeof tmdb !== "function") return eps;
+    if (typeof KEY === "undefined" || !KEY) return eps;
+    try {
+      var tmdbList = await loadSeasonEpsFromTmdb(tvId, seasonNum);
+      if (!tmdbList.length) {
+        // fallback inglés si es-MX viene vacío
+        try {
+          var s = await tmdb("/tv/" + tvId + "/season/" + seasonNum, {
+            language: "en-US"
+          });
+          tmdbList = (s.episodes || []).map(function (e) {
+            return normalizeEp(e, seasonNum);
+          }).filter(Boolean);
+        } catch (_) {}
+      }
+      var byN = Object.create(null);
+      for (var i = 0; i < tmdbList.length; i++) {
+        if (tmdbList[i]) byN[tmdbList[i].episode_number] = tmdbList[i];
+      }
+      for (var j = 0; j < eps.length; j++) {
+        var ep = eps[j];
+        var m = byN[ep.episode_number];
+        if (!m) continue;
+        if (m.name && (!ep.name || /^Episodio\s*\d+/i.test(ep.name))) {
+          ep.name = m.name;
+        }
+        if (m.overview && !ep.overview) ep.overview = m.overview;
+        if (m.still_path && !ep.still_path) ep.still_path = m.still_path;
+        if (m.runtime && !ep.runtime) ep.runtime = m.runtime;
+        ep.season_number = parseInt(seasonNum, 10) || ep.season_number;
+        ep.__tmdb_season = ep.season_number;
+        ep.__playSeason = ep.season_number;
+      }
+    } catch (_) {}
+    return eps;
+  }
+
   async function loadSeasonEps(opts) {
     opts = opts || {};
-    var seasonNum = opts.season || "1";
+    var seasonNum = String(opts.season || "1");
     var anime = isAnimeSourceId(opts.sourceId);
-    // Anime fuente 4/5: NUNCA listar temporadas TMDB (T23 E1…); usar worker
+    // Anime multi-temporada (Wistoria T1/T2): respetar season de la URL.
+    // Anime largo flat (One Piece): loadSeasonEpsFromWorker usa totalEps>60 && temps<=1.
     var fromWorker = await loadSeasonEpsFromWorker(
       opts.slug,
-      anime ? "1" : seasonNum,
+      seasonNum,
       opts.sourceId,
       opts.currentEpisode || opts.episode
     );
-    if (fromWorker.length) return fromWorker;
-    if (anime) return []; // no caer a TMDB para animeav1/jk
+    if (fromWorker.length) {
+      // Solo la temporada pedida; rellenar meta TMDB (nombres / sinopsis)
+      if (opts.tvId) {
+        fromWorker = await enrichEpsWithTmdb(fromWorker, opts.tvId, seasonNum);
+      }
+      return fromWorker;
+    }
+    // Sin lista worker: series normales → TMDB; anime no inventar temps TMDB
+    if (anime) return [];
     if (opts.tvId) {
       var fromTmdb = await loadSeasonEpsFromTmdb(opts.tvId, seasonNum);
       if (fromTmdb.length) return fromTmdb;
