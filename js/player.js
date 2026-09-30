@@ -6,25 +6,36 @@ async function loadPlayer() {
     var season = u.searchParams.get('season');
     var episode = u.searchParams.get('episode');
     var slug = u.searchParams.get('slug');
+    var sourceId = u.searchParams.get('source_id') || u.searchParams.get('source') || null;
+    var urlVid = u.searchParams.get('url_vid') || null;
+    if (urlVid) {
+      try { urlVid = decodeURIComponent(urlVid); } catch (_) {}
+    }
+    // Serie: si url_vid no trae /temp/ep, anexarlos
+    if (urlVid && type === 'tv' && season && episode) {
+      if (!/\/\d+\/\d+\/?$/.test(urlVid)) {
+        urlVid = urlVid.replace(/\/$/, '') + '/' + season + '/' + episode;
+      }
+    }
 
     var meta = null;
-    if (KEY && id) {
+    if (typeof KEY !== 'undefined' && KEY && id) {
       try {
         meta = await tmdb('/' + type + '/' + id);
         if (!slug) slug = mzSlug(meta.title || meta.name);
         document.title = (meta.title || meta.name || 'Reproductor') + ' — Kinox';
       } catch (_) {}
     }
-    if (!slug) {
+    if (!slug && !urlVid) {
       $('#view').innerHTML = '<div class="load">Falta el slug del título.</div>';
       return;
     }
-    if (type === 'tv' && (!season || !episode)) {
+    if (type === 'tv') {
       season = season || '1';
       episode = episode || '1';
     }
 
-    var title = (meta && (meta.title || meta.name)) || slug.replace(/-/g, ' ');
+    var title = (meta && (meta.title || meta.name)) || (slug || 'Reproducción').replace(/-/g, ' ');
     var label = type === 'tv' ? ('Temporada ' + season + ' · Episodio ' + episode) : 'Película';
 
     $('#view').innerHTML =
@@ -36,7 +47,14 @@ async function loadPlayer() {
 
     var box = $('#playerBox');
     var servers = $('#servers');
-    var data = await mzPlayers({ type: type, slug: slug, season: season, episode: episode });
+    var data = await mzPlayers({
+      type: type,
+      slug: slug,
+      season: season,
+      episode: episode,
+      source_id: sourceId,
+      url_vid: urlVid
+    });
     var players = data.reproductores || [];
 
     if (!players.length) {
@@ -136,7 +154,9 @@ async function loadPlayer() {
     document.querySelectorAll('.server-btn').forEach(function (btn) {
       btn.onclick = function () { play(players[Number(btn.dataset.i)], btn); };
     });
-    box.innerHTML = '<div class="player-empty">Selecciona un servidor para comenzar.</div>';
+    var first = document.querySelector('.server-btn');
+    if (first) play(players[0], first);
+    else box.innerHTML = '<div class="player-empty">Selecciona un servidor.</div>';
   } catch (e) {
     $('#view').innerHTML = '<div class="load">' + esc(e.message) + '</div>';
   }
