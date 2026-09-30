@@ -500,21 +500,42 @@ body.kx-trailer-open{overflow:hidden}
 .card .badge-rating-empty{display:none!important}
 
 
-/* Detalle: fondo backdrop + volver en burbuja + header integrado */
+/* Detalle: backdrop detrás, contenido opaco, solo header se funde */
 .det{position:relative}
 .det .bd{
-  position:fixed;inset:0 0 auto;height:min(78vh,720px);
-  background-size:cover;background-position:center 18%;
-  opacity:.5;z-index:0;pointer-events:none;
+  position:absolute;inset:0 0 auto;height:70vh;
+  background-size:cover;background-position:center 20%;
+  opacity:.32;z-index:0;pointer-events:none;
 }
 .det .bd:after{
   content:"";position:absolute;inset:0;
-  background:
-    linear-gradient(180deg, rgba(10,6,17,.55) 0%, rgba(10,6,17,.25) 28%, rgba(10,6,17,.55) 58%, var(--bg,#0a0611) 100%),
-    linear-gradient(90deg, rgba(10,6,17,.5) 0%, transparent 55%);
+  background:linear-gradient(transparent, var(--bg,#0a0611) 90%);
 }
 
-/* Botón volver: burbuja / cuadrito */
+/* Contenido del detalle SIEMPRE opaco (episodios, info, etc.) */
+.det .dw,
+.det .info,
+.det .pos,
+.seasons,
+.seasons .ep,
+#eps,
+#eps .ep{
+  position:relative;
+  z-index:2;
+  opacity:1 !important;
+}
+.seasons{
+  background:var(--panel,#150e22);
+  border:1px solid var(--line,#2a1f3d);
+  border-radius:12px;
+}
+.seasons .ep,
+#eps .ep{
+  background:transparent;
+  opacity:1 !important;
+}
+
+/* Botón volver: burbuja */
 .det .det-back,
 a.det-back.kx-back{
   position:relative;z-index:3;
@@ -525,40 +546,46 @@ a.det-back.kx-back{
   color:#f4f0fa !important;
   text-decoration:none !important;
   font-weight:700;font-size:.88rem;
-  background:rgba(21,14,34,.72);
-  border:1px solid rgba(255,255,255,.12);
+  background:rgba(21,14,34,.88);
+  border:1px solid rgba(255,255,255,.14);
   border-radius:999px;
-  backdrop-filter:blur(10px);
-  -webkit-backdrop-filter:blur(10px);
-  box-shadow:0 4px 18px rgba(0,0,0,.28);
+  box-shadow:0 4px 14px rgba(0,0,0,.25);
   transition:background .2s,border-color .2s,transform .15s;
 }
 .det .det-back:hover,
 a.det-back.kx-back:hover{
-  background:rgba(166,107,255,.28);
+  background:rgba(166,107,255,.35);
   border-color:rgba(166,107,255,.55);
   color:#fff !important;
   transform:translateY(-1px);
 }
-.det .dw{position:relative;z-index:2}
 
-/* Header se funde con el fondo en detalle (no resalta) */
-body.mz-on-detail header,
+/* SOLO la barra de arriba (header) se funde con el fondo en detalle */
+body.mz-on-detail > header,
 body.mz-on-detail header#top{
-  background:transparent !important;
-  background-image:none !important;
+  background:linear-gradient(
+    180deg,
+    rgba(10,6,17,.55) 0%,
+    rgba(10,6,17,.25) 70%,
+    transparent 100%
+  ) !important;
   border-bottom-color:transparent !important;
   box-shadow:none !important;
-  backdrop-filter:none !important;
-  -webkit-backdrop-filter:none !important;
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
 }
 body.mz-on-detail header.solid{
-  background:transparent !important;
+  background:linear-gradient(
+    180deg,
+    rgba(10,6,17,.55) 0%,
+    rgba(10,6,17,.25) 70%,
+    transparent 100%
+  ) !important;
   border-color:transparent !important;
 }
-/* Al hacer scroll, un velo suave del mismo color de fondo */
 body.mz-on-detail header.mz-detail-scrolled{
-  background:linear-gradient(180deg, rgba(10,6,17,.82) 0%, rgba(10,6,17,.45) 100%) !important;
+  background:rgba(10,6,17,.92) !important;
   backdrop-filter:blur(12px) !important;
   -webkit-backdrop-filter:blur(12px) !important;
+  border-bottom:1px solid rgba(42,31,61,.5) !important;
 }
