@@ -1,5 +1,6 @@
-const MZ_WORKER = 'https://moviezone.tvjz.workers.dev';
-const MZ_SOURCE = '9';
+// Reproductores — Worker MovieZone (no redeclarar MZ_WORKER si ya existe)
+var MZ_WORKER = (typeof MZ_WORKER !== 'undefined' && MZ_WORKER) || 'https://moviezone.tvjz.workers.dev';
+var MZ_SOURCE = (typeof MZ_SOURCE !== 'undefined' && MZ_SOURCE) || '9';
 
 function mzSlug(value) {
   return String(value || '')

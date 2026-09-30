@@ -1,5 +1,6 @@
 const TMDB_KEY='';const API='https://api.themoviedb.org/3',IMG='https://image.tmdb.org/t/p/';
-const MZ_WORKER='https://moviezone.tvjz.workers.dev';
+// Worker: NO declarar MZ_WORKER aquí (lo define worker.js). Solo la URL de búsqueda:
+const MZ_SEARCH='https://moviezone.tvjz.workers.dev';
 const $=(s,r=document)=>r.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 let KEY=TMDB_KEY||store.get('mz_key','');let profiles=store.get('mz_profiles',[{id:'p1',name:'Invitado'}]),pid=store.get('mz_pid','p1');if(!profiles.some(p=>p.id===pid))pid=profiles[0].id;const pk=k=>`mz_${pid}_${k}`;const favs=()=>store.get(pk('favs'),[]),hist=()=>store.get(pk('hist'),[]);const cache=new Map(),ITEMS=new Map();
@@ -44,7 +45,6 @@ async function tmdb(path,params={}){if(!KEY)return keyPage();const u=new URL(API
 function slugify(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' y ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
 function detailLink(it){return appLink(`/${it.type==='movie'?'pelicula':'serie'}/${it.id}`)}
 function card(it){return `<a class="card" href="${detailLink(it)}"><div class="im">${it.poster?`<img loading="lazy" src="${IMG}w342${it.poster}" alt="">`:''}</div>${it.rating?`<span class="badge">★ ${it.rating.toFixed(1)}</span>`:''}<b>${esc(it.title)}</b><small>${it.year||''}</small></a>`}
-/** Tarjeta desde resultados del Worker (?q=) */
 function workerCard(it){
   const tipo=String(it.type||it.tipo||'').toLowerCase();
   const isTv=/serie|tv|anime|dorama/.test(tipo);
@@ -73,7 +73,6 @@ function nav(){
   else active='inicio';
   const current=document.querySelector(`nav a[data-section="${active}"]`);
   if(current) current.classList.add('on');
-  // Buscar → /pages/buscar.html?q=  (NO /buscar?q= que da 404)
   $('#sf').onsubmit=e=>{e.preventDefault();const q=$('#q').value.trim();if(q)location.href=pageHref('buscar.html',{q})};
   window.addEventListener('scroll',()=>$('#top').classList.toggle('solid',scrollY>30),{passive:true})
 }
