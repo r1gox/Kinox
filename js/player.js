@@ -181,14 +181,24 @@
   }
 
   /** Episodios desde detalle del worker: /{source}/serie/{slug} */
-  async function loadSeasonEpsFromWorker(slug, seasonNum, sourceId) {
+  function isAnimeSourceId(sid) {
+    var s = String(sid || "").toLowerCase();
+    return s === "4" || s === "5" || s === "animeav1" || s === "jkanime";
+  }
+
+  /**
+   * Episodios desde worker.
+   * Anime (4/5): numeración continua (E1170), no temporadas TMDB (T23 E1…).
+   * Si total_episodios >> lista, genera ventana alrededor del episodio actual.
+   */
+  async function loadSeasonEpsFromWorker(slug, seasonNum, sourceId, currentEp) {
     if (!slug) return [];
     var base =
       (typeof MZ_WORKER !== "undefined" && MZ_WORKER) ||
       (typeof MZ_SEARCH !== "undefined" && MZ_SEARCH) ||
       "https://moviezone.tvjz.workers.dev";
     var sid = String(sourceId || (typeof MZ_SOURCE !== "undefined" ? MZ_SOURCE : "9"));
-    var isAnime = sid === "4" || sid === "animeav1" || sid === "5" || sid === "jkanime";
+    var isAnime = isAnimeSourceId(sid);
     if (isAnime) {
       sid = sid === "5" || sid === "jkanime" ? "5" : "4";
     }
@@ -202,8 +212,67 @@
       var data = await r.json();
       if (!data || data.success === false) return [];
       var temps = data.temporadas || [];
-      if (!Array.isArray(temps)) return [];
+      if (!Array.isArray(temps)) temps = [];
+      var totalEps =
+        parseInt(data.total_episodios, 10) ||
+        parseInt(data.episodes_count, 10) ||
+        0;
+      var cur = parseInt(currentEp, 10) || 1;
+
+      // --- Anime largo (One Piece): 1 temporada worker + miles de caps ---
+      if (isAnime && totalEps > 60 && temps.length <= 1) {
+        var win = 35;
+        var start = Math.max(1, cur - win);
+        var end = Math.min(totalEps, cur + win);
+        var outFlat = [];
+        var lista0 =
+          temps[0] && Array.isArray(temps[0].lista) ? temps[0].lista : [];
+        var byNum = Object.create(null);
+        for (var li = 0; li < lista0.length; li++) {
+          var raw = lista0[li];
+          var num = parseInt(
+            raw && (raw.episodio != null ? raw.episodio : raw.episode),
+            10
+          );
+          if (num) byNum[num] = raw;
+        }
+        for (var n = start; n <= end; n++) {
+          var src = byNum[n];
+          outFlat.push({
+            episode_number: n,
+            season_number: 1,
+            name: (src && (src.titulo || src.name)) || "Episodio " + n,
+            still_url: (src && (src.back_img || src.still)) || null,
+            still_path: null,
+            __animeFlat: true,
+            __playSeason: 1
+          });
+        }
+        return outFlat;
+      }
+
+      // --- Anime / serie con temporadas reales en el worker ---
       var want = parseInt(seasonNum, 10) || 1;
+      // Si el ep actual está en alguna lista, usar esa temporada del worker
+      if (isAnime && cur && temps.length) {
+        for (var ti = 0; ti < temps.length; ti++) {
+          var L = temps[ti].lista || temps[ti].episodios || [];
+          if (!Array.isArray(L)) continue;
+          for (var ej = 0; ej < L.length; ej++) {
+            var en = parseInt(
+              L[ej] && (L[ej].episodio != null ? L[ej].episodio : L[ej].episode),
+              10
+            );
+            if (en === cur) {
+              want = parseInt(
+                temps[ti].temporada != null ? temps[ti].temporada : ti + 1,
+                10
+              );
+              break;
+            }
+          }
+        }
+      }
       var block = null;
       for (var i = 0; i < temps.length; i++) {
         var t = temps[i];
@@ -216,14 +285,21 @@
       if (!block && temps[0]) block = temps[0];
       if (!block) return [];
       var lista = block.lista || block.episodios || block.episodes || [];
-      if (!Array.isArray(lista)) {
-        // a veces episodios es solo el número total
-        return [];
-      }
+      if (!Array.isArray(lista)) return [];
       var out = [];
+      var sn = parseInt(
+        block.temporada != null ? block.temporada : want,
+        10
+      ) || 1;
       for (var j = 0; j < lista.length; j++) {
-        var ep = normalizeEp(lista[j], want);
-        if (ep) out.push(ep);
+        var ep = normalizeEp(lista[j], sn);
+        if (ep) {
+          if (isAnime) {
+            ep.__playSeason = sn;
+            ep.__animeFlat = temps.length <= 1;
+          }
+          out.push(ep);
+        }
       }
       out.sort(function (a, b) {
         return a.episode_number - b.episode_number;
@@ -253,14 +329,16 @@
   async function loadSeasonEps(opts) {
     opts = opts || {};
     var seasonNum = opts.season || "1";
-    // 1) Worker (funciona solo con slug, sin id TMDB)
+    var anime = isAnimeSourceId(opts.sourceId);
+    // Anime fuente 4/5: NUNCA listar temporadas TMDB (T23 E1…); usar worker
     var fromWorker = await loadSeasonEpsFromWorker(
       opts.slug,
-      seasonNum,
-      opts.sourceId
+      anime ? "1" : seasonNum,
+      opts.sourceId,
+      opts.currentEpisode || opts.episode
     );
     if (fromWorker.length) return fromWorker;
-    // 2) TMDB si hay id
+    if (anime) return []; // no caer a TMDB para animeav1/jk
     if (opts.tvId) {
       var fromTmdb = await loadSeasonEpsFromTmdb(opts.tvId, seasonNum);
       if (fromTmdb.length) return fromTmdb;
@@ -286,7 +364,8 @@
       var urlVidBase = urlVid;
       if (urlVid && type === "tv" && season && episode) {
         if (!/\/\d+\/\d+\/?$/.test(urlVid)) {
-          urlVid = urlVid.replace(/\/$/, "") + "/" + season + "/" + episode;
+          var seaUv = isAnimeSourceId(sourceId) ? "1" : season;
+          urlVid = urlVid.replace(/\/$/, "") + "/" + seaUv + "/" + episode;
         }
         urlVidBase = String(urlVid).replace(/\/\d+\/\d+\/?$/, "");
       }
@@ -325,7 +404,9 @@
           tvId: id,
           slug: slug,
           season: season,
-          sourceId: sourceId
+          sourceId: sourceId,
+          currentEpisode: episode,
+          episode: episode
         });
       }
 
@@ -362,8 +443,10 @@
           '<div id="playerBox" class="kx-player mz-player"><div class="player-loading">Buscando reproductores…</div></div>' +
           "</div>" +
           '<aside class="kx-sidebar" id="kxSidebar">' +
-          '<div class="kx-sidebar-head">Episodios · T' +
-          esc(season) +
+          '<div class="kx-sidebar-head">Episodios' +
+          (isAnimeSourceId(sourceId)
+            ? " · E" + esc(episode)
+            : " · T" + esc(season)) +
           "</div>" +
           '<div class="kx-ep-list" id="kxEpList"></div>' +
           "</aside>" +
@@ -410,11 +493,13 @@
       }
 
       var box = $("#playerBox");
+      var playSeasonMz = isAnimeSourceId(sourceId) ? 1 : season;
+      var playEpisodeMz = episode;
       var data = await mzPlayers({
         type: type,
         slug: slug,
-        season: season,
-        episode: episode,
+        season: playSeasonMz,
+        episode: playEpisodeMz,
         source_id: sourceId,
         url_vid: urlVid
       });
@@ -485,10 +570,17 @@
             : e.still_path && typeof IMG !== "undefined"
               ? IMG + "w300" + e.still_path
               : poster;
+          // Anime fuente 4: reproducir T1 + ep absoluto (no temporada TMDB)
+          var playSea =
+            e.__playSeason != null
+              ? e.__playSeason
+              : isAnimeSourceId(sourceId)
+                ? 1
+                : season;
           var href = buildPlayHref({
             type: "tv",
             id: id,
-            season: season,
+            season: playSea,
             episode: n,
             slug: slug,
             sourceId: sourceId,
@@ -526,10 +618,10 @@
               ? '<span class="kx-badge-dur">' + e.runtime + "m</span>"
               : "") +
             "</div>" +
-            '<div class="kx-ep-info"><div class="kx-ep-name">T' +
-            season +
-            " E" +
-            n +
+            '<div class="kx-ep-info"><div class="kx-ep-name">' +
+            (e.__animeFlat || isAnimeSourceId(sourceId)
+              ? "E" + n
+              : "T" + (e.season_number || season) + " E" + n) +
             " — " +
             esc(e.name || "Episodio " + n) +
             "</div></div></a>"
@@ -546,15 +638,25 @@
             : '<p class="kx-muted">Sin lista de episodios.</p>';
           // scroll al activo
           requestAnimationFrame(function () {
-            var act = list.querySelector(".kx-ep-card.playing");
+            var act =
+              list.querySelector(".kx-ep-card.playing") ||
+              list.querySelector(".kx-ep-card.active");
             if (act) {
               try {
-                var offset =
-                  act.offsetTop -
-                  list.clientHeight / 2 +
-                  act.clientHeight / 2;
-                list.scrollTop = Math.max(0, offset);
-              } catch (_) {}
+                act.scrollIntoView({
+                  block: "center",
+                  inline: "nearest",
+                  behavior: "smooth"
+                });
+              } catch (_) {
+                try {
+                  var offset =
+                    act.offsetTop -
+                    list.clientHeight / 2 +
+                    act.clientHeight / 2;
+                  list.scrollTop = Math.max(0, offset);
+                } catch (_) {}
+              }
             }
           });
         }
