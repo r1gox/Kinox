@@ -46,6 +46,12 @@ function workerPlayHref(hit, type, id, season, episode) {
   });
 }
 
+function workerBaseUrl() {
+  if (typeof MZ_WORKER !== 'undefined' && MZ_WORKER) return MZ_WORKER;
+  if (typeof MZ_SEARCH !== 'undefined' && MZ_SEARCH) return MZ_SEARCH;
+  return 'https://moviezone.tvjz.workers.dev';
+}
+
 async function fetchWorkerDetail(slug, type, sourceId) {
   var sid = sourceId || (typeof MZ_SOURCE !== 'undefined' ? MZ_SOURCE : '9');
   var path =
@@ -55,7 +61,7 @@ async function fetchWorkerDetail(slug, type, sourceId) {
     (type === 'tv' ? 'serie' : 'pelicula') +
     '/' +
     encodeURIComponent(slug);
-  var r = await fetch(MZ_WORKER + path, { headers: { Accept: 'application/json' } });
+  var r = await fetch(workerBaseUrl() + path, { headers: { Accept: 'application/json' } });
   if (!r.ok) throw new Error('Worker: HTTP ' + r.status);
   var data = await r.json();
   if (data && data.success === false) {

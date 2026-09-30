@@ -1,6 +1,9 @@
 const TMDB_KEY='';const API='https://api.themoviedb.org/3',IMG='https://image.tmdb.org/t/p/';
 // Worker: NO declarar MZ_WORKER aquí (lo define worker.js). Solo la URL de búsqueda:
 const MZ_SEARCH='https://moviezone.tvjz.workers.dev';
+// Base del worker (detalle/buscador; worker.js puede sobrescribir)
+var MZ_WORKER = (typeof MZ_WORKER !== 'undefined' && MZ_WORKER) || MZ_SEARCH;
+var MZ_SOURCE = (typeof MZ_SOURCE !== 'undefined' && MZ_SOURCE) || '9';
 const $=(s,r=document)=>r.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 let KEY=TMDB_KEY||store.get('mz_key','');let profiles=store.get('mz_profiles',[{id:'p1',name:'Invitado'}]),pid=store.get('mz_pid','p1');if(!profiles.some(p=>p.id===pid))pid=profiles[0].id;const pk=k=>`mz_${pid}_${k}`;const favs=()=>store.get(pk('favs'),[]),hist=()=>store.get(pk('hist'),[]);const cache=new Map(),ITEMS=new Map();
