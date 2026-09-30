@@ -1,18 +1,18 @@
 /**
  * Kinox — solo móvil (≤900px). PC no cambia.
- * Anula el header de 2 filas de styles.css @media 700px.
+ * Header: fila 1 logo+buscar+perfil · fila 2 secciones (scroll)
  */
 @media (max-width: 900px) {
   :root {
     --mz-bottom-h: 58px;
-    --mz-header-h: 56px;
+    --mz-header-h: 92px;
   }
 
   body.mz-has-bottom-nav {
     padding-bottom: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px));
   }
 
-  /* ===== HEADER: UNA sola fila (logo | buscar | perfil) ===== */
+  /* Header 2 filas */
   header#top,
   body > header,
   header {
@@ -21,53 +21,36 @@
     left: 0 !important;
     right: 0 !important;
     z-index: 50 !important;
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
+    display: grid !important;
+    grid-template-columns: auto 1fr auto !important;
+    grid-template-rows: 48px 40px !important;
     align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 8px !important;
-    min-height: var(--mz-header-h) !important;
-    height: var(--mz-header-h) !important;
-    max-height: var(--mz-header-h) !important;
-    padding: 0 10px !important;
-    padding-top: env(safe-area-inset-top, 0px) !important;
-    box-sizing: content-box !important;
+    gap: 4px 8px !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 6px 10px 4px !important;
+    padding-top: max(6px, env(safe-area-inset-top, 0px)) !important;
+    box-sizing: border-box !important;
     background: rgba(10, 6, 17, 0.98) !important;
     border-bottom: 1px solid var(--line, #2a1f3d) !important;
-    /* matar grid de styles.css */
-    grid-template-columns: none !important;
-    grid-template-rows: none !important;
-    grid-template-areas: none !important;
   }
 
   header .logo,
   header a.logo {
-    flex: 0 0 auto !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
     font-size: 1.12rem !important;
-    grid-column: auto !important;
-    grid-row: auto !important;
     margin: 0 !important;
-  }
-
-  /* Nav superior fuera: va a la barra de abajo */
-  header nav {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
-    overflow: hidden !important;
-    grid-column: auto !important;
-    grid-row: auto !important;
   }
 
   header #sf,
   header form#sf {
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    width: auto !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
     margin: 0 !important;
-    grid-column: auto !important;
-    grid-row: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
   }
 
   header #q,
@@ -81,164 +64,107 @@
   }
 
   header #prof {
-    flex: 0 0 auto !important;
+    grid-column: 3 !important;
+    grid-row: 1 !important;
     width: 34px !important;
     height: 34px !important;
-    grid-column: auto !important;
-    grid-row: auto !important;
   }
 
-  /* Contenido debajo del header compacto */
+  /* Secciones ARRIBA visibles */
+  header nav {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 2px !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+    white-space: nowrap !important;
+  }
+  header nav::-webkit-scrollbar { display: none !important; }
+  header nav a {
+    display: inline-flex !important;
+    flex: 0 0 auto !important;
+    align-items: center !important;
+    padding: 7px 11px !important;
+    font-size: 0.78rem !important;
+    border-radius: 8px !important;
+  }
+
   .page {
-    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 14px) !important;
+    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 10px) !important;
     padding-left: 12px !important;
     padding-right: 12px !important;
     padding-bottom: 16px !important;
   }
 
-  .page h1 {
-    font-size: 1.4rem !important;
-    margin-bottom: 10px !important;
-  }
+  .page h1 { font-size: 1.4rem !important; margin-bottom: 10px !important; }
 
   .det,
   .player-page {
-    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 12px) !important;
+    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 10px) !important;
     padding-left: 12px !important;
     padding-right: 12px !important;
   }
 
-  /* Hero */
   .hero {
     min-height: 56vh !important;
     padding: 0 12px 28px !important;
-    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 6px) !important;
+    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 4px) !important;
     background-position: center top !important;
   }
+  .hero h1 { font-size: 1.55rem !important; }
+  .hero p { font-size: 0.84rem !important; }
+  .hero .btn { padding: 10px 14px !important; min-height: 40px !important; font-size: 0.88rem !important; }
 
-  .hero h1 {
-    font-size: 1.55rem !important;
-  }
+  .row { padding: 12px 12px 0 !important; }
+  .row h2 { font-size: 1.02rem !important; }
+  .track { grid-auto-columns: 110px !important; gap: 10px !important; }
+  .track .card { width: 110px !important; }
 
-  .hero p {
-    font-size: 0.84rem !important;
-  }
-
-  .hero .btn {
-    padding: 10px 14px !important;
-    min-height: 40px !important;
-    font-size: 0.88rem !important;
-  }
-
-  /* Rows / tracks */
-  .row {
-    padding: 12px 12px 0 !important;
-  }
-
-  .row h2 {
-    font-size: 1.02rem !important;
-  }
-
-  .track {
-    grid-auto-columns: 110px !important;
-    gap: 10px !important;
-  }
-
-  .track .card {
-    width: 110px !important;
-  }
-
-  /* Grid 3 cols */
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 12px 8px !important;
   }
-
-  .card b {
-    font-size: 0.72rem !important;
-    height: 2.35em !important;
-  }
+  .card b { font-size: 0.72rem !important; height: 2.35em !important; }
 
   .filters {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
     gap: 8px !important;
   }
+  .filters select { width: 100% !important; min-width: 0 !important; }
 
-  .filters select {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
+  .dw { display: flex !important; flex-direction: column !important; gap: 14px !important; }
+  .pos { width: min(170px, 40vw) !important; margin: 0 auto !important; }
+  .info h1 { font-size: 1.4rem !important; text-align: center !important; }
+  .btns { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
+  .btns .btn { width: 100% !important; min-width: 0 !important; }
+  .ep img, .ep .ph { width: 92px !important; }
 
-  /* Detalle */
-  .dw {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 14px !important;
-  }
-
-  .pos {
-    width: min(170px, 40vw) !important;
-    margin: 0 auto !important;
-  }
-
-  .info h1 {
-    font-size: 1.4rem !important;
-    text-align: center !important;
-  }
-
-  .btns {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 8px !important;
-  }
-
-  .btns .btn {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  .ep img,
-  .ep .ph {
-    width: 92px !important;
-  }
-
-  /* Player */
   .server-list {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 8px !important;
   }
+  .server-btn { width: 100% !important; }
 
-  .server-btn {
-    width: 100% !important;
-  }
+  .mz-cal-card { flex-basis: 128px !important; }
+  .mz-anime-search { flex-direction: column !important; max-width: none !important; }
+  .mz-anime-search .btn { width: 100% !important; }
 
-  /* Anime */
-  .mz-cal-card {
-    flex-basis: 128px !important;
-  }
+  footer { padding: 20px 12px 8px !important; font-size: 0.7rem !important; }
 
-  .mz-anime-search {
-    flex-direction: column !important;
-    max-width: none !important;
-  }
-
-  .mz-anime-search .btn {
-    width: 100% !important;
-  }
-
-  footer {
-    padding: 20px 12px 8px !important;
-    font-size: 0.7rem !important;
-  }
-
-  /* Barra inferior */
+  /* Barra inferior (extra; las secciones también están arriba) */
   .mz-bottom-nav {
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: 0; right: 0; bottom: 0;
     z-index: 80;
     display: flex;
     align-items: stretch;
@@ -250,7 +176,6 @@
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
   }
-
   .mz-bottom-nav a {
     flex: 1;
     display: flex;
@@ -266,20 +191,9 @@
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
   }
-
-  .mz-bottom-nav a .ico {
-    font-size: 1.1rem;
-    line-height: 1;
-  }
-
-  .mz-bottom-nav a.on {
-    color: var(--tx, #f4f0fa);
-  }
-
-  .mz-bottom-nav a.on .ico {
-    color: var(--ac, #a66bff);
-  }
-
+  .mz-bottom-nav a .ico { font-size: 1.1rem; line-height: 1; }
+  .mz-bottom-nav a.on { color: var(--tx, #f4f0fa); }
+  .mz-bottom-nav a.on .ico { color: var(--ac, #a66bff); }
   .mz-bottom-nav a .lbl {
     max-width: 100%;
     overflow: hidden;
@@ -289,13 +203,9 @@
 }
 
 @media (min-width: 901px) {
-  .mz-bottom-nav {
-    display: none !important;
-  }
+  .mz-bottom-nav { display: none !important; }
 }
 
 @media (max-width: 390px) {
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
