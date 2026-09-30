@@ -286,7 +286,7 @@ function mzEnsureMobileBottomNav(active){
 }
 
 function keyPage(){const v=$('#view');v.innerHTML=`<section class="page" style="max-width:520px;margin:auto"><h1>Conecta TMDB</h1><p style="color:var(--mute);line-height:1.6;margin-bottom:16px">Necesitas una API key v3 de <a style="color:var(--ac)" href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org/settings/api</a>. Se guarda solo en este navegador.</p><form id="kf" style="display:flex;gap:8px"><input id="kv" style="flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px" placeholder="API key v3"><button class="btn">Guardar</button></form></section>`;$('#kf').onsubmit=e=>{e.preventDefault();const v=$('#kv').value.trim();if(v){KEY=v;store.set('mz_key',v);location.reload()}}}
-n
+
 nav();
 
 /* Mobile UI después de armar el header */
