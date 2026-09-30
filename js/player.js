@@ -228,6 +228,7 @@
         var lista0 =
           temps[0] && Array.isArray(temps[0].lista) ? temps[0].lista : [];
         var byNum = Object.create(null);
+        var stillPattern = null; // https://cdn.animeav1.com/screenshots/197/{ep}.jpg
         for (var li = 0; li < lista0.length; li++) {
           var raw = lista0[li];
           var num = parseInt(
@@ -235,6 +236,31 @@
             10
           );
           if (num) byNum[num] = raw;
+          var bi = raw && (raw.back_img || raw.still || raw.image);
+          if (!stillPattern && bi && /\/screenshots\/\d+\/\d+\./i.test(String(bi))) {
+            stillPattern = String(bi).replace(
+              /\/screenshots\/(\d+)\/\d+(\.\w+)([?#].*)?$/i,
+              "/screenshots/$1/__EP__$2"
+            );
+          }
+        }
+        // Fallback: id desde portada covers/197.jpg
+        if (!stillPattern) {
+          var cover =
+            data.portada ||
+            data.portada_fuente_raw ||
+            data.poster ||
+            "";
+          var cm = String(cover).match(/\/covers\/(\d+)\./i);
+          if (cm) {
+            stillPattern =
+              "https://cdn.animeav1.com/screenshots/" + cm[1] + "/__EP__.jpg";
+          }
+        }
+        function stillForEp(n, src) {
+          if (src && (src.back_img || src.still)) return src.back_img || src.still;
+          if (stillPattern) return stillPattern.replace("__EP__", String(n));
+          return null;
         }
         for (var n = start; n <= end; n++) {
           var src = byNum[n];
@@ -242,7 +268,7 @@
             episode_number: n,
             season_number: 1,
             name: (src && (src.titulo || src.name)) || "Episodio " + n,
-            still_url: (src && (src.back_img || src.still)) || null,
+            still_url: stillForEp(n, src),
             still_path: null,
             __animeFlat: true,
             __playSeason: 1
