@@ -346,3 +346,47 @@ main{flex:1;width:100%;min-width:0}footer{color:var(--mute);font-size:.78rem;tex
   .kx-ep-num-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
   .kx-chip{font-size:.8rem;padding:7px 10px}
 }
+
+
+/* Tráiler modal */
+body.kx-trailer-open{overflow:hidden}
+.kx-trailer-modal{
+  position:fixed;inset:0;z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  padding:16px;
+  background:rgba(0,0,0,.78);
+  backdrop-filter:blur(6px);
+  -webkit-backdrop-filter:blur(6px);
+  box-sizing:border-box;
+}
+.kx-trailer-dialog{
+  position:relative;
+  width:min(900px,100%);
+  background:#0f0b18;
+  border:1px solid rgba(139,92,246,.4);
+  border-radius:16px;
+  padding:44px 14px 14px;
+  box-shadow:0 24px 64px rgba(0,0,0,.55);
+  box-sizing:border-box;
+}
+.kx-trailer-close{
+  position:absolute;top:8px;right:10px;
+  width:36px;height:36px;border-radius:50%;
+  border:1px solid rgba(255,255,255,.15);
+  background:rgba(255,255,255,.08);
+  color:#f8fafc;font-size:22px;line-height:1;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.kx-trailer-close:hover{background:rgba(139,92,246,.35);border-color:#a78bfa}
+.kx-trailer-frame{
+  width:100%;aspect-ratio:16/9;
+  border-radius:10px;overflow:hidden;background:#000;
+}
+.kx-trailer-frame iframe{
+  width:100%;height:100%;border:0;display:block;
+}
+.kx-trailer-yt{
+  display:inline-block;margin-top:10px;
+  color:#a78bfa;font-size:.85rem;font-weight:600;text-decoration:none;
+}
+.kx-trailer-yt:hover{text-decoration:underline}
