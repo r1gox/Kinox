@@ -456,3 +456,10 @@ body.kx-trailer-open{overflow:hidden}
 @media (max-width: 640px) {
   .mz-cal-card { flex-basis: 140px; }
 }
+
+
+/* Móvil/tablet: secciones en barra inferior (common.js) */
+@media (max-width:900px){
+  header nav{display:none!important}
+  body.mz-has-bottom-nav{padding-bottom:calc(62px + env(safe-area-inset-bottom,0px))}
+}
