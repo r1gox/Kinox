@@ -221,8 +221,70 @@ function nav(){
   const current=document.querySelector(`nav a[data-section="${active}"]`);
   if(current) current.classList.add('on');
   $('#sf').onsubmit=e=>{e.preventDefault();const q=$('#q').value.trim();if(q)location.href=pageHref('buscar.html',{q})};
-  window.addEventListener('scroll',()=>$('#top').classList.toggle('solid',scrollY>30),{passive:true})
+  window.addEventListener('scroll',()=>$('#top').classList.toggle('solid',scrollY>30),{passive:true});
+  // Barra de secciones ABAJO solo móvil (no depende de mobile-ui.js)
+  try{ mzEnsureMobileBottomNav(active); }catch(e){}
 }
+
+/** Barra inferior de secciones — solo viewport ≤900px. PC no se toca. */
+function mzEnsureMobileBottomNav(active){
+  var isMobile = window.matchMedia('(max-width:900px)').matches;
+  var oldTop = document.getElementById('mz-sec-bar');
+  if(oldTop) oldTop.remove();
+  var bar = document.getElementById('mz-bottom-nav');
+  if(!isMobile){
+    if(bar) bar.remove();
+    document.body.classList.remove('mz-has-bottom-nav');
+    return;
+  }
+  document.body.classList.add('mz-has-bottom-nav');
+  // CSS crítico inline por si mobile.css no carga
+  if(!document.getElementById('mz-bottom-critical-css')){
+    var st=document.createElement('style');
+    st.id='mz-bottom-critical-css';
+    st.textContent=[
+      '@media (max-width:900px){',
+      'header nav{display:none!important}',
+      'header#top,header{display:flex!important;flex-wrap:nowrap!important;align-items:center!important;gap:8px!important;min-height:56px!important;height:auto!important;padding:8px 10px!important}',
+      'header #sf{flex:1;min-width:0;margin:0}',
+      'header #q,header #q:focus{width:100%;font-size:16px}',
+      '.page,.det,.player-page{padding-top:70px!important;padding-bottom:80px!important}',
+      '#mz-bottom-nav{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:flex;flex-direction:row;align-items:stretch;overflow-x:auto;-webkit-overflow-scrolling:touch;height:calc(62px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:rgba(12,8,20,.98);border-top:1px solid #2a1f3d;scrollbar-width:none}',
+      '#mz-bottom-nav::-webkit-scrollbar{display:none}',
+      '#mz-bottom-nav a{flex:1 0 auto;min-width:64px;max-width:90px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 8px;color:#9a8fb0;font-size:.58rem;font-weight:600;text-decoration:none}',
+      '#mz-bottom-nav a .ico{font-size:1.15rem;line-height:1}',
+      '#mz-bottom-nav a.on{color:#fff}',
+      '#mz-bottom-nav a.on .ico{color:#a66bff}',
+      '}',
+      '@media (min-width:901px){#mz-bottom-nav{display:none!important}header nav{display:flex!important}}'
+    ].join('');
+    document.head.appendChild(st);
+  }
+  if(!bar){
+    bar=document.createElement('nav');
+    bar.id='mz-bottom-nav';
+    bar.setAttribute('aria-label','Secciones');
+    document.body.appendChild(bar);
+  }
+  var items=[
+    {id:'inicio',href:appLink('/'),ico:'⌂',lbl:'Inicio'},
+    {id:'peliculas',href:appLink('/peliculas'),ico:'🎬',lbl:'Películas'},
+    {id:'series',href:appLink('/series'),ico:'📺',lbl:'Series'},
+    {id:'anime',href:appLink('/anime'),ico:'✦',lbl:'Anime'},
+    {id:'jk',href:appLink('/jk'),ico:'JK',lbl:'JK'},
+    {id:'favoritos',href:appLink('/favoritos'),ico:'♥',lbl:'Favoritos'},
+    {id:'historial',href:appLink('/historial'),ico:'◷',lbl:'Historial'}
+  ];
+  bar.innerHTML=items.map(function(it){
+    return '<a data-section="'+it.id+'" href="'+it.href+'"><span class="ico">'+it.ico+'</span><span class="lbl">'+it.lbl+'</span></a>';
+  }).join('');
+  if(active){
+    bar.querySelectorAll('a').forEach(function(a){
+      a.classList.toggle('on', a.getAttribute('data-section')===active);
+    });
+  }
+}
+
 function keyPage(){const v=$('#view');v.innerHTML=`<section class="page" style="max-width:520px;margin:auto"><h1>Conecta TMDB</h1><p style="color:var(--mute);line-height:1.6;margin-bottom:16px">Necesitas una API key v3 de <a style="color:var(--ac)" href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org/settings/api</a>. Se guarda solo en este navegador.</p><form id="kf" style="display:flex;gap:8px"><input id="kv" style="flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px" placeholder="API key v3"><button class="btn">Guardar</button></form></section>`;$('#kf').onsubmit=e=>{e.preventDefault();const v=$('#kv').value.trim();if(v){KEY=v;store.set('mz_key',v);location.reload()}}}
 n
 nav();
@@ -239,9 +301,9 @@ nav();
       var src = scripts[i].src || '';
       if (/common\.js/i.test(src)) { base = src.replace(/common\.js(\?.*)?$/i, 'mobile-ui.js'); break; }
     }
-    s.src = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'v=5';
+    s.src = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'v=6';
   } catch (_) {
-    s.src = (location.pathname.indexOf('/pages/') !== -1) ? '../js/mobile-ui.js?v=5' : 'js/mobile-ui.js?v=5';
+    s.src = (location.pathname.indexOf('/pages/') !== -1) ? '../js/mobile-ui.js?v=6' : 'js/mobile-ui.js?v=6';
   }
   document.body.appendChild(s);
 })();
