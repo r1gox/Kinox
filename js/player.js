@@ -145,14 +145,122 @@
     return "reproductor.html?" + sp.toString();
   }
 
-  async function loadSeasonEps(tvId, seasonNum) {
-    if (!tvId || typeof tmdb !== "function") return [];
+  /** Normaliza un episodio de TMDB o del worker a un shape común */
+  function normalizeEp(e, seasonNum) {
+    if (!e) return null;
+    var n =
+      e.episode_number != null
+        ? e.episode_number
+        : e.episodio != null
+          ? e.episodio
+          : e.episode != null
+            ? e.episode
+            : null;
+    if (n == null) return null;
+    n = parseInt(n, 10);
+    if (!n || n < 1) return null;
+    var name = e.name || e.titulo || e.title || ("Episodio " + n);
+    var still =
+      e.still_path ||
+      e.back_img ||
+      e.still ||
+      e.image ||
+      e.imagen ||
+      e.thumbnail ||
+      null;
+    // still_path de TMDB es relativo; back_img del worker es URL absoluta
+    return {
+      episode_number: n,
+      name: name,
+      overview: e.overview || e.descripcion || "",
+      runtime: e.runtime || e.duracion || null,
+      still_path: e.still_path || null,
+      still_url: still && String(still).indexOf("http") === 0 ? still : null,
+      link: e.link || null
+    };
+  }
+
+  /** Episodios desde detalle del worker: /{source}/serie/{slug} */
+  async function loadSeasonEpsFromWorker(slug, seasonNum, sourceId) {
+    if (!slug || typeof MZ_WORKER === "undefined") return [];
+    var sid = sourceId || (typeof MZ_SOURCE !== "undefined" ? MZ_SOURCE : "9");
+    var path =
+      "/" +
+      sid +
+      "/serie/" +
+      encodeURIComponent(slug);
     try {
-      var s = await tmdb("/tv/" + tvId + "/season/" + seasonNum);
-      return s.episodes || [];
+      var r = await fetch(MZ_WORKER + path, {
+        headers: { Accept: "application/json" }
+      });
+      if (!r.ok) return [];
+      var data = await r.json();
+      if (!data || data.success === false) return [];
+      var temps = data.temporadas || [];
+      if (!Array.isArray(temps)) return [];
+      var want = parseInt(seasonNum, 10) || 1;
+      var block = null;
+      for (var i = 0; i < temps.length; i++) {
+        var t = temps[i];
+        var tn = parseInt(t.temporada != null ? t.temporada : t.season, 10);
+        if (tn === want) {
+          block = t;
+          break;
+        }
+      }
+      if (!block && temps[0]) block = temps[0];
+      if (!block) return [];
+      var lista = block.lista || block.episodios || block.episodes || [];
+      if (!Array.isArray(lista)) {
+        // a veces episodios es solo el número total
+        return [];
+      }
+      var out = [];
+      for (var j = 0; j < lista.length; j++) {
+        var ep = normalizeEp(lista[j], want);
+        if (ep) out.push(ep);
+      }
+      out.sort(function (a, b) {
+        return a.episode_number - b.episode_number;
+      });
+      return out;
     } catch (_) {
       return [];
     }
+  }
+
+  async function loadSeasonEpsFromTmdb(tvId, seasonNum) {
+    if (!tvId || typeof tmdb !== "function") return [];
+    try {
+      var s = await tmdb("/tv/" + tvId + "/season/" + seasonNum);
+      var list = s.episodes || [];
+      var out = [];
+      for (var i = 0; i < list.length; i++) {
+        var ep = normalizeEp(list[i], seasonNum);
+        if (ep) out.push(ep);
+      }
+      return out;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  async function loadSeasonEps(opts) {
+    opts = opts || {};
+    var seasonNum = opts.season || "1";
+    // 1) Worker (funciona solo con slug, sin id TMDB)
+    var fromWorker = await loadSeasonEpsFromWorker(
+      opts.slug,
+      seasonNum,
+      opts.sourceId
+    );
+    if (fromWorker.length) return fromWorker;
+    // 2) TMDB si hay id
+    if (opts.tvId) {
+      var fromTmdb = await loadSeasonEpsFromTmdb(opts.tvId, seasonNum);
+      if (fromTmdb.length) return fromTmdb;
+    }
+    return [];
   }
 
   window.loadPlayer = async function loadPlayer() {
@@ -207,8 +315,13 @@
           : "";
 
       var seasonEps = [];
-      if (type === "tv" && id) {
-        seasonEps = await loadSeasonEps(id, season);
+      if (type === "tv") {
+        seasonEps = await loadSeasonEps({
+          tvId: id,
+          slug: slug,
+          season: season,
+          sourceId: sourceId
+        });
       }
 
       var epMeta = null;
@@ -218,9 +331,9 @@
         });
       }
       var epTitle = epMeta
-        ? "E" + episode + " — " + (epMeta.name || "Episodio " + episode)
+        ? "T" + season + " E" + episode + " — " + (epMeta.name || "Episodio " + episode)
         : type === "tv"
-          ? "Temporada " + season + " · Episodio " + episode
+          ? "T" + season + " · E" + episode
           : "Película";
       var epRuntime =
         (epMeta && epMeta.runtime) ||
@@ -362,8 +475,9 @@
         function epCard(e, mobile) {
           var n = e.episode_number;
           var playing = String(n) === String(episode);
-          var still =
-            e.still_path && typeof IMG !== "undefined"
+          var still = e.still_url
+            ? e.still_url
+            : e.still_path && typeof IMG !== "undefined"
               ? IMG + "w300" + e.still_path
               : poster;
           var href = buildPlayHref({
@@ -407,7 +521,9 @@
               ? '<span class="kx-badge-dur">' + e.runtime + "m</span>"
               : "") +
             "</div>" +
-            '<div class="kx-ep-info"><div class="kx-ep-name">E' +
+            '<div class="kx-ep-info"><div class="kx-ep-name">T' +
+            season +
+            " E" +
             n +
             " — " +
             esc(e.name || "Episodio " + n) +

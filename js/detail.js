@@ -249,9 +249,11 @@ async function loadDetailFromWorker(type, params) {
                 (still
                   ? '<img loading="lazy" src="' + esc(still) + '" alt="">'
                   : '<div class="ph"></div>') +
-                '<div><b>' +
+                '<div><b>T' +
+                sn +
+                ' E' +
                 en +
-                '. ' +
+                ' — ' +
                 esc(name) +
                 '</b></div></a>'
               );
@@ -430,9 +432,11 @@ async function loadDetail(type) {
               (e.still_path
                 ? '<img loading="lazy" src="' + IMG + 'w300' + e.still_path + '" alt="">'
                 : '<div class="ph"></div>') +
-              '<div><b>' +
+              '<div><b>T' +
+              e.season_number +
+              ' E' +
               e.episode_number +
-              '. ' +
+              ' — ' +
               esc(e.name) +
               '</b><small>' +
               esc((e.overview || 'Sin sinopsis.').slice(0, 220)) +
