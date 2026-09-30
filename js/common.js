@@ -1,34 +1,49 @@
 const TMDB_KEY='';const API='https://api.themoviedb.org/3',IMG='https://image.tmdb.org/t/p/';
-const $=(s,r=document)=>r.querySelector(s),esc=s=>String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\\':'&#39;'}[c]));
+const $=(s,r=document)=>r.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 let KEY=TMDB_KEY||store.get('mz_key','');let profiles=store.get('mz_profiles',[{id:'p1',name:'Invitado'}]),pid=store.get('mz_pid','p1');if(!profiles.some(p=>p.id===pid))pid=profiles[0].id;const pk=k=>`mz_${pid}_${k}`;const favs=()=>store.get(pk('favs'),[]),hist=()=>store.get(pk('hist'),[]);const cache=new Map(),ITEMS=new Map();
 
-// Local-first navigation. When opened with file://, never create /pelicula/... paths,
-// because Windows interprets those as file:///C:/pelicula/....
+// Rutas reales a archivos HTML (Vercel no necesita rewrite de /pelicula/:id)
 const LOCAL=location.protocol==='file:';
 function pageUrl(file,params={}){
   const prefix=LOCAL?(location.pathname.includes('/pages/')?'./':'pages/'):'/pages/';
   const u=new URL(prefix+file,location.href);
   Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,v)});
-  return u.href;
+  return u.pathname+u.search+(LOCAL?'': '');
+}
+// En file:// devolver href completo; en web path absoluto
+function pageHref(file,params={}){
+  const prefix=LOCAL?(location.pathname.includes('/pages/')?'./':'pages/'):'/pages/';
+  const u=new URL(prefix+file,location.href);
+  Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,v)});
+  return LOCAL?u.href:(u.pathname+u.search);
 }
 function appLink(path){
-  const clean=path.replace(/^\//,'');
-  if(!LOCAL)return '/'+clean;
-  if(clean==='')return new URL(location.pathname.includes('/pages/')?'../index.html':'index.html',location.href).href;
-  if(clean.startsWith('pelicula/'))return pageUrl('detalle-pelicula.html',{id:clean.split('/')[1]});
-  if(clean.startsWith('serie/'))return pageUrl('detalle-serie.html',{id:clean.split('/')[1]});
-  if(clean==='peliculas')return pageUrl('peliculas.html');
-  if(clean==='series')return pageUrl('series.html');
-  if(clean==='anime')return pageUrl('anime.html');
-  if(clean==='jk')return pageUrl('jk.html');
-  if(clean==='favoritos')return pageUrl('favoritos.html');
-  if(clean==='historial')return pageUrl('historial.html');
-  if(clean==='perfil')return pageUrl('perfil.html');
-  if(clean.startsWith('buscar')){const q=clean.includes('?')?new URLSearchParams(clean.split('?')[1]).get('q'):'';return pageUrl('buscar.html',q?{q}:{});}
-  if(clean.startsWith('trailer')){const p=new URLSearchParams(clean.split('?')[1]||'');return pageUrl('trailer.html',{type:p.get('type'),id:p.get('id')});}
-  if(clean.startsWith('reproductor')){const p=new URLSearchParams(clean.split('?')[1]||'');return pageUrl('reproductor.html',{type:p.get('type'),id:p.get('id'),season:p.get('season'),episode:p.get('episode'),slug:p.get('slug')});}
-  return path;
+  const clean=String(path||'').replace(/^\//,'');
+  if(clean==='')return LOCAL?(location.pathname.includes('/pages/')?'../index.html':'index.html'):'/';
+  // Detalle: SIEMPRE archivo real (evita 404 de /pelicula/:id en Vercel)
+  if(clean.startsWith('pelicula/'))return pageHref('detalle-pelicula.html',{id:clean.split('/')[1]});
+  if(clean.startsWith('serie/'))return pageHref('detalle-serie.html',{id:clean.split('/')[1]});
+  if(clean==='peliculas')return pageHref('peliculas.html');
+  if(clean==='series')return pageHref('series.html');
+  if(clean==='anime')return pageHref('anime.html');
+  if(clean==='jk')return pageHref('jk.html');
+  if(clean==='favoritos')return pageHref('favoritos.html');
+  if(clean==='historial')return pageHref('historial.html');
+  if(clean==='perfil')return pageHref('perfil.html');
+  if(clean.startsWith('buscar')){
+    const q=clean.includes('?')?new URLSearchParams(clean.split('?')[1]).get('q'):'';
+    return pageHref('buscar.html',q?{q}:{});
+  }
+  if(clean.startsWith('trailer')){
+    const p=new URLSearchParams(clean.split('?')[1]||'');
+    return pageHref('trailer.html',{type:p.get('type'),id:p.get('id')});
+  }
+  if(clean.startsWith('reproductor')){
+    const p=new URLSearchParams(clean.split('?')[1]||'');
+    return pageHref('reproductor.html',{type:p.get('type'),id:p.get('id'),season:p.get('season'),episode:p.get('episode'),slug:p.get('slug')});
+  }
+  return LOCAL?path:('/'+clean);
 }
 function go(path){location.href=appLink(path)}
 
@@ -41,17 +56,15 @@ function rowHtml(t,items){return items?.length?`<section class="row"><h2>${esc(t
 function list(res,type){return (res.results||[]).filter(x=>x.poster_path&&x.media_type!=='person').map(x=>norm(x,type))}
 function nav(){
   $('#top').innerHTML=`<a class="logo" href="${appLink('/')}" >Movie<span>Zone</span></a><nav><a data-section="inicio" href="${appLink('/')}" >Inicio</a><a data-section="peliculas" href="${appLink('/peliculas')}">Películas</a><a data-section="series" href="${appLink('/series')}">Series</a><a data-section="anime" href="${appLink('/anime')}">Anime</a><a data-section="jk" href="${appLink('/jk')}">JK</a><a data-section="favoritos" href="${appLink('/favoritos')}">Favoritos</a><a data-section="historial" href="${appLink('/historial')}">Historial</a></nav><form id="sf"><input id="q" type="search" placeholder="Buscar…" aria-label="Buscar"></form><a id="prof" href="${appLink('/perfil')}" aria-label="Perfil">${esc((profiles.find(p=>p.id===pid)||profiles[0]).name[0].toUpperCase())}</a>`;
-  // Marca la sección actual en el menú. Funciona tanto con file:// como con servidor web.
   const path=location.pathname.toLowerCase();
   let active='';
-  if(path.endsWith('/peliculas.html') || /\/pelicula\//.test(path)) active='peliculas';
-  else if(path.endsWith('/series.html') || /\/serie\//.test(path)) active='series';
-  else if(path.endsWith('/anime.html')) active='anime';
-  else if(path.endsWith('/jk.html')) active='jk';
-  else if(path.endsWith('/favoritos.html')) active='favoritos';
-  else if(path.endsWith('/historial.html')) active='historial';
-  else if(path.endsWith('/perfil.html')) active='';
-  else if(path.endsWith('/buscar.html') || path.endsWith('/trailer.html') || path.endsWith('/reproductor.html') || path.endsWith('/detalle-pelicula.html') || path.endsWith('/detalle-serie.html')) active='';
+  if(path.includes('peliculas')||path.includes('detalle-pelicula')) active='peliculas';
+  else if(path.includes('series')||path.includes('detalle-serie')) active='series';
+  else if(path.includes('anime.html')||path.endsWith('/anime')) active='anime';
+  else if(path.includes('jk.html')||path.endsWith('/jk')) active='jk';
+  else if(path.includes('favoritos')) active='favoritos';
+  else if(path.includes('historial')) active='historial';
+  else if(path.includes('perfil')||path.includes('buscar')||path.includes('trailer')||path.includes('reproductor')) active='';
   else active='inicio';
   const current=document.querySelector(`nav a[data-section="${active}"]`);
   if(current) current.classList.add('on');
