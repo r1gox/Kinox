@@ -523,18 +523,15 @@
       var labelSea =
         (epMeta && epMeta.__tmdb_season) ||
         (epMeta && epMeta.season_number) ||
-        season;
+        (isAnimeSourceId(sourceId) ? "1" : season);
+      // Formato compacto: T1E2 / T23E1180 + nombre del episodio
       var epTitle =
         type === "tv"
-          ? (isAnimeSourceId(sourceId)
-              ? "E" +
-                episode +
-                (epMeta && epMeta.name ? " — " + epMeta.name : "")
-              : "T" +
-                labelSea +
-                " E" +
-                episode +
-                (epMeta && epMeta.name ? " — " + epMeta.name : ""))
+          ? "T" +
+            labelSea +
+            "E" +
+            episode +
+            (epMeta && epMeta.name ? " — " + epMeta.name : "")
           : "Película";
       var epRuntime =
         (epMeta && epMeta.runtime) ||
@@ -738,9 +735,10 @@
               : "") +
             "</div>" +
             '<div class="kx-ep-info"><div class="kx-ep-name">' +
-            (e.__animeFlat || isAnimeSourceId(sourceId)
-              ? "E" + n
-              : "T" + (e.season_number || season) + " E" + n) +
+            "T" +
+            (e.season_number || (isAnimeSourceId(sourceId) ? "1" : season)) +
+            "E" +
+            n +
             " — " +
             esc(e.name || "Episodio " + n) +
             "</div></div></a>"
@@ -930,6 +928,42 @@
       var pref = loadPref();
       var auto = matchPref(players, pref);
       var autoMode = pref && pref.mode === "direct" ? "direct" : "iframe";
+
+      function pickUpnShare(list) {
+        if (!list || !list.length) return null;
+        for (var ui = 0; ui < list.length; ui++) {
+          var px = list[ui];
+          var lab = serverLabel(px).toLowerCase();
+          var pr = String(
+            (px && (px.provider || px.servidor || px.server || px.name)) || ""
+          ).toLowerCase();
+          var url = String((px && px.url) || "").toLowerCase();
+          if (
+            lab.indexOf("upnshare") !== -1 ||
+            lab.indexOf("upn") !== -1 ||
+            pr.indexOf("upnshare") !== -1 ||
+            pr.indexOf("upn") !== -1 ||
+            url.indexOf("uns.bio") !== -1 ||
+            url.indexOf("upnshare") !== -1
+          ) {
+            return px;
+          }
+        }
+        return null;
+      }
+
+      // Anime (fuente 4/5): UPNShare por defecto si no hay preferencia previa
+      if (!auto && isAnimeSourceId(sourceId)) {
+        auto = pickUpnShare(normals) || pickUpnShare(players) || pickUpnShare(directs);
+        if (auto) {
+          autoMode =
+            normals.indexOf(auto) >= 0
+              ? "iframe"
+              : isDirectPlayer(auto)
+                ? "direct"
+                : "iframe";
+        }
+      }
       if (!auto) {
         auto = normals[0] || directs[0] || players[0];
         autoMode = isDirectPlayer(auto) && !isNormalPlayer(auto) ? "direct" : "iframe";
