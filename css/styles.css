@@ -463,3 +463,22 @@ body.kx-trailer-open{overflow:hidden}
   header nav{display:none!important}
   body.mz-has-bottom-nav{padding-bottom:calc(62px + env(safe-area-inset-bottom,0px))}
 }
+
+
+/* Cards: tipo izq · rating der (sobre la portada) */
+.card .im{position:relative}
+.card .badge-type{
+  position:absolute;left:6px;top:6px;z-index:2;
+  background:rgba(10,6,17,.82);color:#e8e0f5;
+  font-size:.65rem;font-weight:700;letter-spacing:.02em;
+  padding:3px 7px;border-radius:6px;text-transform:uppercase;
+  max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.card .badge-rating{
+  position:absolute;right:6px;top:6px;z-index:2;
+  background:rgba(10,6,17,.85);color:#ffd166;
+  font-size:.7rem;font-weight:700;
+  padding:3px 7px;border-radius:6px;
+}
+.card .badge-rating-empty{display:none}
+.card .badge:not(.badge-type):not(.badge-rating){/* legacy */}
