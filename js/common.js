@@ -6,7 +6,10 @@ var MZ_WORKER = (typeof MZ_WORKER !== 'undefined' && MZ_WORKER) || MZ_SEARCH;
 var MZ_SOURCE = (typeof MZ_SOURCE !== 'undefined' && MZ_SOURCE) || '9';
 const $=(s,r=document)=>r.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
-let KEY=TMDB_KEY||store.get('mz_key','');let profiles=store.get('mz_profiles',[{id:'p1',name:'Invitado'}]),pid=store.get('mz_pid','p1');if(!profiles.some(p=>p.id===pid))pid=profiles[0].id;const pk=k=>`mz_${pid}_${k}`;const favs=()=>store.get(pk('favs'),[]),hist=()=>store.get(pk('hist'),[]);const cache=new Map(),ITEMS=new Map();
+let KEY=TMDB_KEY||store.get('mz_key','');
+/** true si Vercel tiene TMDB_API_KEY y el proxy /api/tmdb responde */
+let TMDB_SERVER=false;
+let profiles=store.get('mz_profiles',[{id:'p1',name:'Invitado'}]),pid=store.get('mz_pid','p1');if(!profiles.some(p=>p.id===pid))pid=profiles[0].id;const pk=k=>`mz_${pid}_${k}`;const favs=()=>store.get(pk('favs'),[]),hist=()=>store.get(pk('hist'),[]);const cache=new Map(),ITEMS=new Map();
 
 const LOCAL=location.protocol==='file:';
 function pageHref(file,params={}){
@@ -44,7 +47,66 @@ function appLink(path){
 function go(path){location.href=appLink(path)}
 
 function norm(x,type){type=type||x.media_type||(x.title?'movie':'tv');const it={id:x.id,type,title:x.title||x.name,poster:x.poster_path,backdrop:x.backdrop_path,year:(x.release_date||x.first_air_date||'').slice(0,4),rating:x.vote_average||0,overview:x.overview||''};ITEMS.set(type+x.id,it);return it}
-async function tmdb(path,params={}){if(!KEY)return keyPage();const u=new URL(API+path);u.searchParams.set('api_key',KEY);u.searchParams.set('language','es-MX');for(const k in params)if(params[k]!==''&&params[k]!=null)u.searchParams.set(k,params[k]);const key=u.toString();if(cache.has(key))return cache.get(key);const r=await fetch(key);if(r.status===401){store.set('mz_key','');KEY='';throw Error('API key inválida')}if(!r.ok)throw Error('Error '+r.status);const j=await r.json();cache.set(key,j);return j}
+async function tmdbViaServer(path,params={}){
+  if(LOCAL) return null;
+  const u=new URL('/api/tmdb',location.origin);
+  u.searchParams.set('path',path.startsWith('/')?path:'/'+path);
+  u.searchParams.set('language',params.language||'es-MX');
+  for(const k in params){
+    if(k==='language') continue;
+    if(params[k]!==''&&params[k]!=null) u.searchParams.set(k,params[k]);
+  }
+  const cacheKey='srv:'+u.toString();
+  if(cache.has(cacheKey)) return cache.get(cacheKey);
+  const r=await fetch(u.toString(),{headers:{Accept:'application/json'}});
+  if(r.status===503) return null; // sin env en Vercel
+  if(!r.ok) throw Error('TMDB proxy '+r.status);
+  const j=await r.json();
+  if(j&&j.error&&!j.id&&!j.results) throw Error(j.error);
+  cache.set(cacheKey,j);
+  TMDB_SERVER=true;
+  if(!KEY) KEY='__server__';
+  return j;
+}
+async function tmdb(path,params={}){
+  // 1) Proxy Vercel (TMDB_API_KEY en env) — no pide key al usuario
+  try{
+    const via=await tmdbViaServer(path,params);
+    if(via) return via;
+  }catch(e){
+    if(KEY&&KEY!=='__server__'){ /* caer a key local */ }
+    else if(String(e.message||'').indexOf('503')>=0||String(e.message||'').indexOf('Falta')>=0){
+      /* sin server key */
+    }else{
+      // error real del proxy: rethrow si no hay key local
+      if(!KEY||KEY==='__server__') throw e;
+    }
+  }
+  // 2) Key local (localStorage / TMDB_KEY embebida)
+  if(!KEY||KEY==='__server__') return keyPage();
+  const u=new URL(API+path);
+  u.searchParams.set('api_key',KEY);
+  u.searchParams.set('language',params.language||'es-MX');
+  for(const k in params) if(params[k]!==''&&params[k]!=null) u.searchParams.set(k,params[k]);
+  const key=u.toString();
+  if(cache.has(key)) return cache.get(key);
+  const r=await fetch(key);
+  if(r.status===401){store.set('mz_key','');KEY='';throw Error('API key inválida')}
+  if(!r.ok) throw Error('Error '+r.status);
+  const j=await r.json();
+  cache.set(key,j);
+  return j;
+}
+/** Comprueba si hay TMDB (servidor o local) sin bloquear la UI */
+async function ensureTmdbReady(){
+  if(KEY&&KEY!=='__server__') return true;
+  try{
+    const j=await tmdbViaServer('/configuration',{});
+    if(j){ TMDB_SERVER=true; KEY='__server__'; return true; }
+  }catch(_){}
+  return !!(KEY&&KEY!=='__server__');
+}
+
 function slugify(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' y ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
 function detailLink(it){return appLink(`/${it.type==='movie'?'pelicula':'serie'}/${it.id}`)}
 function tipoFromIt(it){
