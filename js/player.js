@@ -352,6 +352,60 @@
     }
   }
 
+  /**
+   * Mapea episodio absoluto (1180) → temporada/ep TMDB y devuelve meta (nombre + overview).
+   */
+  async function loadTmdbEpByAbsolute(tvId, absoluteEp) {
+    if (!tvId || !absoluteEp || typeof tmdb !== "function") return null;
+    var abs = parseInt(absoluteEp, 10);
+    if (!abs || abs < 1) return null;
+    try {
+      var tv = await tmdb("/tv/" + tvId);
+      var seasons = (tv && tv.seasons) || [];
+      var left = abs;
+      for (var i = 0; i < seasons.length; i++) {
+        var s = seasons[i];
+        var sn = parseInt(s.season_number, 10);
+        if (sn === 0) continue; // especiales
+        var count = parseInt(s.episode_count, 10) || 0;
+        if (count < 1) continue;
+        if (left <= count) {
+          try {
+            var ep = await tmdb(
+              "/tv/" + tvId + "/season/" + sn + "/episode/" + left
+            );
+            if (ep) {
+              ep.__tmdb_season = sn;
+              ep.__tmdb_episode = left;
+              ep.__absolute = abs;
+            }
+            return ep || null;
+          } catch (_) {
+            return null;
+          }
+        }
+        left -= count;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  async function loadTmdbEpDirect(tvId, seasonNum, episodeNum) {
+    if (!tvId || typeof tmdb !== "function") return null;
+    try {
+      return await tmdb(
+        "/tv/" +
+          tvId +
+          "/season/" +
+          seasonNum +
+          "/episode/" +
+          episodeNum
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   async function loadSeasonEps(opts) {
     opts = opts || {};
     var seasonNum = opts.season || "1";
@@ -442,16 +496,55 @@
           return String(e.episode_number) === String(episode);
         });
       }
-      var epTitle = epMeta
-        ? "T" + season + " E" + episode + " — " + (epMeta.name || "Episodio " + episode)
-        : type === "tv"
-          ? "T" + season + " · E" + episode
+
+      // Meta real del episodio (nombre + sinopsis TMDB), no la de la serie
+      var tmdbEp = null;
+      if (type === "tv" && id && episode) {
+        var epN = parseInt(episode, 10);
+        var seaN = parseInt(season, 10) || 1;
+        // Episodio absoluto (anime One Piece 1180) o temporada TMDB normal
+        if (isAnimeSourceId(sourceId) || epN > 80) {
+          tmdbEp = await loadTmdbEpByAbsolute(id, epN);
+        }
+        if (!tmdbEp) {
+          tmdbEp = await loadTmdbEpDirect(id, seaN, epN);
+        }
+        // Si season=23 y episode=1180 falló directo, ya intentamos absoluto
+      }
+      if (tmdbEp) {
+        epMeta = epMeta || {};
+        if (tmdbEp.name) epMeta.name = tmdbEp.name;
+        if (tmdbEp.overview) epMeta.overview = tmdbEp.overview;
+        if (tmdbEp.runtime) epMeta.runtime = tmdbEp.runtime;
+        if (tmdbEp.still_path) epMeta.still_path = tmdbEp.still_path;
+        if (tmdbEp.__tmdb_season) epMeta.__tmdb_season = tmdbEp.__tmdb_season;
+      }
+
+      var labelSea =
+        (epMeta && epMeta.__tmdb_season) ||
+        (epMeta && epMeta.season_number) ||
+        season;
+      var epTitle =
+        type === "tv"
+          ? (isAnimeSourceId(sourceId)
+              ? "E" +
+                episode +
+                (epMeta && epMeta.name ? " — " + epMeta.name : "")
+              : "T" +
+                labelSea +
+                " E" +
+                episode +
+                (epMeta && epMeta.name ? " — " + epMeta.name : ""))
           : "Película";
       var epRuntime =
         (epMeta && epMeta.runtime) ||
         (meta && meta.runtime) ||
         null;
-      var epOverview = (epMeta && epMeta.overview) || overview || "";
+      // Descripción del EPISODIO; solo si no hay, no usar overview de toda la serie
+      var epOverview =
+        (epMeta && epMeta.overview && String(epMeta.overview).trim()) ||
+        (tmdbEp && tmdbEp.overview && String(tmdbEp.overview).trim()) ||
+        "";
 
       /* —— Shell UI (series = MovieZone-like) —— */
       if (type === "tv") {
