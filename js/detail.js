@@ -1,28 +1,160 @@
-async function resolveWorkerHit(title, type, preferAnime) {
-  var base = (typeof MZ_SEARCH !== 'undefined' && MZ_SEARCH) || 'https://moviezone.tvjz.workers.dev';
-  var r = await fetch(base + '/?q=' + encodeURIComponent(title), { headers: { Accept: 'application/json' } });
-  if (!r.ok) return null;
-  var data = await r.json();
-  var results = data.results || [];
-  if (!results.length) return null;
-  if (typeof preferAnimeSource === 'function') results = preferAnimeSource(results);
+async function resolveWorkerHit(title, type, preferAnime, opts) {
+  opts = opts || {};
+  var base =
+    (typeof MZ_SEARCH !== 'undefined' && MZ_SEARCH) ||
+    (typeof MZ_WORKER !== 'undefined' && MZ_WORKER) ||
+    'https://moviezone.tvjz.workers.dev';
+
+  function normKey(s) {
+    return String(s || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  /** Variantes de búsqueda: en películas el original EN de TMDB suele coincidir con la fuente */
+  function buildQueries(main, original, year, preferOriginal) {
+    var out = [];
+    var seen = Object.create(null);
+    function add(q) {
+      q = String(q || '').replace(/\s+/g, ' ').trim();
+      if (!q || q.length < 2) return;
+      var k = normKey(q);
+      if (!k || seen[k]) return;
+      seen[k] = 1;
+      out.push(q);
+    }
+    // Películas: primero original (EN) → luego título local
+    if (preferOriginal) {
+      add(original);
+      add(main);
+    } else {
+      add(main);
+      add(original);
+    }
+    // Quitar año entre paréntesis
+    add(String(main || '').replace(/\(\s*\d{4}\s*\)/g, '').trim());
+    add(String(original || '').replace(/\(\s*\d{4}\s*\)/g, '').trim());
+    // Solo cortar por ":" si el prefijo es LO SUFICIENTE largo (>= 3 palabras o >= 18 chars)
+    // Evita que "Spider-Man: Un nuevo día" quede en solo "Spider-Man"
+    function maybePrefix(s) {
+      s = String(s || '');
+      var idx = s.indexOf(':');
+      if (idx < 1) return;
+      var left = s.slice(0, idx).trim();
+      var words = left.split(/\s+/).filter(Boolean);
+      if (words.length >= 3 || left.length >= 18) add(left);
+    }
+    maybePrefix(main);
+    maybePrefix(original);
+    // Con año al final (muchas fuentes lo llevan)
+    if (year) {
+      var y = String(year).slice(0, 4);
+      if (main) add(main + ' ' + y);
+      if (original) add(original + ' ' + y);
+    }
+    return out;
+  }
+
+  function scoreHit(hit, mainKey, origKey, year, isTv) {
+    var t = String(hit.type || hit.tipo || '').toLowerCase();
+    var typeOk = isTv
+      ? /serie|tv|anime|dorama|ova|ona/.test(t)
+      : /peli|movie/.test(t);
+    if (!typeOk && t) return -1000;
+
+    var ht = normKey(hit.title || hit.titulo || '');
+    var hy = String(hit.year || '').slice(0, 4);
+    var sc = 0;
+    if (year && hy && hy === String(year).slice(0, 4)) sc += 50;
+    if (year && hy && hy !== String(year).slice(0, 4)) sc -= 30;
+
+    if (mainKey && ht === mainKey) sc += 80;
+    else if (origKey && ht === origKey) sc += 80;
+    else if (mainKey && (ht.indexOf(mainKey) !== -1 || mainKey.indexOf(ht) !== -1)) sc += 40;
+    else if (origKey && (ht.indexOf(origKey) !== -1 || origKey.indexOf(ht) !== -1)) sc += 40;
+    else {
+      // tokens compartidos
+      var a = mainKey ? mainKey.split(' ') : [];
+      var b = ht.split(' ');
+      var shared = 0;
+      for (var i = 0; i < a.length; i++) {
+        if (a[i].length > 2 && b.indexOf(a[i]) !== -1) shared++;
+      }
+      sc += shared * 8;
+    }
+
+    var sid = String(hit.source_id || hit.source || '');
+    // películas: preferir 9 / 3 / 2
+    if (!isTv) {
+      if (sid === '9' || sid === 'pelisplushd_bz') sc += 6;
+      if (sid === '3' || sid === 'pelisplushd') sc += 4;
+      if (sid === '2' || sid === 'hackstore') sc += 2;
+    }
+    return sc;
+  }
+
   var isTv = type === 'tv' || type === 'anime';
-  // Anime: priorizar source 4 (animeav1)
+  var year = opts.year || null;
+  var original = opts.original || opts.original_title || opts.original_name || '';
+  // Fuentes (pelis) suelen indexar el título original EN de TMDB
+  var preferOriginal = !isTv;
+  var queries = buildQueries(title, original, year, preferOriginal);
+  if (!queries.length && title) queries = [title];
+  if (!queries.length && original) queries = [original];
+
+  var pool = [];
+  var seenSlug = Object.create(null);
+
+  for (var qi = 0; qi < queries.length; qi++) {
+    try {
+      var r = await fetch(base + '/?q=' + encodeURIComponent(queries[qi]), {
+        headers: { Accept: 'application/json' }
+      });
+      if (!r.ok) continue;
+      var data = await r.json();
+      var results = data.results || [];
+      if (typeof preferAnimeSource === 'function') results = preferAnimeSource(results);
+      for (var ri = 0; ri < results.length; ri++) {
+        var item = results[ri];
+        if (!item) continue;
+        var key = String(item.source_id || item.source || '') + '|' + String(item.slug || item.title || '');
+        if (seenSlug[key]) continue;
+        seenSlug[key] = 1;
+        pool.push(item);
+      }
+      // Si ya tenemos un match fuerte, no hace falta seguir
+      var mainKeyEarly = normKey(title);
+      var strong = pool.some(function (h) {
+        return scoreHit(h, mainKeyEarly, normKey(original), year, isTv) >= 80;
+      });
+      if (strong && pool.length) break;
+    } catch (_) {}
+  }
+
+  if (!pool.length) return null;
+
   if (preferAnime || type === 'anime') {
-    var a4 = results.find(function (x) {
+    var a4 = pool.find(function (x) {
       var sid = String(x.source_id || x.source || '').toLowerCase();
       return sid === '4' || sid === 'animeav1';
     });
     if (a4) return a4;
   }
-  var hit =
-    results.find(function (x) {
-      var t = String(x.type || x.tipo || '').toLowerCase();
-      if (isTv) return /serie|tv|anime|dorama|ova|ona/.test(t);
-      return /peli|movie/.test(t);
-    }) || results[0];
-  return hit;
+
+  var mainKey = normKey(title);
+  var origKey = normKey(original);
+  pool.sort(function (a, b) {
+    return scoreHit(b, mainKey, origKey, year, isTv) - scoreHit(a, mainKey, origKey, year, isTv);
+  });
+
+  var best = pool[0];
+  if (scoreHit(best, mainKey, origKey, year, isTv) < 0) return null;
+  return best;
 }
+
 
 function workerPlayHref(hit, type, id, season, episode) {
   if (!hit) {
@@ -369,7 +501,19 @@ async function loadDetail(type) {
           (x.genres || []).some(function (g) {
             return g && (g.id === 16 || /anim/i.test(g.name || ''));
           });
-        hit = await resolveWorkerHit(it.title, type, isAnim);
+        var origEn =
+          String(it.original_title || x.original_title || x.original_name || '').trim();
+        hit = await resolveWorkerHit(it.title, type, isAnim, {
+          original: origEn,
+          year: (x.release_date || x.first_air_date || '').slice(0, 4) || it.year || null
+        });
+        // Películas: si no hubo hit, buscar solo con Original Title (EN) de TMDB
+        if (!hit && origEn && type !== 'tv' && type !== 'anime') {
+          hit = await resolveWorkerHit(origEn, type, false, {
+            original: origEn,
+            year: (x.release_date || x.first_air_date || '').slice(0, 4) || null
+          });
+        }
       } catch (_) {}
     }
 
