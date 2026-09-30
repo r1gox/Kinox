@@ -1,17 +1,10 @@
 const TMDB_KEY='';const API='https://api.themoviedb.org/3',IMG='https://image.tmdb.org/t/p/';
+const MZ_WORKER='https://moviezone.tvjz.workers.dev';
 const $=(s,r=document)=>r.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 let KEY=TMDB_KEY||store.get('mz_key','');let profiles=store.get('mz_profiles',[{id:'p1',name:'Invitado'}]),pid=store.get('mz_pid','p1');if(!profiles.some(p=>p.id===pid))pid=profiles[0].id;const pk=k=>`mz_${pid}_${k}`;const favs=()=>store.get(pk('favs'),[]),hist=()=>store.get(pk('hist'),[]);const cache=new Map(),ITEMS=new Map();
 
-// Rutas reales a archivos HTML (Vercel no necesita rewrite de /pelicula/:id)
 const LOCAL=location.protocol==='file:';
-function pageUrl(file,params={}){
-  const prefix=LOCAL?(location.pathname.includes('/pages/')?'./':'pages/'):'/pages/';
-  const u=new URL(prefix+file,location.href);
-  Object.entries(params).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')u.searchParams.set(k,v)});
-  return u.pathname+u.search+(LOCAL?'': '');
-}
-// En file:// devolver href completo; en web path absoluto
 function pageHref(file,params={}){
   const prefix=LOCAL?(location.pathname.includes('/pages/')?'./':'pages/'):'/pages/';
   const u=new URL(prefix+file,location.href);
@@ -21,7 +14,6 @@ function pageHref(file,params={}){
 function appLink(path){
   const clean=String(path||'').replace(/^\//,'');
   if(clean==='')return LOCAL?(location.pathname.includes('/pages/')?'../index.html':'index.html'):'/';
-  // Detalle: SIEMPRE archivo real (evita 404 de /pelicula/:id en Vercel)
   if(clean.startsWith('pelicula/'))return pageHref('detalle-pelicula.html',{id:clean.split('/')[1]});
   if(clean.startsWith('serie/'))return pageHref('detalle-serie.html',{id:clean.split('/')[1]});
   if(clean==='peliculas')return pageHref('peliculas.html');
@@ -52,6 +44,19 @@ async function tmdb(path,params={}){if(!KEY)return keyPage();const u=new URL(API
 function slugify(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' y ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
 function detailLink(it){return appLink(`/${it.type==='movie'?'pelicula':'serie'}/${it.id}`)}
 function card(it){return `<a class="card" href="${detailLink(it)}"><div class="im">${it.poster?`<img loading="lazy" src="${IMG}w342${it.poster}" alt="">`:''}</div>${it.rating?`<span class="badge">★ ${it.rating.toFixed(1)}</span>`:''}<b>${esc(it.title)}</b><small>${it.year||''}</small></a>`}
+/** Tarjeta desde resultados del Worker (?q=) */
+function workerCard(it){
+  const tipo=String(it.type||it.tipo||'').toLowerCase();
+  const isTv=/serie|tv|anime|dorama/.test(tipo);
+  const type=isTv?'tv':'movie';
+  const slug=it.slug||slugify(it.title||it.titulo||'');
+  const href=pageHref('reproductor.html',{type,slug,season:isTv?'1':undefined,episode:isTv?'1':undefined});
+  const img=it.portada||it.poster||'';
+  const title=it.title||it.titulo||'Sin título';
+  const year=it.year||'';
+  const src=it.source||it.fuente||'';
+  return `<a class="card" href="${href}"><div class="im">${img?`<img loading="lazy" src="${esc(img)}" alt="">`:''}</div>${src?`<span class="badge">${esc(src)}</span>`:''}<b>${esc(title)}</b><small>${esc(year)}${isTv?' · Serie':' · Película'}</small></a>`;
+}
 function rowHtml(t,items){return items?.length?`<section class="row"><h2>${esc(t)}</h2><div class="track">${items.map(card).join('')}</div></section>`:''}
 function list(res,type){return (res.results||[]).filter(x=>x.poster_path&&x.media_type!=='person').map(x=>norm(x,type))}
 function nav(){
@@ -60,15 +65,16 @@ function nav(){
   let active='';
   if(path.includes('peliculas')||path.includes('detalle-pelicula')) active='peliculas';
   else if(path.includes('series')||path.includes('detalle-serie')) active='series';
-  else if(path.includes('anime.html')||path.endsWith('/anime')) active='anime';
-  else if(path.includes('jk.html')||path.endsWith('/jk')) active='jk';
+  else if(path.includes('anime')) active='anime';
+  else if(path.includes('/jk')||path.includes('jk.html')) active='jk';
   else if(path.includes('favoritos')) active='favoritos';
   else if(path.includes('historial')) active='historial';
   else if(path.includes('perfil')||path.includes('buscar')||path.includes('trailer')||path.includes('reproductor')) active='';
   else active='inicio';
   const current=document.querySelector(`nav a[data-section="${active}"]`);
   if(current) current.classList.add('on');
-  $('#sf').onsubmit=e=>{e.preventDefault();const q=$('#q').value.trim();if(q)go('/buscar?q='+encodeURIComponent(q))};
+  // Buscar → /pages/buscar.html?q=  (NO /buscar?q= que da 404)
+  $('#sf').onsubmit=e=>{e.preventDefault();const q=$('#q').value.trim();if(q)location.href=pageHref('buscar.html',{q})};
   window.addEventListener('scroll',()=>$('#top').classList.toggle('solid',scrollY>30),{passive:true})
 }
 function keyPage(){const v=$('#view');v.innerHTML=`<section class="page" style="max-width:520px;margin:auto"><h1>Conecta TMDB</h1><p style="color:var(--mute);line-height:1.6;margin-bottom:16px">Necesitas una API key v3 de <a style="color:var(--ac)" href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org/settings/api</a>. Se guarda solo en este navegador.</p><form id="kf" style="display:flex;gap:8px"><input id="kv" style="flex:1;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:11px" placeholder="API key v3"><button class="btn">Guardar</button></form></section>`;$('#kf').onsubmit=e=>{e.preventDefault();const v=$('#kv').value.trim();if(v){KEY=v;store.set('mz_key',v);location.reload()}}}

@@ -7,23 +7,24 @@ async function loadPlayer() {
     var episode = u.searchParams.get('episode');
     var slug = u.searchParams.get('slug');
 
-    if (!id) {
-      $('#view').innerHTML = '<div class="load">Falta el ID.</div>';
-      return;
-    }
-
     var meta = null;
-    if (KEY) {
-      meta = await tmdb('/' + type + '/' + id);
-      if (!slug) slug = mzSlug(meta.title || meta.name);
-      document.title = (meta.title || meta.name || 'Reproductor') + ' — Kinox';
+    if (KEY && id) {
+      try {
+        meta = await tmdb('/' + type + '/' + id);
+        if (!slug) slug = mzSlug(meta.title || meta.name);
+        document.title = (meta.title || meta.name || 'Reproductor') + ' — Kinox';
+      } catch (_) {}
     }
     if (!slug) {
       $('#view').innerHTML = '<div class="load">Falta el slug del título.</div>';
       return;
     }
+    if (type === 'tv' && (!season || !episode)) {
+      season = season || '1';
+      episode = episode || '1';
+    }
 
-    var title = (meta && (meta.title || meta.name)) || 'Reproducción';
+    var title = (meta && (meta.title || meta.name)) || slug.replace(/-/g, ' ');
     var label = type === 'tv' ? ('Temporada ' + season + ' · Episodio ' + episode) : 'Película';
 
     $('#view').innerHTML =
@@ -39,7 +40,7 @@ async function loadPlayer() {
     var players = data.reproductores || [];
 
     if (!players.length) {
-      box.innerHTML = '<div class="player-empty">No hay reproductores disponibles para este título.</div>';
+      box.innerHTML = '<div class="player-empty">No hay reproductores disponibles.</div>';
       return;
     }
 
@@ -49,7 +50,7 @@ async function loadPlayer() {
         var lang = (p.language || p.idioma || '').toUpperCase();
         return (
           '<button class="server-btn' + (i === 0 ? ' active' : '') + '" data-i="' + i + '">' +
-          esc(p.name || p.servidor || ('Servidor ' + (i + 1))) +
+          esc(p.name || 'Servidor ' + (i + 1)) +
           (lang ? '<small>' + esc(lang) + '</small>' : '') +
           '</button>'
         );
@@ -88,27 +89,24 @@ async function loadPlayer() {
       box.innerHTML = '<video id="mzVideo" controls playsinline preload="metadata" poster="' + poster + '"></video>';
       var video = $('#mzVideo');
       if (/\.m3u8(?:\?|$)/i.test(src) || /m3u8/i.test(src)) {
-        if (video.canPlayType('application/vnd.apple.mpegurl')) {
-          video.src = src;
-        } else if (window.Hls && Hls.isSupported()) {
+        if (video.canPlayType('application/vnd.apple.mpegurl')) video.src = src;
+        else if (window.Hls && Hls.isSupported()) {
           var hls = new Hls({ enableWorker: true });
           hls.loadSource(src);
           hls.attachMedia(video);
           video._hls = hls;
         } else {
-          box.innerHTML = '<div class="player-empty">Tu navegador no puede reproducir HLS aquí.</div>';
+          box.innerHTML = '<div class="player-empty">Tu navegador no puede reproducir HLS.</div>';
           return;
         }
-      } else {
-        video.src = src;
-      }
+      } else video.src = src;
       video.play().catch(function () {});
     }
 
     function renderIframe(url) {
       box.innerHTML =
         '<iframe class="mz-iframe" src="' + esc(url) +
-        '" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="no-referrer" style="width:100%;aspect-ratio:16/9;border:0;border-radius:12px;background:#000"></iframe>';
+        '" allowfullscreen allow="autoplay; encrypted-media" referrerpolicy="no-referrer" style="width:100%;aspect-ratio:16/9;border:0;border-radius:12px;background:#000"></iframe>';
     }
 
     async function play(p, btn) {
@@ -119,9 +117,8 @@ async function loadPlayer() {
       if (endpoint) {
         try {
           var src = null;
-          if (/\.m3u8(?:\?|$)/i.test(endpoint) || /\.mp4(?:\?|$)/i.test(endpoint)) {
-            src = endpoint;
-          } else {
+          if (/\.m3u8(?:\?|$)/i.test(endpoint) || /\.mp4(?:\?|$)/i.test(endpoint)) src = endpoint;
+          else {
             var r = await fetch(endpoint, { headers: { Accept: 'application/json,text/plain,*/*' } });
             if (!r.ok) throw new Error('HTTP ' + r.status);
             var raw = await r.text();
@@ -130,19 +127,16 @@ async function loadPlayer() {
             src = extractVideoUrl(payload);
           }
           if (src) { renderVideo(src); return; }
-        } catch (e) { console.warn('stream', e); }
+        } catch (e) { console.warn(e); }
       }
-      if (p.url && /^https?:\/\//i.test(p.url)) {
-        renderIframe(p.url);
-        return;
-      }
+      if (p.url && /^https?:\/\//i.test(p.url)) { renderIframe(p.url); return; }
       box.innerHTML = '<div class="player-empty">No se pudo iniciar este servidor.</div>';
     }
 
     document.querySelectorAll('.server-btn').forEach(function (btn) {
       btn.onclick = function () { play(players[Number(btn.dataset.i)], btn); };
     });
-    box.innerHTML = '<div class="player-empty">Selecciona un servidor para comenzar la reproducción.</div>';
+    box.innerHTML = '<div class="player-empty">Selecciona un servidor para comenzar.</div>';
   } catch (e) {
     $('#view').innerHTML = '<div class="load">' + esc(e.message) + '</div>';
   }

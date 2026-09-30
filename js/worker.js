@@ -1,7 +1,5 @@
-// Kinox — API de reproductores (Worker)
-// Catálogo/detalle = TMDB. Solo se llama al worker al reproducir.
 const MZ_WORKER = 'https://moviezone.tvjz.workers.dev';
-const MZ_SOURCE = '9'; // cambia a '3' si quieres la otra fuente
+const MZ_SOURCE = '9';
 
 function mzSlug(value) {
   return String(value || '')
