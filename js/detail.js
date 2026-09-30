@@ -60,34 +60,49 @@ async function resolveWorkerHit(title, type, preferAnime, opts) {
 
   function scoreHit(hit, mainKey, origKey, year, isTv) {
     var t = String(hit.type || hit.tipo || '').toLowerCase();
-    var typeOk = isTv
-      ? /serie|tv|anime|dorama|ova|ona/.test(t)
-      : /peli|movie/.test(t);
-    if (!typeOk && t) return -1000;
-
-    var ht = normKey(hit.title || hit.titulo || '');
-    var hy = String(hit.year || '').slice(0, 4);
-    var sc = 0;
-    if (year && hy && hy === String(year).slice(0, 4)) sc += 50;
-    if (year && hy && hy !== String(year).slice(0, 4)) sc -= 30;
-
-    if (mainKey && ht === mainKey) sc += 80;
-    else if (origKey && ht === origKey) sc += 80;
-    else if (mainKey && (ht.indexOf(mainKey) !== -1 || mainKey.indexOf(ht) !== -1)) sc += 40;
-    else if (origKey && (ht.indexOf(origKey) !== -1 || origKey.indexOf(ht) !== -1)) sc += 40;
-    else {
-      // tokens compartidos
-      var a = mainKey ? mainKey.split(' ') : [];
-      var b = ht.split(' ');
-      var shared = 0;
-      for (var i = 0; i < a.length; i++) {
-        if (a[i].length > 2 && b.indexOf(a[i]) !== -1) shared++;
-      }
-      sc += shared * 8;
+    // Rechazar peli↔serie cruzado
+    if (t) {
+      if (!isTv && /serie|tv|dorama/.test(t) && !/peli|movie|film/.test(t)) return -1000;
+      if (isTv && /peli|movie|film/.test(t) && !/serie|tv|anime|dorama|ova|ona/.test(t)) return -1000;
     }
 
+    var ht = normKey(hit.title || hit.titulo || '');
+    var hs = normKey(String(hit.slug || '').replace(/-/g, ' '));
+    var hy = String(hit.year || '').slice(0, 4);
+    var sc = 0;
+    if (!ht && !hs) return -1000;
+
+    if (year && hy && hy === String(year).slice(0, 4)) sc += 50;
+    if (year && hy && hy !== String(year).slice(0, 4)) sc -= 40;
+
+    var titleMatch = false;
+    if (mainKey && ht === mainKey) { sc += 100; titleMatch = true; }
+    else if (origKey && ht === origKey) { sc += 100; titleMatch = true; }
+    else if (mainKey && ht && mainKey.length >= 4 && (ht === mainKey || ht.indexOf(mainKey) !== -1 || mainKey.indexOf(ht) !== -1)) {
+      sc += 55; titleMatch = true;
+    } else if (origKey && ht && origKey.length >= 4 && (ht.indexOf(origKey) !== -1 || origKey.indexOf(ht) !== -1)) {
+      sc += 55; titleMatch = true;
+    }
+
+    function sharedTokens(aKey, bKey) {
+      var a = String(aKey || '').split(' ').filter(function (w) { return w.length > 2; });
+      var b = String(bKey || '').split(' ').filter(function (w) { return w.length > 2; });
+      var n = 0;
+      for (var i = 0; i < a.length; i++) if (b.indexOf(a[i]) !== -1) n++;
+      return n;
+    }
+    var sh = Math.max(sharedTokens(mainKey, ht), sharedTokens(origKey, ht), sharedTokens(mainKey, hs));
+    if (sh > 0) { sc += sh * 15; titleMatch = true; }
+
+    // slug tipo colony-a4fmlD
+    if (mainKey && hs && (hs === mainKey || hs.indexOf(mainKey) === 0 || hs.indexOf(mainKey + ' ') === 0)) {
+      sc += 25; titleMatch = true;
+    }
+
+    // Sin ninguna coincidencia de título → basura (Gintama ≠ Colony)
+    if (!titleMatch) return -1000;
+
     var sid = String(hit.source_id || hit.source || '');
-    // películas: preferir 9 / 3 / 2
     if (!isTv) {
       if (sid === '9' || sid === 'pelisplushd_bz') sc += 6;
       if (sid === '3' || sid === 'pelisplushd') sc += 4;
@@ -110,22 +125,30 @@ async function resolveWorkerHit(title, type, preferAnime, opts) {
 
   for (var qi = 0; qi < queries.length; qi++) {
     try {
-      var r = await fetch(base + '/?q=' + encodeURIComponent(queries[qi]), {
-        headers: { Accept: 'application/json' }
-      });
-      if (!r.ok) continue;
-      var data = await r.json();
-      var results = data.results || [];
-      if (typeof preferAnimeSource === 'function') results = preferAnimeSource(results);
-      for (var ri = 0; ri < results.length; ri++) {
-        var item = results[ri];
-        if (!item) continue;
-        var key = String(item.source_id || item.source || '') + '|' + String(item.slug || item.title || '');
-        if (seenSlug[key]) continue;
-        seenSlug[key] = 1;
-        pool.push(item);
+      var urlsTry = [base + '/?q=' + encodeURIComponent(queries[qi])];
+      if (!isTv) {
+        urlsTry.push(base + '/9/buscar?q=' + encodeURIComponent(queries[qi]));
+        urlsTry.push(base + '/3/buscar?q=' + encodeURIComponent(queries[qi]));
+      } else {
+        urlsTry.push(base + '/4/buscar?q=' + encodeURIComponent(queries[qi]));
       }
-      // Si ya tenemos un match fuerte, no hace falta seguir
+      for (var ui = 0; ui < urlsTry.length; ui++) {
+        try {
+          var r = await fetch(urlsTry[ui], { headers: { Accept: 'application/json' } });
+          if (!r.ok) continue;
+          var data = await r.json();
+          var results = data.results || data.resultados || [];
+          if (typeof preferAnimeSource === 'function') results = preferAnimeSource(results);
+          for (var ri = 0; ri < results.length; ri++) {
+            var item = results[ri];
+            if (!item) continue;
+            var key = String(item.source_id || item.source || '') + '|' + String(item.slug || item.title || '');
+            if (seenSlug[key]) continue;
+            seenSlug[key] = 1;
+            pool.push(item);
+          }
+        } catch (_) {}
+      }
       var mainKeyEarly = normKey(title);
       var strong = pool.some(function (h) {
         return scoreHit(h, mainKeyEarly, normKey(original), year, isTv) >= 80;
@@ -151,7 +174,8 @@ async function resolveWorkerHit(title, type, preferAnime, opts) {
   });
 
   var best = pool[0];
-  if (scoreHit(best, mainKey, origKey, year, isTv) < 0) return null;
+  var bestScore = scoreHit(best, mainKey, origKey, year, isTv);
+  if (bestScore < 40) return null;
   return best;
 }
 
