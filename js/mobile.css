@@ -1,0 +1,206 @@
+/**
+ * Kinox móvil ≤900px — secciones del menú VISIBLES arriba
+ */
+@media (max-width: 900px) {
+  :root {
+    --mz-bottom-h: 58px;
+    --mz-header-h: 96px;
+  }
+
+  body.mz-has-bottom-nav {
+    padding-bottom: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Header: logo+buscar+perfil / secciones debajo */
+  header#top,
+  header {
+    position: fixed !important;
+    inset: 0 0 auto 0 !important;
+    z-index: 50 !important;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    grid-template-rows: 48px 42px !important;
+    align-items: center !important;
+    column-gap: 8px !important;
+    row-gap: 2px !important;
+    min-height: 90px !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 6px 10px 6px !important;
+    padding-top: max(6px, env(safe-area-inset-top, 0px)) !important;
+    box-sizing: border-box !important;
+    background: rgba(10, 6, 17, 0.98) !important;
+    border-bottom: 1px solid var(--line, #2a1f3d) !important;
+  }
+
+  header .logo {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    font-size: 1.12rem !important;
+  }
+
+  header #sf {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  header #q,
+  header #q:focus {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 36px !important;
+    font-size: 16px !important;
+    box-sizing: border-box !important;
+  }
+
+  header #prof {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  /* IMPORTANTE: menú de secciones visible y scrolleable */
+  header nav {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    min-height: 36px !important;
+    height: auto !important;
+    max-height: 48px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    gap: 2px !important;
+    white-space: nowrap !important;
+    scrollbar-width: none !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  header nav::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  header nav a {
+    display: inline-flex !important;
+    visibility: visible !important;
+    flex: 0 0 auto !important;
+    align-items: center !important;
+    padding: 8px 12px !important;
+    font-size: 0.8rem !important;
+    border-radius: 8px !important;
+    color: var(--mute, #9a8fb0) !important;
+  }
+  header nav a.on,
+  header nav a:hover {
+    color: var(--tx, #f4f0fa) !important;
+    background: rgba(166, 107, 255, 0.12) !important;
+  }
+
+  .page {
+    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 8px) !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  .det,
+  .player-page {
+    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 8px) !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .hero {
+    min-height: 56vh !important;
+    padding: 0 12px 28px !important;
+    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px)) !important;
+  }
+  .hero h1 { font-size: 1.55rem !important; }
+  .hero p { font-size: 0.84rem !important; }
+
+  .row { padding: 12px 12px 0 !important; }
+  .track { grid-auto-columns: 110px !important; gap: 10px !important; }
+  .track .card { width: 110px !important; }
+
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 12px 8px !important;
+  }
+
+  .filters {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+  .filters select { width: 100% !important; min-width: 0 !important; }
+
+  .dw { flex-direction: column !important; gap: 14px !important; }
+  .pos { width: min(170px, 40vw) !important; margin: 0 auto !important; }
+  .info h1 { font-size: 1.4rem !important; text-align: center !important; }
+  .btns { display: grid !important; grid-template-columns: 1fr !important; gap: 8px !important; }
+  .btns .btn { width: 100% !important; min-width: 0 !important; }
+
+  .server-list {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+  .server-btn { width: 100% !important; }
+
+  .mz-cal-card { flex-basis: 128px !important; }
+  .mz-anime-search { flex-direction: column !important; max-width: none !important; }
+  .mz-anime-search .btn { width: 100% !important; }
+
+  footer { padding: 20px 12px 8px !important; font-size: 0.7rem !important; }
+
+  .mz-bottom-nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 80;
+    display: flex;
+    align-items: stretch;
+    justify-content: space-around;
+    height: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(12, 8, 20, 0.98);
+    border-top: 1px solid var(--line, #2a1f3d);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .mz-bottom-nav a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 6px 2px;
+    color: var(--mute, #9a8fb0);
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .mz-bottom-nav a .ico { font-size: 1.1rem; line-height: 1; }
+  .mz-bottom-nav a.on { color: var(--tx, #f4f0fa); }
+  .mz-bottom-nav a.on .ico { color: var(--ac, #a66bff); }
+  .mz-bottom-nav a .lbl {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 901px) {
+  .mz-bottom-nav { display: none !important; }
+}
+
+@media (max-width: 390px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
