@@ -1,5 +1,6 @@
 /**
- * Kinox móvil ≤900px — secciones del menú VISIBLES arriba
+ * Kinox móvil — header reordenado por mobile-ui.js
+ * .mz-m-header > .mz-m-top (logo buscar perfil) + nav (secciones)
  */
 @media (max-width: 900px) {
   :root {
@@ -11,110 +12,115 @@
     padding-bottom: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px));
   }
 
-  /* Header: logo+buscar+perfil / secciones debajo */
-  header#top,
-  header {
+  header.mz-m-header,
+  header#top.mz-m-header {
     position: fixed !important;
-    inset: 0 0 auto 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
     z-index: 50 !important;
-    display: grid !important;
-    grid-template-columns: auto minmax(0, 1fr) auto !important;
-    grid-template-rows: 48px 42px !important;
-    align-items: center !important;
-    column-gap: 8px !important;
-    row-gap: 2px !important;
-    min-height: 90px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0 !important;
+    min-height: 0 !important;
     height: auto !important;
     max-height: none !important;
-    padding: 6px 10px 6px !important;
-    padding-top: max(6px, env(safe-area-inset-top, 0px)) !important;
-    box-sizing: border-box !important;
+    padding: 0 !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
     background: rgba(10, 6, 17, 0.98) !important;
     border-bottom: 1px solid var(--line, #2a1f3d) !important;
+    grid-template-columns: none !important;
+    grid-template-rows: none !important;
   }
 
-  header .logo {
-    grid-column: 1 !important;
-    grid-row: 1 !important;
+  header.mz-m-header .mz-m-top {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 8px 10px 4px !important;
+    min-height: 48px !important;
+  }
+
+  header.mz-m-header .mz-m-top .logo {
+    flex: 0 0 auto !important;
     font-size: 1.12rem !important;
   }
 
-  header #sf {
-    grid-column: 2 !important;
-    grid-row: 1 !important;
-    margin: 0 !important;
-    width: 100% !important;
+  header.mz-m-header .mz-m-top #sf {
+    flex: 1 1 auto !important;
     min-width: 0 !important;
+    margin: 0 !important;
+    width: auto !important;
   }
 
-  header #q,
-  header #q:focus {
+  header.mz-m-header .mz-m-top #q,
+  header.mz-m-header .mz-m-top #q:focus {
     width: 100% !important;
-    max-width: 100% !important;
+    max-width: none !important;
     height: 36px !important;
     font-size: 16px !important;
     box-sizing: border-box !important;
   }
 
-  header #prof {
-    grid-column: 3 !important;
-    grid-row: 1 !important;
+  header.mz-m-header .mz-m-top #prof {
+    flex: 0 0 auto !important;
     width: 34px !important;
     height: 34px !important;
   }
 
-  /* IMPORTANTE: menú de secciones visible y scrolleable */
-  header nav {
+  /* Secciones: fila completa, scroll horizontal */
+  header.mz-m-header > nav {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
-    pointer-events: auto !important;
-    grid-column: 1 / -1 !important;
-    grid-row: 2 !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
     width: 100% !important;
-    min-height: 36px !important;
-    height: auto !important;
-    max-height: 48px !important;
+    min-height: 40px !important;
+    height: 40px !important;
+    padding: 0 6px 6px !important;
+    margin: 0 !important;
+    gap: 2px !important;
     overflow-x: auto !important;
     overflow-y: hidden !important;
-    gap: 2px !important;
-    white-space: nowrap !important;
-    scrollbar-width: none !important;
     -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    background: transparent !important;
   }
-  header nav::-webkit-scrollbar {
+  header.mz-m-header > nav::-webkit-scrollbar {
     display: none !important;
-    width: 0 !important;
-    height: 0 !important;
   }
-  header nav a {
+  header.mz-m-header > nav a {
     display: inline-flex !important;
-    visibility: visible !important;
     flex: 0 0 auto !important;
     align-items: center !important;
     padding: 8px 12px !important;
     font-size: 0.8rem !important;
+    font-weight: 600 !important;
     border-radius: 8px !important;
-    color: var(--mute, #9a8fb0) !important;
+    color: #c4b8d9 !important;
+    white-space: nowrap !important;
   }
-  header nav a.on,
-  header nav a:hover {
-    color: var(--tx, #f4f0fa) !important;
-    background: rgba(166, 107, 255, 0.12) !important;
+  header.mz-m-header > nav a.on {
+    color: #fff !important;
+    background: rgba(166, 107, 255, 0.2) !important;
   }
 
+  /* Contenido bajo header (~96px) */
   .page {
-    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 8px) !important;
+    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 6px) !important;
     padding-left: 12px !important;
     padding-right: 12px !important;
   }
   .det,
   .player-page {
-    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 8px) !important;
+    padding-top: calc(var(--mz-header-h) + env(safe-area-inset-top, 0px) + 6px) !important;
     padding-left: 12px !important;
     padding-right: 12px !important;
   }
-
   .hero {
     min-height: 56vh !important;
     padding: 0 12px 28px !important;
@@ -163,8 +169,6 @@
     left: 0; right: 0; bottom: 0;
     z-index: 80;
     display: flex;
-    align-items: stretch;
-    justify-content: space-around;
     height: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: rgba(12, 8, 20, 0.98);
@@ -186,8 +190,8 @@
     font-weight: 600;
     text-decoration: none;
   }
-  .mz-bottom-nav a .ico { font-size: 1.1rem; line-height: 1; }
-  .mz-bottom-nav a.on { color: var(--tx, #f4f0fa); }
+  .mz-bottom-nav a .ico { font-size: 1.1rem; }
+  .mz-bottom-nav a.on { color: #fff; }
   .mz-bottom-nav a.on .ico { color: var(--ac, #a66bff); }
   .mz-bottom-nav a .lbl {
     max-width: 100%;
@@ -199,6 +203,7 @@
 
 @media (min-width: 901px) {
   .mz-bottom-nav { display: none !important; }
+  .mz-m-top { display: contents !important; }
 }
 
 @media (max-width: 390px) {
