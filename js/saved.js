@@ -1,0 +1,1 @@
+function loadSaved(which,title,empty){const items=which==='favs'?favs():hist();$('#view').innerHTML=`<section class="page"><h1>${title}</h1>${items.length?`<div class="grid">${items.map(card).join('')}</div>`:`<div class="empty">${empty}</div>`}</section>`}
