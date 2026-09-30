@@ -284,10 +284,19 @@
         return outFlat;
       }
 
-      // --- Anime / serie con temporadas reales en el worker ---
+      // --- Temporadas reales del worker (Wistoria T1/T2, etc.) ---
       var want = parseInt(seasonNum, 10) || 1;
-      // Si el ep actual está en alguna lista, usar esa temporada del worker
-      if (isAnime && cur && temps.length) {
+      var block = null;
+      for (var i = 0; i < temps.length; i++) {
+        var t = temps[i];
+        var tn = parseInt(t.temporada != null ? t.temporada : t.season, 10);
+        if (tn === want) {
+          block = t;
+          break;
+        }
+      }
+      // Si la URL pide T2 y existe, usarla. Solo buscar por nº de ep si no hay bloque.
+      if (!block && isAnime && cur && temps.length) {
         for (var ti = 0; ti < temps.length; ti++) {
           var L = temps[ti].lista || temps[ti].episodios || [];
           if (!Array.isArray(L)) continue;
@@ -296,7 +305,13 @@
               L[ej] && (L[ej].episodio != null ? L[ej].episodio : L[ej].episode),
               10
             );
-            if (en === cur) {
+            var etn = parseInt(
+              L[ej] && L[ej].temporada != null ? L[ej].temporada : temps[ti].temporada,
+              10
+            );
+            // Preferir match de misma temporada de URL
+            if (en === cur && (!want || etn === want || !etn)) {
+              block = temps[ti];
               want = parseInt(
                 temps[ti].temporada != null ? temps[ti].temporada : ti + 1,
                 10
@@ -304,15 +319,7 @@
               break;
             }
           }
-        }
-      }
-      var block = null;
-      for (var i = 0; i < temps.length; i++) {
-        var t = temps[i];
-        var tn = parseInt(t.temporada != null ? t.temporada : t.season, 10);
-        if (tn === want) {
-          block = t;
-          break;
+          if (block) break;
         }
       }
       if (!block && temps[0]) block = temps[0];
@@ -327,9 +334,17 @@
       for (var j = 0; j < lista.length; j++) {
         var ep = normalizeEp(lista[j], sn);
         if (ep) {
-          if (isAnime) {
-            ep.__playSeason = sn;
-            ep.__animeFlat = temps.length <= 1;
+          ep.season_number = sn;
+          ep.__tmdb_season = sn;
+          ep.__playSeason = sn;
+          ep.__animeFlat = false;
+          // back_img del worker
+          var raw = lista[j];
+          if (raw && (raw.back_img || raw.still) && !ep.still_url) {
+            ep.still_url = raw.back_img || raw.still;
+          }
+          if (raw && (raw.titulo || raw.name) && (!ep.name || /^Episodio/i.test(ep.name))) {
+            ep.name = raw.titulo || raw.name;
           }
           out.push(ep);
         }
@@ -451,8 +466,8 @@
       var urlVidBase = urlVid;
       if (urlVid && type === "tv" && season && episode) {
         if (!/\/\d+\/\d+\/?$/.test(urlVid)) {
-          var seaUv = isAnimeSourceId(sourceId) ? "1" : season;
-          urlVid = urlVid.replace(/\/$/, "") + "/" + seaUv + "/" + episode;
+          urlVid =
+            urlVid.replace(/\/$/, "") + "/" + (season || "1") + "/" + episode;
         }
         urlVidBase = String(urlVid).replace(/\/\d+\/\d+\/?$/, "");
       }
@@ -525,10 +540,16 @@
         return row ? row.season : null;
       }
 
-      // Enriquecer lista de episodios con temporada TMDB real (no T1 ficticio)
-      if (seasonEps.length && absSeasonMap) {
+      // One Piece-like (eps absolutos): mapear a T23. Multi-temp worker (Wistoria): no pisar.
+      var workerMulti =
+        seasonEps.length &&
+        seasonEps[0] &&
+        seasonEps[0].__playSeason != null &&
+        seasonEps[0].__animeFlat === false;
+      if (seasonEps.length && absSeasonMap && !workerMulti) {
         for (var se = 0; se < seasonEps.length; se++) {
           var rowEp = seasonEps[se];
+          if (rowEp.__animeFlat === false && rowEp.__playSeason != null) continue;
           var absEp = parseInt(rowEp.episode_number, 10);
           var mapRow = absSeasonMap[absEp];
           if (mapRow) {
@@ -550,24 +571,28 @@
       var epN = parseInt(episode, 10);
       var seaN = parseInt(season, 10) || 1;
       if (type === "tv" && id && episode) {
-        var mappedSea = tmdbSeasonForAbs(epN);
-        var mappedEpInSea =
-          absSeasonMap && absSeasonMap[epN]
-            ? absSeasonMap[epN].episode
-            : null;
-        if (mappedSea && mappedEpInSea) {
-          tmdbEp = await loadTmdbEpDirect(id, mappedSea, mappedEpInSea);
-          if (tmdbEp) {
-            tmdbEp.__tmdb_season = mappedSea;
-            tmdbEp.__tmdb_episode = mappedEpInSea;
-            tmdbEp.__absolute = epN;
+        // 1) Temporada de la URL (Wistoria T2 E12)
+        tmdbEp = await loadTmdbEpDirect(id, seaN, epN);
+        if (tmdbEp) {
+          tmdbEp.__tmdb_season = seaN;
+          tmdbEp.__tmdb_episode = epN;
+        }
+        // 2) One Piece-like: episodio absoluto alto
+        if (!tmdbEp && epN > 80) {
+          var mappedSea = tmdbSeasonForAbs(epN);
+          var mappedEpInSea =
+            absSeasonMap && absSeasonMap[epN]
+              ? absSeasonMap[epN].episode
+              : null;
+          if (mappedSea && mappedEpInSea) {
+            tmdbEp = await loadTmdbEpDirect(id, mappedSea, mappedEpInSea);
+            if (tmdbEp) {
+              tmdbEp.__tmdb_season = mappedSea;
+              tmdbEp.__tmdb_episode = mappedEpInSea;
+              tmdbEp.__absolute = epN;
+            }
           }
-        }
-        if (!tmdbEp && (isAnimeSourceId(sourceId) || epN > 80)) {
-          tmdbEp = await loadTmdbEpByAbsolute(id, epN);
-        }
-        if (!tmdbEp) {
-          tmdbEp = await loadTmdbEpDirect(id, seaN, epN);
+          if (!tmdbEp) tmdbEp = await loadTmdbEpByAbsolute(id, epN);
         }
       }
       if (tmdbEp) {
@@ -580,11 +605,11 @@
       }
 
       var labelSea =
+        season ||
         (epMeta && epMeta.__tmdb_season) ||
         (epMeta && epMeta.season_number) ||
         tmdbSeasonForAbs(episode) ||
-        (isAnimeSourceId(sourceId) ? null : season) ||
-        season;
+        1;
       // Formato como en detalle: T23 E1179 — Nombre
       var epTitle =
         type === "tv"
@@ -619,10 +644,10 @@
           '<div id="playerBox" class="kx-player mz-player"><div class="player-loading">Buscando reproductores…</div></div>' +
           "</div>" +
           '<aside class="kx-sidebar" id="kxSidebar">' +
-          '<div class="kx-sidebar-head">Episodios' +
-          (isAnimeSourceId(sourceId)
-            ? " · E" + esc(episode)
-            : " · T" + esc(season)) +
+          '<div class="kx-sidebar-head">Episodios · T' +
+          esc(season || "1") +
+          " E" +
+          esc(episode) +
           "</div>" +
           '<div class="kx-ep-list" id="kxEpList"></div>' +
           "</aside>" +
@@ -669,7 +694,8 @@
       }
 
       var box = $("#playerBox");
-      var playSeasonMz = isAnimeSourceId(sourceId) ? 1 : season;
+      // Anime multi-temp: respetar season de la URL (T2 E12). Flat One Piece: 1.
+      var playSeasonMz = season || 1;
       var playEpisodeMz = episode;
       var data = await mzPlayers({
         type: type,
@@ -750,9 +776,9 @@
           var playSea =
             e.__playSeason != null
               ? e.__playSeason
-              : isAnimeSourceId(sourceId)
-                ? 1
-                : season;
+              : e.season_number != null
+                ? e.season_number
+                : season || 1;
           var href = buildPlayHref({
             type: "tv",
             id: id,
