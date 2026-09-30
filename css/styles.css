@@ -465,20 +465,36 @@ body.kx-trailer-open{overflow:hidden}
 }
 
 
-/* Cards: tipo izq · rating der (sobre la portada) */
-.card .im{position:relative}
+.card .im{position:relative;overflow:hidden}
 .card .badge-type{
   position:absolute;left:6px;top:6px;z-index:2;
-  background:rgba(10,6,17,.82);color:#e8e0f5;
-  font-size:.65rem;font-weight:700;letter-spacing:.02em;
-  padding:3px 7px;border-radius:6px;text-transform:uppercase;
-  max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  background:rgba(10,6,17,.85);color:#e8e0f5;
+  font-size:.65rem;font-weight:700;text-transform:uppercase;
+  padding:3px 7px;border-radius:6px;max-width:52%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  border:0;
 }
 .card .badge-rating{
   position:absolute;right:6px;top:6px;z-index:2;
-  background:rgba(10,6,17,.85);color:#ffd166;
-  font-size:.7rem;font-weight:700;
-  padding:3px 7px;border-radius:6px;
+  background:rgba(10,6,17,.88);color:#ffd166;
+  font-size:.7rem;font-weight:700;padding:3px 7px;border-radius:6px;border:0;
 }
-.card .badge-rating-empty{display:none}
-.card .badge:not(.badge-type):not(.badge-rating){/* legacy */}
+.card .badge:not(.badge-type):not(.badge-rating){
+  position:absolute;right:6px;top:6px;z-index:1;
+}
+
+/* Layout cards general: tipo izq · rating der · abajo tipo · año */
+.card .im{position:relative}
+.card .badge-type{
+  position:absolute!important;left:6px!important;right:auto!important;top:6px!important;z-index:2;
+  background:rgba(10,6,17,.85)!important;color:#e8e0f5!important;
+  font-size:.65rem!important;font-weight:700;text-transform:uppercase;
+  padding:3px 7px;border-radius:6px;max-width:52%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0!important;
+}
+.card .badge-rating{
+  position:absolute!important;right:6px!important;left:auto!important;top:6px!important;z-index:2;
+  background:rgba(10,6,17,.88)!important;color:#ffd166!important;
+  font-size:.7rem!important;font-weight:700;padding:3px 7px;border-radius:6px;border:0!important;
+}
+.card .badge-rating-empty{display:none!important}
