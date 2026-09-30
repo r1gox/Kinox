@@ -296,17 +296,38 @@ async function loadDetailFromWorker(type, params) {
       if (tmdbIdForTrailer) {
         var tr = await findYoutubeTrailer(type, tmdbIdForTrailer);
         if (tr && tr.key) trailerKey = tr.key;
+        // Backdrop w1280 desde TMDB si el worker no trae
+        if (!backdrop && typeof tmdb === 'function') {
+          try {
+            var tx = await tmdb('/' + type + '/' + tmdbIdForTrailer);
+            if (tx && tx.backdrop_path) {
+              backdrop =
+                (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
+                'w1280' +
+                tx.backdrop_path;
+            }
+            if ((!rating || rating === '') && tx && tx.vote_average) {
+              rating = tx.vote_average;
+            }
+          } catch (_) {}
+        }
       }
     }
   } catch (_) {}
 
   var temps = Array.isArray(data.temporadas) ? data.temporadas : [];
 
+  // Preferir backdrop TMDB w1280
+  var bdUrl = backdrop || '';
+  if (bdUrl && bdUrl.indexOf('/t/p/') !== -1 && bdUrl.indexOf('w1280') === -1) {
+    bdUrl = bdUrl.replace(/\/t\/p\/\w+\//, '/t/p/w1280/');
+  }
   $('#view').innerHTML =
     '<section class="det">' +
-    (backdrop
-      ? '<div class="bd" style="background-image:url(' + esc(backdrop) + ')"></div>'
+    (bdUrl
+      ? '<div class="bd" style="background-image:url(' + esc(bdUrl) + ')"></div>'
       : '') +
+    '<a class="kx-back det-back" href="javascript:history.back()">← Volver</a>' +
     '<div class="dw">' +
     (portada ? '<img class="pos" src="' + esc(portada) + '" alt="">' : '') +
     '<div class="info"><h1>' +
@@ -578,7 +599,10 @@ async function loadDetail(type) {
 
     $('#view').innerHTML =
       '<section class="det">' +
-      (x.backdrop_path ? '<div class="bd" style="background-image:url(' + IMG + 'w1280' + x.backdrop_path + ')"></div>' : '') +
+      (x.backdrop_path
+        ? '<div class="bd" style="background-image:url(' + IMG + 'w1280' + x.backdrop_path + ')"></div>'
+        : '') +
+      '<a class="kx-back det-back" href="javascript:history.back()">← Volver</a>' +
       '<div class="dw">' +
       (x.poster_path ? '<img class="pos" src="' + IMG + 'w500' + x.poster_path + '" alt="Póster de ' + esc(it.title) + '">' : '') +
       '<div class="info"><h1>' +
