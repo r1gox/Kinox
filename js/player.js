@@ -497,6 +497,47 @@
         });
       }
 
+      /* Mapa absoluto → temporada TMDB (igual que detalle) */
+      var absSeasonMap = null; // absEp -> { season, episode, name? }
+      if (type === "tv" && id && typeof tmdb === "function") {
+        try {
+          var tvMeta = await tmdb("/tv/" + id);
+          var seasonsMeta = (tvMeta && tvMeta.seasons) || [];
+          absSeasonMap = Object.create(null);
+          var absN = 1;
+          for (var si = 0; si < seasonsMeta.length; si++) {
+            var sm = seasonsMeta[si];
+            var sn = parseInt(sm.season_number, 10);
+            if (sn === 0) continue;
+            var cnt = parseInt(sm.episode_count, 10) || 0;
+            for (var ei = 1; ei <= cnt; ei++) {
+              absSeasonMap[absN] = { season: sn, episode: ei };
+              absN++;
+            }
+          }
+        } catch (_) {
+          absSeasonMap = null;
+        }
+      }
+      function tmdbSeasonForAbs(absEp) {
+        if (!absSeasonMap) return null;
+        var row = absSeasonMap[parseInt(absEp, 10)];
+        return row ? row.season : null;
+      }
+
+      // Enriquecer lista de episodios con temporada TMDB real (no T1 ficticio)
+      if (seasonEps.length && absSeasonMap) {
+        for (var se = 0; se < seasonEps.length; se++) {
+          var rowEp = seasonEps[se];
+          var absEp = parseInt(rowEp.episode_number, 10);
+          var mapRow = absSeasonMap[absEp];
+          if (mapRow) {
+            rowEp.__tmdb_season = mapRow.season;
+            rowEp.season_number = mapRow.season;
+          }
+        }
+      }
+
       var epMeta = null;
       if (seasonEps.length) {
         epMeta = seasonEps.find(function (e) {
@@ -504,19 +545,30 @@
         });
       }
 
-      // Meta real del episodio (nombre + sinopsis TMDB), no la de la serie
+      // Meta real del episodio (nombre + sinopsis TMDB)
       var tmdbEp = null;
+      var epN = parseInt(episode, 10);
+      var seaN = parseInt(season, 10) || 1;
       if (type === "tv" && id && episode) {
-        var epN = parseInt(episode, 10);
-        var seaN = parseInt(season, 10) || 1;
-        // Episodio absoluto (anime One Piece 1180) o temporada TMDB normal
-        if (isAnimeSourceId(sourceId) || epN > 80) {
+        var mappedSea = tmdbSeasonForAbs(epN);
+        var mappedEpInSea =
+          absSeasonMap && absSeasonMap[epN]
+            ? absSeasonMap[epN].episode
+            : null;
+        if (mappedSea && mappedEpInSea) {
+          tmdbEp = await loadTmdbEpDirect(id, mappedSea, mappedEpInSea);
+          if (tmdbEp) {
+            tmdbEp.__tmdb_season = mappedSea;
+            tmdbEp.__tmdb_episode = mappedEpInSea;
+            tmdbEp.__absolute = epN;
+          }
+        }
+        if (!tmdbEp && (isAnimeSourceId(sourceId) || epN > 80)) {
           tmdbEp = await loadTmdbEpByAbsolute(id, epN);
         }
         if (!tmdbEp) {
           tmdbEp = await loadTmdbEpDirect(id, seaN, epN);
         }
-        // Si season=23 y episode=1180 falló directo, ya intentamos absoluto
       }
       if (tmdbEp) {
         epMeta = epMeta || {};
@@ -530,8 +582,10 @@
       var labelSea =
         (epMeta && epMeta.__tmdb_season) ||
         (epMeta && epMeta.season_number) ||
-        (isAnimeSourceId(sourceId) ? "1" : season);
-      // Formato como en detalle: T23 E1179 — Nombre del episodio
+        tmdbSeasonForAbs(episode) ||
+        (isAnimeSourceId(sourceId) ? null : season) ||
+        season;
+      // Formato como en detalle: T23 E1179 — Nombre
       var epTitle =
         type === "tv"
           ? "T" +
@@ -544,7 +598,6 @@
         (epMeta && epMeta.runtime) ||
         (meta && meta.runtime) ||
         null;
-      // Descripción del EPISODIO; solo si no hay, no usar overview de toda la serie
       var epOverview =
         (epMeta && epMeta.overview && String(epMeta.overview).trim()) ||
         (tmdbEp && tmdbEp.overview && String(tmdbEp.overview).trim()) ||
@@ -743,9 +796,13 @@
             "</div>" +
             '<div class="kx-ep-info"><div class="kx-ep-name">' +
             "T" +
-            (e.season_number ||
-              e.__tmdb_season ||
-              (isAnimeSourceId(sourceId) ? "1" : season)) +
+            (e.__tmdb_season ||
+              e.season_number ||
+              (typeof tmdbSeasonForAbs === "function"
+                ? tmdbSeasonForAbs(n)
+                : null) ||
+              season ||
+              "1") +
             " E" +
             n +
             " — " +
