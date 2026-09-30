@@ -991,10 +991,6 @@
       });
 
       // Auto: preferido → primer normal → primer directo
-      var pref = loadPref();
-      var auto = matchPref(players, pref);
-      var autoMode = pref && pref.mode === "direct" ? "direct" : "iframe";
-
       function pickUpnShare(list) {
         if (!list || !list.length) return null;
         for (var ui = 0; ui < list.length; ui++) {
@@ -1005,14 +1001,12 @@
               (px.provider ||
                 px.servidor ||
                 px.server ||
-                px.name ||
-                px.servidor)) ||
+                px.name)) ||
               ""
           ).toLowerCase();
           var url = String((px && (px.url || px.link)) || "").toLowerCase();
           if (
             lab.indexOf("upnshare") !== -1 ||
-            lab === "upn" ||
             lab.indexOf("upn") !== -1 ||
             pr.indexOf("upnshare") !== -1 ||
             pr.indexOf("upn") !== -1 ||
@@ -1026,9 +1020,16 @@
         return null;
       }
 
-      // Anime (fuente 4/5): UPNShare por defecto si no hay preferencia previa
-      if (!auto && isAnimeSourceId(sourceId)) {
-        auto = pickUpnShare(normals) || pickUpnShare(players) || pickUpnShare(directs);
+      var pref = loadPref();
+      var auto = null;
+      var autoMode = "iframe";
+
+      // Anime (4/5): SIEMPRE preferir UPNShare (ignora VOE guardado)
+      if (isAnimeSourceId(sourceId)) {
+        auto =
+          pickUpnShare(normals) ||
+          pickUpnShare(players) ||
+          pickUpnShare(directs);
         if (auto) {
           autoMode =
             normals.indexOf(auto) >= 0
@@ -1038,9 +1039,15 @@
                 : "iframe";
         }
       }
+      // Otras fuentes: preferencia guardada (VOE, etc.)
+      if (!auto) {
+        auto = matchPref(players, pref);
+        autoMode = pref && pref.mode === "direct" ? "direct" : "iframe";
+      }
       if (!auto) {
         auto = normals[0] || directs[0] || players[0];
-        autoMode = isDirectPlayer(auto) && !isNormalPlayer(auto) ? "direct" : "iframe";
+        autoMode =
+          isDirectPlayer(auto) && !isNormalPlayer(auto) ? "direct" : "iframe";
         if (normals.indexOf(auto) >= 0) autoMode = "iframe";
         else if (directs.indexOf(auto) >= 0) autoMode = "direct";
       }
