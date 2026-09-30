@@ -13,17 +13,20 @@
     if (!r.ok) throw new Error('Worker HTTP ' + r.status);
     const data = await r.json();
     let items = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : [];
+    if (typeof preferAnimeSource === 'function') items = preferAnimeSource(items);
 
-    // Enriquecer con id TMDB → mismo detalle que el catálogo (id=108978, etc.)
+    // Enriquecer con id TMDB (nombres anime suelen diferir → cleanAnimeTitle + original)
     if (typeof resolveTmdbIdForTitle === 'function' && KEY) {
       items = await Promise.all(
         items.map(async function (it) {
           try {
             const tipo = String(it.type || it.tipo || '').toLowerCase();
-            const isTv = /serie|tv|anime|dorama/.test(tipo);
+            const isTv = /serie|tv|anime|dorama|ova|ona/.test(tipo);
             const title = it.title || it.titulo || '';
             const year = it.year || '';
-            const tid = await resolveTmdbIdForTitle(title, isTv ? 'tv' : 'movie', year);
+            const tid = await resolveTmdbIdForTitle(title, isTv ? 'tv' : 'movie', year, {
+              original: it.titulo_original || it.original_title
+            });
             if (tid) it.tmdb_id = tid;
           } catch (_) {}
           return it;

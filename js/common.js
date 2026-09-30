@@ -95,38 +95,100 @@ function openTrailerModal(youtubeKey) {
   document.addEventListener('keydown', onKey);
 }
 
-async function resolveTmdbIdForTitle(title, type, year) {
+function cleanAnimeTitle(title) {
+  return String(title || '')
+    .replace(/\s*[\[\(].*?[\]\)]\s*/g, ' ')
+    .replace(/\s*(TV|OVA|ONA|Special|Season\s*\d+|\d+(st|nd|rd|th)\s*Season)\s*/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function resolveTmdbIdForTitle(title, type, year, opts) {
   if (!KEY || !title) return null;
+  opts = opts || {};
   try {
-    const path = type === 'tv' ? '/search/tv' : '/search/movie';
-    const params = { query: title };
-    if (year) {
-      if (type === 'tv') params.first_air_date_year = year;
-      else params.year = year;
+    const path = type === 'tv' || type === 'anime' ? '/search/tv' : '/search/movie';
+    const queries = [];
+    const t0 = String(title).trim();
+    const t1 = cleanAnimeTitle(t0);
+    if (t0) queries.push(t0);
+    if (t1 && t1 !== t0) queries.push(t1);
+    if (opts.original) queries.push(String(opts.original).trim());
+    if (opts.english) queries.push(String(opts.english).trim());
+    // únicos
+    const seen = {};
+    const listQ = queries.filter(function (q) {
+      const k = q.toLowerCase();
+      if (!q || seen[k]) return false;
+      seen[k] = 1;
+      return true;
+    });
+
+    let best = null;
+    for (let qi = 0; qi < listQ.length; qi++) {
+      const params = { query: listQ[qi] };
+      if (year) {
+        if (type === 'tv' || type === 'anime') params.first_air_date_year = year;
+        else params.year = year;
+      }
+      const r = await tmdb(path, params);
+      const results = (r && r.results) || [];
+      if (!results.length) continue;
+      const y = year ? String(year).slice(0, 4) : '';
+      let hit = null;
+      if (y) {
+        hit = results.find(function (x) {
+          const d = (x.first_air_date || x.release_date || '').slice(0, 4);
+          return d === y;
+        });
+      }
+      // prefer exact name match (ignore case)
+      if (!hit) {
+        const qn = listQ[qi].toLowerCase();
+        hit = results.find(function (x) {
+          const n = String(x.name || x.title || '').toLowerCase();
+          const o = String(x.original_name || x.original_title || '').toLowerCase();
+          return n === qn || o === qn;
+        });
+      }
+      if (!hit) hit = results[0];
+      if (hit) {
+        best = hit.id;
+        break;
+      }
     }
-    const r = await tmdb(path, params);
-    const results = (r && r.results) || [];
-    if (!results.length) return null;
-    const y = year ? String(year).slice(0, 4) : '';
-    if (y) {
-      const hit = results.find(function (x) {
-        const d = (x.first_air_date || x.release_date || '').slice(0, 4);
-        return d === y;
-      });
-      if (hit) return hit.id;
-    }
-    return results[0].id;
+    return best;
   } catch (_) {
     return null;
   }
 }
 
+/** Preferir fuente animeav1 (4) en resultados del worker */
+function preferAnimeSource(results) {
+  if (!Array.isArray(results)) return results;
+  const score = function (x) {
+    const sid = String(x.source_id || x.source || '').toLowerCase();
+    const tipo = String(x.type || x.tipo || '').toLowerCase();
+    if (sid === '4' || sid === 'animeav1') return 100;
+    if (sid === '5' || sid === 'jkanime') return 80;
+    if (/anime|ova|ona/.test(tipo)) return 50;
+    return 0;
+  };
+  return results.slice().sort(function (a, b) {
+    return score(b) - score(a);
+  });
+}
+
 function workerCard(it){
   const tipo=String(it.type||it.tipo||'').toLowerCase();
-  const isTv=/serie|tv|anime|dorama/.test(tipo);
+  const isAnime=/anime|ova|ona|especial/.test(tipo);
+  const isTv=/serie|tv|anime|dorama|ova|ona/.test(tipo);
   const type=isTv?'tv':'movie';
   const slug=it.slug||slugify(it.title||it.titulo||'');
-  const sid=it.source_id||it.sourceId||'';
+  let sid=it.source_id||it.sourceId||'';
+  // Animes → fuente 4 (animeav1) si el resultado ya es de ahí; no forzar 9
+  if (isAnime && (!sid || sid === '9') && (it.source === 'animeav1' || it.fuente === 'animeav1')) sid = '4';
+  if (isAnime && (String(it.source||'').toLowerCase()==='animeav1' || sid==='4')) sid = '4';
   const title=it.title||it.titulo||'Sin título';
   const img=it.portada||it.poster||'';
   const year=it.year||'';

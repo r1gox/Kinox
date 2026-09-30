@@ -182,15 +182,20 @@
 
   /** Episodios desde detalle del worker: /{source}/serie/{slug} */
   async function loadSeasonEpsFromWorker(slug, seasonNum, sourceId) {
-    if (!slug || typeof MZ_WORKER === "undefined") return [];
-    var sid = sourceId || (typeof MZ_SOURCE !== "undefined" ? MZ_SOURCE : "9");
-    var path =
-      "/" +
-      sid +
-      "/serie/" +
-      encodeURIComponent(slug);
+    if (!slug) return [];
+    var base =
+      (typeof MZ_WORKER !== "undefined" && MZ_WORKER) ||
+      (typeof MZ_SEARCH !== "undefined" && MZ_SEARCH) ||
+      "https://moviezone.tvjz.workers.dev";
+    var sid = String(sourceId || (typeof MZ_SOURCE !== "undefined" ? MZ_SOURCE : "9"));
+    var isAnime = sid === "4" || sid === "animeav1" || sid === "5" || sid === "jkanime";
+    if (isAnime) {
+      sid = sid === "5" || sid === "jkanime" ? "5" : "4";
+    }
+    var kind = isAnime ? "anime" : "serie";
+    var path = "/" + sid + "/" + kind + "/" + encodeURIComponent(slug);
     try {
-      var r = await fetch(MZ_WORKER + path, {
+      var r = await fetch(base + path, {
         headers: { Accept: "application/json" }
       });
       if (!r.ok) return [];

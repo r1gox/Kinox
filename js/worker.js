@@ -36,19 +36,53 @@ function mzListFromWorker(data) {
   });
 }
 
-async function mzPlayers(opts) {
+function mzIsAnimeSource(sourceId, type) {
+  var sid = String(sourceId || '').toLowerCase();
+  if (sid === '4' || sid === 'animeav1' || sid === '5' || sid === 'jkanime') return true;
+  var t = String(type || '').toLowerCase();
+  return t === 'anime' || t === 'ova' || t === 'ona';
+}
+
+/** Ruta worker: anime → /4/anime/slug/T/E · serie → /9/serie/... · peli → /…/pelicula/ */
+function mzBuildPath(opts) {
   var type = opts.type;
   var slug = opts.slug;
   var season = opts.season;
   var episode = opts.episode;
-  if (!slug) throw new Error('No se pudo determinar el título para buscar reproductores.');
-  var path;
-  if (type === 'tv') {
+  var sid = String(opts.source_id || opts.sourceId || MZ_SOURCE || '9');
+  var isAnime = mzIsAnimeSource(sid, type) || String(type).toLowerCase() === 'anime';
+
+  if (type === 'tv' || type === 'anime' || isAnime && season && episode) {
     if (!season || !episode) throw new Error('Faltan temporada o episodio.');
-    path = '/' + MZ_SOURCE + '/serie/' + encodeURIComponent(slug) + '/' + encodeURIComponent(season) + '/' + encodeURIComponent(episode);
-  } else {
-    path = '/' + MZ_SOURCE + '/pelicula/' + encodeURIComponent(slug);
+    if (isAnime || sid === '4' || sid === '5') {
+      // AnimeAV1 (4) y JKanime (5) usan /anime/
+      var animeSid = sid === '5' || sid === 'jkanime' ? '5' : '4';
+      if (sid === '4' || sid === 'animeav1') animeSid = '4';
+      if (sid === '5' || sid === 'jkanime') animeSid = '5';
+      // default anime → 4
+      if (!sid || sid === '9') animeSid = '4';
+      return (
+        '/' + animeSid + '/anime/' + encodeURIComponent(slug) +
+        '/' + encodeURIComponent(season) + '/' + encodeURIComponent(episode)
+      );
+    }
+    return (
+      '/' + sid + '/serie/' + encodeURIComponent(slug) +
+      '/' + encodeURIComponent(season) + '/' + encodeURIComponent(episode)
+    );
   }
+  // película / ova de un episodio
+  if (isAnime || sid === '4' || sid === '5') {
+    var aSid = sid === '5' || sid === 'jkanime' ? '5' : '4';
+    return '/' + aSid + '/pelicula/' + encodeURIComponent(slug);
+  }
+  return '/' + sid + '/pelicula/' + encodeURIComponent(slug);
+}
+
+async function mzPlayers(opts) {
+  var slug = opts.slug;
+  if (!slug) throw new Error('No se pudo determinar el título para buscar reproductores.');
+  var path = mzBuildPath(opts);
   var r = await fetch(MZ_WORKER + path, { headers: { Accept: 'application/json' } });
   if (!r.ok) throw new Error('Worker: HTTP ' + r.status);
   var data = await r.json();
@@ -57,5 +91,31 @@ async function mzPlayers(opts) {
   }
   var players = mzListFromWorker(data);
   if (!players.length) throw new Error('No hay reproductores para este título.');
-  return { success: true, reproductores: players };
+  return { success: true, reproductores: players, path: path };
+}
+
+/** Detalle worker (temporadas separadas en animeav1) */
+async function mzFetchDetail(opts) {
+  var slug = opts.slug;
+  var sid = String(opts.source_id || opts.sourceId || MZ_SOURCE || '9');
+  var type = opts.type || 'tv';
+  var isAnime = mzIsAnimeSource(sid, type);
+  var path;
+  if (isAnime || sid === '4' || sid === '5') {
+    var aSid = sid === '5' || sid === 'jkanime' ? '5' : '4';
+    if (sid === '4' || sid === 'animeav1' || !sid || sid === '9') aSid = '4';
+    if (sid === '5' || sid === 'jkanime') aSid = '5';
+    path = '/' + aSid + '/anime/' + encodeURIComponent(slug);
+  } else if (type === 'movie') {
+    path = '/' + sid + '/pelicula/' + encodeURIComponent(slug);
+  } else {
+    path = '/' + sid + '/serie/' + encodeURIComponent(slug);
+  }
+  var r = await fetch(MZ_WORKER + path, { headers: { Accept: 'application/json' } });
+  if (!r.ok) throw new Error('Worker: HTTP ' + r.status);
+  var data = await r.json();
+  if (data && data.success === false) {
+    throw new Error(data.error || data.message || 'No encontrado');
+  }
+  return data;
 }

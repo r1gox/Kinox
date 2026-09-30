@@ -1,15 +1,25 @@
-async function resolveWorkerHit(title, type) {
+async function resolveWorkerHit(title, type, preferAnime) {
   var base = (typeof MZ_SEARCH !== 'undefined' && MZ_SEARCH) || 'https://moviezone.tvjz.workers.dev';
   var r = await fetch(base + '/?q=' + encodeURIComponent(title), { headers: { Accept: 'application/json' } });
   if (!r.ok) return null;
   var data = await r.json();
   var results = data.results || [];
   if (!results.length) return null;
-  var isTv = type === 'tv';
+  if (typeof preferAnimeSource === 'function') results = preferAnimeSource(results);
+  var isTv = type === 'tv' || type === 'anime';
+  // Anime: priorizar source 4 (animeav1)
+  if (preferAnime || type === 'anime') {
+    var a4 = results.find(function (x) {
+      var sid = String(x.source_id || x.source || '').toLowerCase();
+      return sid === '4' || sid === 'animeav1';
+    });
+    if (a4) return a4;
+  }
   var hit =
     results.find(function (x) {
       var t = String(x.type || x.tipo || '').toLowerCase();
-      return isTv ? /serie|tv|anime|dorama/.test(t) : /peli|movie/.test(t);
+      if (isTv) return /serie|tv|anime|dorama|ova|ona/.test(t);
+      return /peli|movie/.test(t);
     }) || results[0];
   return hit;
 }
@@ -81,14 +91,19 @@ async function findYoutubeTrailer(type, tmdbId) {
 }
 
 async function fetchWorkerDetail(slug, type, sourceId) {
-  var sid = sourceId || (typeof MZ_SOURCE !== 'undefined' ? MZ_SOURCE : '9');
-  var path =
-    '/' +
-    sid +
-    '/' +
-    (type === 'tv' ? 'serie' : 'pelicula') +
-    '/' +
-    encodeURIComponent(slug);
+  if (typeof mzFetchDetail === 'function') {
+    return mzFetchDetail({ slug: slug, type: type, source_id: sourceId });
+  }
+  var sid = String(sourceId || (typeof MZ_SOURCE !== 'undefined' ? MZ_SOURCE : '9'));
+  var isAnime = sid === '4' || sid === 'animeav1' || sid === '5' || sid === 'jkanime' || type === 'anime';
+  var kind;
+  if (isAnime) {
+    sid = sid === '5' || sid === 'jkanime' ? '5' : '4';
+    kind = 'anime';
+  } else {
+    kind = type === 'tv' ? 'serie' : 'pelicula';
+  }
+  var path = '/' + sid + '/' + kind + '/' + encodeURIComponent(slug);
   var r = await fetch(workerBaseUrl() + path, { headers: { Accept: 'application/json' } });
   if (!r.ok) throw new Error('Worker: HTTP ' + r.status);
   var data = await r.json();
@@ -349,7 +364,12 @@ async function loadDetail(type) {
     }
     if (!hit || !hit.slug) {
       try {
-        hit = await resolveWorkerHit(it.title, type);
+        var isAnim =
+          type === 'anime' ||
+          (x.genres || []).some(function (g) {
+            return g && (g.id === 16 || /anim/i.test(g.name || ''));
+          });
+        hit = await resolveWorkerHit(it.title, type, isAnim);
       } catch (_) {}
     }
 
