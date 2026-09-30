@@ -141,16 +141,14 @@ async function loadDetailFromWorker(type, params) {
       ? workerPlayHref(hit, 'tv', null, 1, 1)
       : workerPlayHref(hit, 'movie', null);
 
-  var trailerHref = null;
+  var trailerKey = null;
   var tmdbIdForTrailer = null;
   try {
     if (KEY && typeof resolveTmdbIdForTitle === 'function') {
       tmdbIdForTrailer = await resolveTmdbIdForTitle(title, type, year);
       if (tmdbIdForTrailer) {
         var tr = await findYoutubeTrailer(type, tmdbIdForTrailer);
-        if (tr && tr.key) {
-          trailerHref = appLink('/trailer?type=' + type + '&id=' + tmdbIdForTrailer);
-        }
+        if (tr && tr.key) trailerKey = tr.key;
       }
     }
   } catch (_) {}
@@ -191,8 +189,8 @@ async function loadDetailFromWorker(type, params) {
     '">' +
     (type === 'tv' ? '▶ Comenzar E1' : '▶ Reproducir') +
     '</a>' +
-    (trailerHref
-      ? '<a class="btn" href="' + trailerHref + '">Ver tráiler</a>'
+    (trailerKey
+      ? '<button type="button" class="btn" id="btnTrailer">Ver tráiler</button>'
       : '') +
     '</div>' +
     '<p style="color:var(--mute);font-size:.85rem;margin-top:8px">Fuente: ' +
@@ -225,7 +223,12 @@ async function loadDetailFromWorker(type, params) {
         '</select><div id="eps"></div></section>'
       : '');
 
-  if (type === 'tv' && temps.length) {
+    if (trailerKey && typeof openTrailerModal === 'function') {
+    var btW = document.getElementById('btnTrailer');
+    if (btW) btW.onclick = function () { openTrailerModal(trailerKey); };
+  }
+
+if (type === 'tv' && temps.length) {
     var renderEps = function () {
       var want = parseInt($('#sel').value, 10) || 1;
       var block =
@@ -375,7 +378,7 @@ async function loadDetail(type) {
         ? '<a class="btn play" id="btnPlay" href="' + playMovieHref + '">▶ Reproducir</a>'
         : '<a class="btn play" id="btnPlay" href="' + playTvHref + '">▶ Comenzar 1</a>') +
       (hasTrailer
-        ? '<a class="btn" href="' + appLink('/trailer?type=' + type + '&id=' + id) + '">Ver tráiler</a>'
+        ? '<button type="button" class="btn" id="btnTrailer">Ver tráiler</button>'
         : '') +
       '<button id="favBtn" class="btn alt ' +
       (favs().some(function (f) { return f.id === it.id && f.type === type; }) ? 'on' : '') +
@@ -418,6 +421,13 @@ async function loadDetail(type) {
       $('#favBtn').textContent = has ? '+ Mi lista' : '✓ En mi lista';
       $('#favBtn').classList.toggle('on', !has);
     };
+
+    if (hasTrailer && trailerVid && trailerVid.key && typeof openTrailerModal === 'function') {
+      var btT = document.getElementById('btnTrailer');
+      if (btT) {
+        btT.onclick = function () { openTrailerModal(trailerVid.key); };
+      }
+    }
 
     if (type === 'tv' && seasons.length) {
       var go = async function () {

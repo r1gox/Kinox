@@ -48,6 +48,53 @@ async function tmdb(path,params={}){if(!KEY)return keyPage();const u=new URL(API
 function slugify(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' y ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
 function detailLink(it){return appLink(`/${it.type==='movie'?'pelicula':'serie'}/${it.id}`)}
 function card(it){return `<a class="card" href="${detailLink(it)}"><div class="im">${it.poster?`<img loading="lazy" src="${IMG}w342${it.poster}" alt="">`:''}</div>${it.rating?`<span class="badge">★ ${it.rating.toFixed(1)}</span>`:''}<b>${esc(it.title)}</b><small>${it.year||''}</small></a>`}
+
+/** Ventanita modal con tráiler de YouTube */
+function openTrailerModal(youtubeKey) {
+  if (!youtubeKey) return;
+  var key = String(youtubeKey).trim();
+  var m = key.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{6,})/);
+  if (m) key = m[1];
+  key = key.replace(/[^A-Za-z0-9_-]/g, '');
+  if (!key) return;
+
+  var old = document.getElementById('kx-trailer-modal');
+  if (old) old.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'kx-trailer-modal';
+  overlay.className = 'kx-trailer-modal';
+  overlay.innerHTML =
+    '<div class="kx-trailer-dialog" role="dialog" aria-modal="true" aria-label="Tráiler">' +
+    '<button type="button" class="kx-trailer-close" aria-label="Cerrar">&times;</button>' +
+    '<div class="kx-trailer-frame">' +
+    '<iframe src="https://www.youtube.com/embed/' + key + '?autoplay=1&rel=0" ' +
+    'allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>' +
+    '</div>' +
+    '<a class="kx-trailer-yt" href="https://www.youtube.com/watch?v=' + key + '" target="_blank" rel="noopener">Abrir en YouTube</a>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  document.body.classList.add('kx-trailer-open');
+
+  function close() {
+    try {
+      var iframe = overlay.querySelector('iframe');
+      if (iframe) iframe.src = 'about:blank';
+    } catch (_) {}
+    overlay.remove();
+    document.body.classList.remove('kx-trailer-open');
+    document.removeEventListener('keydown', onKey);
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') close();
+  }
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) close();
+  });
+  overlay.querySelector('.kx-trailer-close').addEventListener('click', close);
+  document.addEventListener('keydown', onKey);
+}
+
 async function resolveTmdbIdForTitle(title, type, year) {
   if (!KEY || !title) return null;
   try {
