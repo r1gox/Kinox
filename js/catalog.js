@@ -113,7 +113,8 @@
       esc(title) +
       "</b>" +
       "<small>" +
-      esc(year) +
+      esc(tipo) +
+      (year ? " · " + esc(year) : "") +
       "</small></a>"
     );
   }

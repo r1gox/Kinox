@@ -47,7 +47,21 @@ function norm(x,type){type=type||x.media_type||(x.title?'movie':'tv');const it={
 async function tmdb(path,params={}){if(!KEY)return keyPage();const u=new URL(API+path);u.searchParams.set('api_key',KEY);u.searchParams.set('language','es-MX');for(const k in params)if(params[k]!==''&&params[k]!=null)u.searchParams.set(k,params[k]);const key=u.toString();if(cache.has(key))return cache.get(key);const r=await fetch(key);if(r.status===401){store.set('mz_key','');KEY='';throw Error('API key inválida')}if(!r.ok)throw Error('Error '+r.status);const j=await r.json();cache.set(key,j);return j}
 function slugify(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' y ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
 function detailLink(it){return appLink(`/${it.type==='movie'?'pelicula':'serie'}/${it.id}`)}
-function card(it){return `<a class="card" href="${detailLink(it)}"><div class="im">${it.poster?`<img loading="lazy" src="${IMG}w342${it.poster}" alt="">`:''}</div>${it.rating?`<span class="badge">★ ${it.rating.toFixed(1)}</span>`:''}<b>${esc(it.title)}</b><small>${it.year||''}</small></a>`}
+function tipoFromIt(it){
+  var t=String(it.type||it.tipo||it.formato||'').toLowerCase();
+  if(/ova/.test(t))return 'OVA';
+  if(/ona/.test(t))return 'ONA';
+  if(/especial|special/.test(t))return 'Especial';
+  if(/anime/.test(t))return 'Anime';
+  if(t==='tv'||/serie|dorama/.test(t))return 'Serie';
+  if(t==='movie'||/peli|film/.test(t))return 'Película';
+  return it.type==='tv'?'Serie':'Película';
+}
+function card(it){
+  var tipo=tipoFromIt(it);
+  var rating=it.rating?`<span class="badge badge-rating">★ ${Number(it.rating).toFixed(1)}</span>`:'';
+  return `<a class="card" href="${detailLink(it)}"><div class="im">${it.poster?`<img loading="lazy" src="${IMG}w342${it.poster}" alt="">`:''}<span class="badge badge-type">${esc(tipo)}</span>${rating}</div><b>${esc(it.title)}</b><small>${esc(tipo)}${it.year?' · '+esc(it.year):''}</small></a>`;
+}
 
 /** Ventanita modal con tráiler de YouTube */
 function openTrailerModal(youtubeKey) {
@@ -202,8 +216,17 @@ function workerCard(it){
     : (tmdbId
         ? pageHref('detalle-pelicula.html',{id:tmdbId,slug,source_id:sid||undefined})
         : pageHref('detalle-pelicula.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined}));
-  return `<a class="card" href="${href}"><div class="im">${img?`<img loading="lazy" src="${esc(img)}" alt="">`:''}</div>${src?`<span class="badge">${esc(src)}</span>`:''}<b>${esc(title)}</b><small>${esc(year)}${isTv?' · Serie':' · Película'}</small></a>`;
+  let tipoLabel='Película';
+  if(/ova/.test(tipo)) tipoLabel='OVA';
+  else if(/ona/.test(tipo)) tipoLabel='ONA';
+  else if(/especial|special/.test(tipo)) tipoLabel='Especial';
+  else if(/anime/.test(tipo) && !/peli|movie|film/.test(tipo)) tipoLabel='Anime';
+  else if(isTv) tipoLabel='Serie';
+  const rating=it.rating||it.vote_average||it.rating_tmdb;
+  const ratingBadge=(rating && Number(rating)>0)?`<span class="badge badge-rating">★ ${Number(rating).toFixed(1)}</span>`:'';
+  return `<a class="card" href="${href}"><div class="im">${img?`<img loading="lazy" src="${esc(img)}" alt="">`:''}<span class="badge badge-type">${esc(tipoLabel)}</span>${ratingBadge}</div><b>${esc(title)}</b><small>${esc(tipoLabel)}${year?' · '+esc(year):''}</small></a>`;
 }
+
 function rowHtml(t,items){return items?.length?`<section class="row"><h2>${esc(t)}</h2><div class="track">${items.map(card).join('')}</div></section>`:''}
 function list(res,type){return (res.results||[]).filter(x=>x.poster_path&&x.media_type!=='person').map(x=>norm(x,type))}
 function nav(){
