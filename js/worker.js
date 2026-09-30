@@ -22,11 +22,14 @@ function mzListFromWorker(data) {
     }
     return {
       name: p.name || p.servidor || p.server || p.provider || ('Servidor ' + (i + 1)),
+      provider: p.provider || p.servidor || p.server || null,
+      servidor: p.servidor || p.server || p.provider || null,
       url: p.url || p.link || p.embed || p.src || null,
       stream_url: p.stream_url || p.hls || p.direct || null,
       hls_resolve: p.hls_resolve || null,
       language: p.language || p.lang || p.idioma || '',
-      idioma: p.idioma || p.language || p.lang || ''
+      idioma: p.idioma || p.language || p.lang || '',
+      noAds: !!(p.noAds || p.no_ads)
     };
   }).filter(function (p) {
     return p && (p.stream_url || p.hls_resolve || p.url);
