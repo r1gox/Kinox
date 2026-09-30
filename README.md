@@ -1,15 +1,21 @@
-# MovieZone - versión local
+# MovieZone
 
-Esta versión está preparada para pruebas locales abriendo `index.html` directamente desde Windows.
+Versión estática lista para Vercel.
 
-## Uso
-1. Extrae el ZIP.
-2. Abre `index.html`.
-3. Introduce tu API key de TMDB cuando la pida.
+## Datos
+- TMDB: títulos, posters, fondos, sinopsis, géneros, temporadas y episodios.
+- Worker MovieZone: únicamente reproductores al entrar al reproductor.
+- Worker: https://moviezone.tvjz.workers.dev
 
-Las páginas están dentro de `pages/`. La navegación local usa rutas relativas, por lo que NO intenta abrir `file:///C:/pelicula/ID`.
+## Flujo de reproducción
+1. El detalle usa TMDB.
+2. El botón Reproducir / Comenzar abre `/reproductor`.
+3. El reproductor consulta el Worker con source `9` y obtiene los reproductores disponibles.
+4. No se resuelven los videos al cargar la lista.
+5. Al seleccionar Streamwish/Vidhide/Voe se consulta su `stream_url`/`hls_resolve` y se intenta reproducir HLS/MP4.
 
-Cuando posteriormente quieras subirlo a Vercel, habrá que volver a habilitar las rutas del servidor.
+## Despliegue
+Sube esta carpeta a Vercel como proyecto estático. `vercel.json` contiene los rewrites para las rutas limpias.
 
-
-Se agregó la sección JK, que reutiliza el mismo catálogo de anime japonés.
+## TMDB
+La primera vez se solicita la API key v3 y se guarda en localStorage del navegador.

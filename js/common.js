@@ -27,13 +27,14 @@ function appLink(path){
   if(clean==='perfil')return pageUrl('perfil.html');
   if(clean.startsWith('buscar')){const q=clean.includes('?')?new URLSearchParams(clean.split('?')[1]).get('q'):'';return pageUrl('buscar.html',q?{q}:{});}
   if(clean.startsWith('trailer')){const p=new URLSearchParams(clean.split('?')[1]||'');return pageUrl('trailer.html',{type:p.get('type'),id:p.get('id')});}
-  if(clean.startsWith('reproductor')){const p=new URLSearchParams(clean.split('?')[1]||'');return pageUrl('reproductor.html',{type:p.get('type'),id:p.get('id'),season:p.get('season'),episode:p.get('episode')});}
+  if(clean.startsWith('reproductor')){const p=new URLSearchParams(clean.split('?')[1]||'');return pageUrl('reproductor.html',{type:p.get('type'),id:p.get('id'),season:p.get('season'),episode:p.get('episode'),slug:p.get('slug')});}
   return path;
 }
 function go(path){location.href=appLink(path)}
 
 function norm(x,type){type=type||x.media_type||(x.title?'movie':'tv');const it={id:x.id,type,title:x.title||x.name,poster:x.poster_path,backdrop:x.backdrop_path,year:(x.release_date||x.first_air_date||'').slice(0,4),rating:x.vote_average||0,overview:x.overview||''};ITEMS.set(type+x.id,it);return it}
 async function tmdb(path,params={}){if(!KEY)return keyPage();const u=new URL(API+path);u.searchParams.set('api_key',KEY);u.searchParams.set('language','es-MX');for(const k in params)if(params[k]!==''&&params[k]!=null)u.searchParams.set(k,params[k]);const key=u.toString();if(cache.has(key))return cache.get(key);const r=await fetch(key);if(r.status===401){store.set('mz_key','');KEY='';throw Error('API key inválida')}if(!r.ok)throw Error('Error '+r.status);const j=await r.json();cache.set(key,j);return j}
+function slugify(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' y ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
 function detailLink(it){return appLink(`/${it.type==='movie'?'pelicula':'serie'}/${it.id}`)}
 function card(it){return `<a class="card" href="${detailLink(it)}"><div class="im">${it.poster?`<img loading="lazy" src="${IMG}w342${it.poster}" alt="">`:''}</div>${it.rating?`<span class="badge">★ ${it.rating.toFixed(1)}</span>`:''}<b>${esc(it.title)}</b><small>${it.year||''}</small></a>`}
 function rowHtml(t,items){return items?.length?`<section class="row"><h2>${esc(t)}</h2><div class="track">${items.map(card).join('')}</div></section>`:''}
