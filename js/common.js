@@ -239,9 +239,9 @@ nav();
       var src = scripts[i].src || '';
       if (/common\.js/i.test(src)) { base = src.replace(/common\.js(\?.*)?$/i, 'mobile-ui.js'); break; }
     }
-    s.src = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'v=4';
+    s.src = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'v=5';
   } catch (_) {
-    s.src = (location.pathname.indexOf('/pages/') !== -1) ? '../js/mobile-ui.js?v=4' : 'js/mobile-ui.js?v=4';
+    s.src = (location.pathname.indexOf('/pages/') !== -1) ? '../js/mobile-ui.js?v=5' : 'js/mobile-ui.js?v=5';
   }
   document.body.appendChild(s);
 })();
