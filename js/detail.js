@@ -52,6 +52,34 @@ function workerBaseUrl() {
   return 'https://moviezone.tvjz.workers.dev';
 }
 
+
+async function findYoutubeTrailer(type, tmdbId) {
+  if (!tmdbId || typeof tmdb !== 'function' || !KEY) return null;
+  async function pick(results) {
+    var list = results || [];
+    var order = ['Trailer', 'Teaser', 'Clip'];
+    for (var i = 0; i < order.length; i++) {
+      var hit = list.find(function (v) {
+        return v.site === 'YouTube' && v.type === order[i] && v.key;
+      });
+      if (hit) return hit;
+    }
+    return list.find(function (v) { return v.site === 'YouTube' && v.key; }) || null;
+  }
+  try {
+    // es-MX a veces no trae videos → probar también en-US
+    var a = await tmdb('/' + type + '/' + tmdbId + '/videos', {});
+    var vid = await pick(a.results);
+    if (vid) return vid;
+  } catch (_) {}
+  try {
+    var b = await tmdb('/' + type + '/' + tmdbId + '/videos', { language: 'en-US' });
+    return await pick(b.results);
+  } catch (_) {
+    return null;
+  }
+}
+
 async function fetchWorkerDetail(slug, type, sourceId) {
   var sid = sourceId || (typeof MZ_SOURCE !== 'undefined' ? MZ_SOURCE : '9');
   var path =
@@ -113,6 +141,20 @@ async function loadDetailFromWorker(type, params) {
       ? workerPlayHref(hit, 'tv', null, 1, 1)
       : workerPlayHref(hit, 'movie', null);
 
+  var trailerHref = null;
+  var tmdbIdForTrailer = null;
+  try {
+    if (KEY && typeof resolveTmdbIdForTitle === 'function') {
+      tmdbIdForTrailer = await resolveTmdbIdForTitle(title, type, year);
+      if (tmdbIdForTrailer) {
+        var tr = await findYoutubeTrailer(type, tmdbIdForTrailer);
+        if (tr && tr.key) {
+          trailerHref = appLink('/trailer?type=' + type + '&id=' + tmdbIdForTrailer);
+        }
+      }
+    }
+  } catch (_) {}
+
   var temps = Array.isArray(data.temporadas) ? data.temporadas : [];
 
   $('#view').innerHTML =
@@ -149,6 +191,9 @@ async function loadDetailFromWorker(type, params) {
     '">' +
     (type === 'tv' ? '▶ Comenzar E1' : '▶ Reproducir') +
     '</a>' +
+    (trailerHref
+      ? '<a class="btn" href="' + trailerHref + '">Ver tráiler</a>'
+      : '') +
     '</div>' +
     '<p style="color:var(--mute);font-size:.85rem;margin-top:8px">Fuente: ' +
     esc(hit.source || hit.source_id || '') +
@@ -276,7 +321,16 @@ async function loadDetail(type) {
           ? x.number_of_seasons + ' temporadas'
           : '';
     var seasons = (x.seasons || []).filter(function (s) { return s.season_number > 0; });
-    var hasTrailer = (x.videos && x.videos.results || []).some(function (v) { return v.site === 'YouTube'; });
+    var trailerVid = null;
+    try {
+      trailerVid = await findYoutubeTrailer(type, id);
+    } catch (_) {}
+    if (!trailerVid) {
+      trailerVid = (x.videos && x.videos.results || []).find(function (v) {
+        return v.site === 'YouTube' && v.key;
+      }) || null;
+    }
+    var hasTrailer = !!trailerVid;
 
     var hit = null;
     // Si venimos del buscador, ya traemos slug/source_id del worker
