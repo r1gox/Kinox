@@ -96,7 +96,8 @@
     text-decoration: none !important;
     border-radius: 0 !important;
   }
-  #mz-bottom-nav a svg {
+  #mz-bottom-nav a svg,
+nav#mz-bottom-nav a svg {
     display: block !important;
     width: 22px !important;
     height: 22px !important;

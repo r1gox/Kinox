@@ -559,3 +559,5 @@ body.mz-on-detail header.mz-detail-scrolled{
   background:rgba(10,6,17,.92) !important;
   border-bottom:1px solid rgba(42,31,61,.45) !important;
 }
+
+#mz-bottom-nav a svg,nav#mz-bottom-nav a svg{display:block!important;width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8}
