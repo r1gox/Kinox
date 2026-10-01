@@ -715,10 +715,10 @@
           '<h3 class="kx-block-title">Directos</h3>' +
           '<div class="kx-chips" id="kxDirects"></div>' +
           "</div>" +
+          '<div class="kx-ep-mobile" id="kxEpMobile"></div>' +
           (epOverview
             ? '<p class="kx-synopsis" id="kxSynopsis">' + esc(epOverview) + "</p>"
             : '<p class="kx-synopsis" id="kxSynopsis"></p>') +
-          '<div class="kx-ep-mobile" id="kxEpMobile"></div>' +
           "</div>" +
           "</section>";
       } else {
