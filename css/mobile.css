@@ -342,3 +342,25 @@
     transform: none !important;
   }
 }
+
+/* Player: reproductores y directos en una sola fila desplazable */
+@media (max-width: 900px) {
+  .kx-chips {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 8px !important;
+  }
+  .kx-chips .kx-chip {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+  .kx-info {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .kx-info .kx-ep-mobile { order: 5 !important; }
+  .kx-info .kx-synopsis { order: 6 !important; margin-top: 16px !important; }
+  .kx-info .kx-block { order: 4 !important; }
+}
