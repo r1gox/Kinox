@@ -1,6 +1,6 @@
 /**
- * Interfaz móvil guiada por el attachment MovieZone (styles.css ≤700px).
- * Datos: Kinox. PC no se toca (≥901px).
+ * Interfaz móvil estilo MovieZone (attachment) — datos Kinox.
+ * Solo ≤900px. PC no se toca.
  */
 @media (max-width: 900px) {
   :root {
@@ -13,10 +13,10 @@
     -webkit-tap-highlight-color: transparent;
   }
   body.mz-has-bottom-nav {
-    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px)) !important;
   }
 
-  /* ===== Header: logo + buscar + perfil ===== */
+  /* Header: logo + buscar + perfil */
   header#top,
   header {
     position: fixed !important;
@@ -36,9 +36,8 @@
     font-size: 1.2rem !important;
     flex: 0 0 auto !important;
   }
-  /* Secciones del header → van abajo */
   header nav {
-    display: none !important;
+    display: none !important; /* secciones abajo */
   }
   header #sf {
     flex: 1 1 auto !important;
@@ -56,28 +55,33 @@
     width: 38px !important;
     height: 38px !important;
     flex: none !important;
-    display: grid !important;
-    place-items: center !important;
   }
 
-  /* ===== Barra inferior (iconos SVG) ===== */
+  /* Barra inferior con iconos (como attachment) */
   #mz-bottom-nav {
     position: fixed !important;
     inset: auto 0 0 !important;
     z-index: 50 !important;
     display: flex !important;
-    justify-content: space-around !important;
+    flex-direction: row !important;
     align-items: stretch !important;
+    justify-content: space-around !important;
     gap: 0 !important;
-    min-height: calc(54px + env(safe-area-inset-bottom, 0px)) !important;
+    height: auto !important;
+    min-height: calc(var(--mz-bottom-h) + env(safe-area-inset-bottom, 0px)) !important;
     padding: 0 0 env(safe-area-inset-bottom, 0px) !important;
     background: rgba(10, 6, 17, 0.98) !important;
     border-top: 1px solid var(--line, #2a1f3d) !important;
     overflow: visible !important;
+    scrollbar-width: none !important;
+  }
+  #mz-bottom-nav::-webkit-scrollbar {
+    display: none !important;
   }
   #mz-bottom-nav a {
     flex: 1 1 0 !important;
     min-width: 0 !important;
+    max-width: none !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
@@ -92,8 +96,7 @@
     text-decoration: none !important;
     border-radius: 0 !important;
   }
-  #mz-bottom-nav a svg,
-  nav#mz-bottom-nav a svg {
+  #mz-bottom-nav a svg {
     display: block !important;
     width: 22px !important;
     height: 22px !important;
@@ -102,11 +105,9 @@
     stroke-width: 1.8 !important;
     stroke-linecap: round !important;
     stroke-linejoin: round !important;
-    visibility: visible !important;
-    opacity: 1 !important;
   }
   #mz-bottom-nav a .ico {
-    display: none !important;
+    display: none !important; /* usamos SVG */
   }
   #mz-bottom-nav a.on {
     color: var(--ac, #a66bff) !important;
@@ -114,12 +115,12 @@
   }
 
   footer {
-    padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
   }
 
-  /* ===== Catálogo / listados ===== */
+  /* Catálogo / páginas */
   .page {
-    padding: calc(76px + env(safe-area-inset-top, 0px)) 4vw 20px !important;
+    padding: calc(76px + env(safe-area-inset-top)) 4vw 20px !important;
   }
   .page h1 {
     font-size: 1.5rem !important;
@@ -144,6 +145,8 @@
     font-size: 16px !important;
     min-height: 44px !important;
   }
+
+  /* Rows / tracks */
   .row {
     padding-top: 18px !important;
   }
@@ -157,26 +160,21 @@
     -webkit-overflow-scrolling: touch !important;
   }
   .track .card {
+    scroll-snap-align: start !important;
     width: var(--cw) !important;
     flex: 0 0 var(--cw) !important;
-    scroll-snap-align: start !important;
   }
 
-  /* ===== Inicio / hero ===== */
+  /* Hero inicio */
   .hero {
     min-height: 74dvh !important;
     padding: 0 4vw 5vh !important;
     background-position: center top !important;
   }
-  @supports (height: 100dvh) {
-    .hero {
-      min-height: 74dvh !important;
-    }
-  }
   .hero:after {
     background: linear-gradient(
       0deg,
-      var(--bg, #0a0611) 8%,
+      var(--bg) 8%,
       rgba(10, 6, 17, 0.55) 50%,
       rgba(10, 6, 17, 0.1)
     ) !important;
@@ -190,57 +188,41 @@
   }
   .hero .btn,
   .btns .btn {
+    flex: 1 !important;
+    text-align: center !important;
     min-height: 46px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    text-align: center !important;
-  }
-  .hero > div > .btn,
-  .hero > div > a.btn {
-    width: calc(50% - 5px) !important;
-    margin-right: 0 !important;
-  }
-  .hero > div > .btn:first-of-type,
-  .hero > div > a.btn:first-of-type {
-    margin-right: 6px !important;
   }
 
-  /* ===== DETALLE (como attachment) ===== */
+  /* Detalle */
   .det {
-    padding-top: calc(72px + env(safe-area-inset-top, 0px)) !important;
+    padding-top: calc(72px + env(safe-area-inset-top)) !important;
     padding-left: 4vw !important;
     padding-right: 4vw !important;
-    padding-bottom: 20px !important;
   }
-  .det .bd,
   .bd {
     opacity: 0.5 !important;
     height: 55vh !important;
   }
-  .det .dw,
   .dw {
     gap: 16px !important;
     flex-direction: column !important;
     align-items: center !important;
   }
-  .det .pos,
   .pos {
     width: 150px !important;
     align-self: center !important;
   }
-  .det .info,
   .info {
     min-width: 0 !important;
     width: 100% !important;
   }
-  .det .info h1,
   .info h1 {
     text-align: center !important;
     font-size: 1.6rem !important;
   }
-  .det .info .meta,
-  .det .tags,
   .info .meta,
   .tags {
     justify-content: center !important;
@@ -249,41 +231,26 @@
   .tags {
     display: flex !important;
   }
-  .det .btns,
   .btns {
     justify-content: center !important;
     display: flex !important;
     flex-wrap: wrap !important;
-    gap: 10px !important;
   }
-  .det .btns .btn,
   .btns .btn {
     flex: 1 1 40% !important;
     min-height: 46px !important;
-    text-align: center !important;
   }
   .det-back,
   .back {
     min-height: 40px !important;
-    display: inline-flex !important;
-    align-items: center !important;
   }
-  .prov img {
-    width: 42px !important;
-    height: 42px !important;
-  }
-
-  /* Temporadas / episodios */
   .seasons {
     padding: 10px 4vw !important;
-    max-width: none !important;
   }
-  .seasons select,
-  .seasons #sel {
+  .seasons select {
     font-size: 16px !important;
     min-height: 44px !important;
     width: 100% !important;
-    max-width: none !important;
   }
   .ep {
     gap: 10px !important;
@@ -296,9 +263,12 @@
     font-size: 0.75rem !important;
   }
 
-  /* Player: solo padding extra por barra inferior */
+  /* Player */
   .player-page {
-    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-top: calc(70px + env(safe-area-inset-top)) !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
   }
 }
 
@@ -311,10 +281,6 @@
   }
   .hero h1 {
     font-size: 1.7rem !important;
-  }
-  .det .info h1,
-  .info h1 {
-    font-size: 1.45rem !important;
   }
 }
 
