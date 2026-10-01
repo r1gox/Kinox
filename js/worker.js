@@ -101,21 +101,35 @@ async function mzFetchDetail(opts) {
   var type = opts.type || 'tv';
   var isAnime = mzIsAnimeSource(sid, type);
   var path;
+  var pathB;
   if (isAnime || sid === '4' || sid === '5') {
     var aSid = sid === '5' || sid === 'jkanime' ? '5' : '4';
     if (sid === '4' || sid === 'animeav1' || !sid || sid === '9') aSid = '4';
     if (sid === '5' || sid === 'jkanime') aSid = '5';
     path = '/' + aSid + '/anime/' + encodeURIComponent(slug);
+    pathB = '/' + aSid + '/anime/b/' + encodeURIComponent(slug);
   } else if (type === 'movie') {
     path = '/' + sid + '/pelicula/' + encodeURIComponent(slug);
+    pathB = '/' + sid + '/pelicula/b/' + encodeURIComponent(slug);
   } else {
     path = '/' + sid + '/serie/' + encodeURIComponent(slug);
+    pathB = '/' + sid + '/serie/b/' + encodeURIComponent(slug);
   }
-  var r = await fetch(MZ_WORKER + path, { headers: { Accept: 'application/json' } });
-  if (!r.ok) throw new Error('Worker: HTTP ' + r.status);
-  var data = await r.json();
-  if (data && data.success === false) {
-    throw new Error(data.error || data.message || 'No encontrado');
+  async function get(p) {
+    var r = await fetch(MZ_WORKER + p, { headers: { Accept: 'application/json' } });
+    if (!r.ok) return null;
+    var data = await r.json();
+    if (data && data.success === false) return null;
+    return data;
   }
+  // Preferir /b/ (url_vid) para episodios con titulo ES + back_img
+  var basic = await get(pathB);
+  var full = await get(path);
+  if (!basic && !full) throw new Error('No encontrado');
+  var data = Object.assign({}, full || {}, basic || {});
+  if (basic && Array.isArray(basic.temporadas) && basic.temporadas.length) {
+    data.temporadas = basic.temporadas;
+  }
+  if (basic && basic.url_vid) data.url_vid = basic.url_vid;
   return data;
 }

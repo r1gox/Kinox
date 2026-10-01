@@ -269,15 +269,73 @@ async function fetchWorkerDetail(slug, type, sourceId) {
   } else {
     kind = type === 'tv' ? 'serie' : 'pelicula';
   }
-  var path = '/' + sid + '/' + kind + '/' + encodeURIComponent(slug);
-  var r = await fetch(workerBaseUrl() + path, { headers: { Accept: 'application/json' } });
-  if (!r.ok) throw new Error('Worker: HTTP ' + r.status);
-  var data = await r.json();
-  if (data && data.success === false) {
-    throw new Error(data.error || data.message || 'No encontrado en el worker');
+  var base = workerBaseUrl();
+  // url_vid (/b/) trae titulo + back_img por episodio (más completo para listados)
+  var pathB = '/' + sid + '/' + kind + '/b/' + encodeURIComponent(slug);
+  var pathFull = '/' + sid + '/' + kind + '/' + encodeURIComponent(slug);
+  async function get(path) {
+    var r = await fetch(base + path, { headers: { Accept: 'application/json' } });
+    if (!r.ok) return null;
+    var data = await r.json();
+    if (data && data.success === false) return null;
+    return data;
   }
+  var basic = null;
+  var full = null;
+  try { basic = await get(pathB); } catch (_) {}
+  try { full = await get(pathFull); } catch (_) {}
+  if (!basic && !full) throw new Error('No encontrado en el worker');
+  // Fusionar: meta de full + temporadas/episodios de basic (titulos ES)
+  var data = Object.assign({}, full || {}, basic || {});
+  if (basic && Array.isArray(basic.temporadas) && basic.temporadas.length) {
+    data.temporadas = basic.temporadas;
+  } else if (full && Array.isArray(full.temporadas)) {
+    data.temporadas = full.temporadas;
+  }
+  if (basic && basic.url_vid) data.url_vid = basic.url_vid;
+  if (full && full.descripcion && !data.descripcion) data.descripcion = full.descripcion;
   return data;
 }
+
+
+/** Carga episodios desde url_vid (/b/) del worker: titulo ES + back_img */
+async function fetchWorkerEpisodesMap(hit, type) {
+  var map = {};
+  if (!hit || !hit.slug) return map;
+  try {
+    var sid = String(hit.source_id || hit.source || (typeof MZ_SOURCE !== 'undefined' ? MZ_SOURCE : '9'));
+    var kind = type === 'movie' ? 'pelicula' : (sid === '4' || sid === '5' || type === 'anime' ? 'anime' : 'serie');
+    if (sid === '4' || sid === 'animeav1') { sid = '4'; kind = 'anime'; }
+    if (sid === '5' || sid === 'jkanime') { sid = '5'; kind = 'anime'; }
+    var base = typeof workerBaseUrl === 'function' ? workerBaseUrl() : (typeof MZ_WORKER !== 'undefined' ? MZ_WORKER : 'https://moviezone.tvjz.workers.dev');
+    var path = '/' + sid + '/' + kind + '/b/' + encodeURIComponent(hit.slug);
+    var r = await fetch(base + path, { headers: { Accept: 'application/json' } });
+    if (!r.ok) {
+      path = '/' + sid + '/' + kind + '/' + encodeURIComponent(hit.slug);
+      r = await fetch(base + path, { headers: { Accept: 'application/json' } });
+    }
+    if (!r.ok) return map;
+    var data = await r.json();
+    var temps = data.temporadas || [];
+    for (var i = 0; i < temps.length; i++) {
+      var lista = temps[i].lista || temps[i].episodios || [];
+      if (!Array.isArray(lista)) continue;
+      var sn = parseInt(temps[i].temporada != null ? temps[i].temporada : 1, 10);
+      for (var j = 0; j < lista.length; j++) {
+        var ep = lista[j];
+        var en = parseInt(ep.episodio != null ? ep.episodio : ep.episode != null ? ep.episode : 0, 10);
+        var key = sn + 'x' + en;
+        map[key] = {
+          titulo: ep.titulo || ep.name || ep.title || '',
+          back_img: ep.back_img || ep.still || '',
+          link: ep.link || ''
+        };
+      }
+    }
+  } catch (_) {}
+  return map;
+}
+
 
 /** Detalle solo con slug del worker (buscador → detalle, no al ep. 1) */
 
@@ -521,11 +579,13 @@ if (type === 'tv' && temps.length) {
               // Forzar título del worker si es real (español de la fuente)
               if (e.titulo && !isGenericEpName(e.titulo)) name = e.titulo;
               var overview = e.descripcion || e.overview || tm.overview || '';
+              // Imagen: TMDB primero; worker (back_img) solo si no hay
               var still =
-                e.back_img ||
+                (tm.still_path ? IMG + 'w300' + tm.still_path : '') ||
                 e.still ||
                 e.image ||
-                (tm.still_path ? IMG + 'w300' + tm.still_path : '');
+                e.back_img ||
+                '';
               var href = workerPlayHref(
                 Object.assign({}, hit || {}, { source_id: (data && data.source_id) || sourceId }),
                 'tv',
@@ -769,22 +829,30 @@ async function loadDetail(type) {
             });
           } catch (_) {}
         }
+        // Títulos ES desde url_vid del worker
+        var wMap = {};
+        try {
+          wMap = await fetchWorkerEpisodesMap(hit, type);
+        } catch (_) {}
         $('#eps').innerHTML = eps
           .map(function (e) {
             var href = workerPlayHref(hit, 'tv', id, e.season_number, e.episode_number);
+            var wk = wMap[e.season_number + 'x' + e.episode_number] || {};
+            var epName = wk.titulo || e.name || ('Episodio ' + e.episode_number);
+            var still = wk.back_img || (e.still_path ? IMG + 'w300' + e.still_path : '');
             return (
               '<a class="ep" href="' +
               href +
               '">' +
-              (e.still_path
-                ? '<img loading="lazy" src="' + IMG + 'w300' + e.still_path + '" alt="">'
+              (still
+                ? '<img loading="lazy" src="' + esc(still) + '" alt="">'
                 : '<div class="ph"></div>') +
               '<div><b>T' +
               e.season_number +
               ' E' +
               e.episode_number +
               ' — ' +
-              esc(e.name || ('Episodio ' + e.episode_number)) +
+              esc(epName) +
               '</b><small>' +
               esc((e.overview || 'Sin sinopsis.').slice(0, 220)) +
               '</small></div></a>'
