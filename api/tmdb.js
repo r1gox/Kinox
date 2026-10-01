@@ -1,22 +1,26 @@
 /**
- * Proxy TMDB en Vercel.
- * Env (Secret): TMDB_API_KEY  (también acepta TMBD_API_KEY por typo)
+ * Proxy TMDB — Vercel Serverless / Edge
+ * Variable: TMDB_API_KEY (Production + Preview)
  *
- * Uso cliente: GET /api/tmdb?path=/movie/550&language=es-MX
+ * GET /api/tmdb?path=/movie/550&language=es-MX
  */
-module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Accept, Content-Type');
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
 
-  if (req.method === 'OPTIONS') {
-    res.status(204).end();
-    return;
+export const config = {
+  runtime: 'edge',
+};
+
+export default async function handler(request) {
+  const cors = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Accept, Content-Type',
+  };
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: cors });
   }
-  if (req.method !== 'GET') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
+  if (request.method !== 'GET') {
+    return Response.json({ error: 'Method not allowed' }, { status: 405, headers: cors });
   }
 
   const key =
@@ -26,29 +30,28 @@ module.exports = async function handler(req, res) {
     '';
 
   if (!key) {
-    res.status(503).json({
-      error: 'Falta TMDB_API_KEY en Vercel (Project → Settings → Environment Variables → Secret)',
-    });
-    return;
+    return Response.json(
+      {
+        error:
+          'Falta TMDB_API_KEY en Vercel → Settings → Environment Variables (Production y Preview) y Redeploy',
+      },
+      { status: 503, headers: cors }
+    );
   }
 
   try {
-    const url = new URL(req.url, 'http://localhost');
-    let path = url.searchParams.get('path') || '';
-    path = String(path).trim();
+    const url = new URL(request.url);
+    let path = (url.searchParams.get('path') || '').trim();
     if (!path.startsWith('/')) path = '/' + path;
-    // Seguridad básica: solo rutas TMDB
-    if (!/^\/[a-zA-Z0-9_./%-]+$/.test(path) || path.includes('..')) {
-      res.status(400).json({ error: 'path inválido' });
-      return;
+    if (!path || path.includes('..') || !/^\/[a-zA-Z0-9_./%-]+$/.test(path)) {
+      return Response.json({ error: 'path inválido' }, { status: 400, headers: cors });
     }
 
     const target = new URL('https://api.themoviedb.org/3' + path);
     target.searchParams.set('api_key', key);
-
     url.searchParams.forEach((v, k) => {
       if (k === 'path') return;
-      if (v !== '' && v != null) target.searchParams.set(k, v);
+      if (v) target.searchParams.set(k, v);
     });
     if (!target.searchParams.get('language')) {
       target.searchParams.set('language', 'es-MX');
@@ -62,11 +65,21 @@ module.exports = async function handler(req, res) {
     try {
       body = JSON.parse(text);
     } catch {
-      body = { error: 'Respuesta no JSON de TMDB', raw: text.slice(0, 200) };
+      body = { error: 'Respuesta no JSON', raw: text.slice(0, 200) };
     }
 
-    res.status(r.status).json(body);
+    return new Response(JSON.stringify(body), {
+      status: r.status,
+      headers: {
+        ...cors,
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 's-maxage=300, stale-while-revalidate=600',
+      },
+    });
   } catch (e) {
-    res.status(502).json({ error: String(e && e.message ? e.message : e) });
+    return Response.json(
+      { error: String(e && e.message ? e.message : e) },
+      { status: 502, headers: cors }
+    );
   }
-};
+}
