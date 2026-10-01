@@ -492,7 +492,9 @@ if (type === 'tv' && temps.length) {
               (sEn.episodes || []).forEach(function (ep) {
                 var prev = tmdbByEp[ep.episode_number] || {};
                 tmdbByEp[ep.episode_number] = Object.assign({}, prev, {
-                  name: isGenericEpName(prev.name) ? (ep.name || prev.name) : prev.name,
+                  // Guardar EN aparte; no forzar inglés sobre es genérico aquí
+                  name: prev.name || ep.name,
+                  name_en: ep.name || prev.name_en,
                   overview: prev.overview || ep.overview,
                   still_path: prev.still_path || ep.still_path,
                   runtime: prev.runtime || ep.runtime
@@ -508,9 +510,16 @@ if (type === 'tv' && temps.length) {
               var en = e.episodio != null ? e.episodio : e.episode != null ? e.episode : e.episode_number;
               var sn = e.temporada != null ? e.temporada : want;
               var tm = tmdbByEp[en] || {};
-              var name = e.titulo || e.name || e.title || '';
-              if (isGenericEpName(name)) name = tm.name || name;
+              // Prioridad: título del WORKER (español) > TMDB > genérico. Nunca pisar worker con inglés.
+              var name = '';
+              if (e.titulo && String(e.titulo).trim()) name = String(e.titulo).trim();
+              else if (e.name && String(e.name).trim()) name = String(e.name).trim();
+              else if (e.title && String(e.title).trim()) name = String(e.title).trim();
+              if (isGenericEpName(name) && tm.name && !isGenericEpName(tm.name)) name = tm.name;
+              if (isGenericEpName(name) && tm.name_en && !isGenericEpName(tm.name_en)) name = tm.name_en;
               if (isGenericEpName(name)) name = 'Episodio ' + en;
+              // Forzar título del worker si es real (español de la fuente)
+              if (e.titulo && !isGenericEpName(e.titulo)) name = e.titulo;
               var overview = e.descripcion || e.overview || tm.overview || '';
               var still =
                 e.back_img ||
