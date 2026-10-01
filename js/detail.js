@@ -1,3 +1,13 @@
+
+  function isGenericEpName(n) {
+    n = String(n || '').trim();
+    if (!n) return true;
+    // "Episodio 1", "Episode 12", "Capítulo 3", etc.
+    if (/^(episodio|episode|capitulo|capítulo|chapter)\s*\d+$/i.test(n)) return true;
+    if (/^e\d+$/i.test(n)) return true;
+    return false;
+  }
+
 async function resolveWorkerHit(title, type, preferAnime, opts) {
   opts = opts || {};
   var base =
@@ -338,7 +348,7 @@ async function loadDetailFromWorker(type, params) {
   var trailerKey = null;
   var tmdbIdForTrailer = null;
   try {
-    if (KEY && typeof resolveTmdbIdForTitle === 'function') {
+    if (typeof resolveTmdbIdForTitle === 'function') {
       tmdbIdForTrailer = await resolveTmdbIdForTitle(title, type, year);
       if (tmdbIdForTrailer) {
         var tr = await findYoutubeTrailer(type, tmdbIdForTrailer);
@@ -445,7 +455,7 @@ async function loadDetailFromWorker(type, params) {
 
 if (type === 'tv' && temps.length) {
     var tmdbIdWorker = null;
-    if (KEY && typeof resolveTmdbIdForTitle === 'function') {
+    if (typeof resolveTmdbIdForTitle === 'function') {
       resolveTmdbIdForTitle(title, type, year).then(function (tid) {
         tmdbIdWorker = tid;
         renderEps();
@@ -461,20 +471,20 @@ if (type === 'tv' && temps.length) {
       if (!Array.isArray(lista)) lista = [];
       var tmdbByEp = {};
       var tid = tmdbIdWorker;
-      if (!tid && KEY && typeof resolveTmdbIdForTitle === 'function') {
+      if (!tid && typeof resolveTmdbIdForTitle === 'function') {
         try {
           tid = await resolveTmdbIdForTitle(title, type, year);
           tmdbIdWorker = tid;
         } catch (_) {}
       }
-      if (tid && KEY && typeof tmdb === 'function') {
+      if (tid && typeof tmdb === 'function') {
         try {
           var s = await tmdb('/tv/' + tid + '/season/' + want);
           (s.episodes || []).forEach(function (ep) {
             tmdbByEp[ep.episode_number] = ep;
           });
           var missing = (s.episodes || []).some(function (ep) {
-            return !ep.name || !ep.overview;
+            return isGenericEpName(ep.name) || !ep.overview;
           });
           if (missing) {
             try {
@@ -482,7 +492,7 @@ if (type === 'tv' && temps.length) {
               (sEn.episodes || []).forEach(function (ep) {
                 var prev = tmdbByEp[ep.episode_number] || {};
                 tmdbByEp[ep.episode_number] = Object.assign({}, prev, {
-                  name: prev.name || ep.name,
+                  name: isGenericEpName(prev.name) ? (ep.name || prev.name) : prev.name,
                   overview: prev.overview || ep.overview,
                   still_path: prev.still_path || ep.still_path,
                   runtime: prev.runtime || ep.runtime
@@ -498,7 +508,9 @@ if (type === 'tv' && temps.length) {
               var en = e.episodio != null ? e.episodio : e.episode != null ? e.episode : e.episode_number;
               var sn = e.temporada != null ? e.temporada : want;
               var tm = tmdbByEp[en] || {};
-              var name = e.titulo || e.name || e.title || tm.name || ('Episodio ' + en);
+              var name = e.titulo || e.name || e.title || '';
+              if (isGenericEpName(name)) name = tm.name || name;
+              if (isGenericEpName(name)) name = 'Episodio ' + en;
               var overview = e.descripcion || e.overview || tm.overview || '';
               var still =
                 e.back_img ||
@@ -552,7 +564,7 @@ async function loadDetail(type) {
     if (!id && slug) {
       var titleHint = params.get('title') || String(slug).replace(/-/g, ' ');
       var yearHint = params.get('year') || '';
-      if (KEY && typeof resolveTmdbIdForTitle === 'function') {
+      if (typeof resolveTmdbIdForTitle === 'function') {
         try {
           var tid = await resolveTmdbIdForTitle(titleHint, type, yearHint);
           if (tid) {
@@ -727,7 +739,7 @@ async function loadDetail(type) {
         var s = await tmdb('/tv/' + id + '/season/' + sn);
         var eps = s.episodes || [];
         var needFill = eps.some(function (e) {
-          return !e.name || !e.overview;
+          return isGenericEpName(e.name) || !e.overview;
         });
         if (needFill) {
           try {
@@ -740,7 +752,7 @@ async function loadDetail(type) {
               var m = byN[e.episode_number];
               if (!m) return e;
               return Object.assign({}, e, {
-                name: e.name || m.name,
+                name: isGenericEpName(e.name) ? (m.name || e.name) : e.name,
                 overview: e.overview || m.overview,
                 still_path: e.still_path || m.still_path,
                 runtime: e.runtime || m.runtime
