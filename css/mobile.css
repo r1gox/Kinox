@@ -218,74 +218,104 @@
     margin-right: 12px !important;
   }
 
-  /* ===== DETALLE (como attachment) ===== */
+
+  /* ===== DETALLE móvil = attachment MovieZone ===== */
   .det {
-    padding-top: calc(72px + env(safe-area-inset-top, 0px)) !important;
-    padding-left: 4vw !important;
-    padding-right: 4vw !important;
-    padding-bottom: 20px !important;
+    position: relative !important;
+    padding: calc(72px + env(safe-area-inset-top, 0px)) 4vw 20px !important;
   }
-  .det .bd,
-  .bd {
-    opacity: 0.5 !important;
+  .det .bd {
+    position: absolute !important;
+    inset: 0 0 auto !important;
     height: 55vh !important;
+    opacity: 0.5 !important;
+    z-index: 0 !important;
+    background-size: cover !important;
+    background-position: center 20% !important;
+    pointer-events: none !important;
   }
-  .det .dw,
-  .dw {
-    gap: 16px !important;
-    flex-direction: column !important;
-    align-items: center !important;
+  .det .bd:after {
+    content: "" !important;
+    position: absolute !important;
+    inset: 0 !important;
+    background: linear-gradient(transparent, var(--bg, #0a0611)) !important;
   }
-  .det .pos,
-  .pos {
-    width: 150px !important;
-    align-self: center !important;
-  }
-  .det .info,
-  .info {
-    min-width: 0 !important;
-    width: 100% !important;
-  }
-  .det .info h1,
-  .info h1 {
-    text-align: center !important;
-    font-size: 1.6rem !important;
-  }
-  .det .info .meta,
-  .det .tags,
-  .info .meta,
-  .tags {
-    justify-content: center !important;
-    text-align: center !important;
-  }
-  .tags {
-    display: flex !important;
-  }
-  .det .btns,
-  .btns {
-    justify-content: center !important;
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 10px !important;
-  }
-  .det .btns .btn,
-  .btns .btn {
-    flex: 1 1 40% !important;
-    min-height: 46px !important;
-    text-align: center !important;
-  }
-  .det-back,
-  .back {
+  .det .det-back,
+  .det .back,
+  .det a.kx-back {
+    position: relative !important;
+    z-index: 2 !important;
     min-height: 40px !important;
+    margin-bottom: 18px !important;
     display: inline-flex !important;
     align-items: center !important;
   }
-  .prov img {
+  .det .dw {
+    position: relative !important;
+    z-index: 1 !important;
+    display: flex !important;
+    gap: 16px !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+  }
+  .det .pos {
+    width: 150px !important;
+    max-width: 45vw !important;
+    align-self: center !important;
+    border-radius: 12px !important;
+  }
+  .det .info {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    text-align: center !important;
+  }
+  .det .info h1 {
+    text-align: center !important;
+    font-size: 1.6rem !important;
+    letter-spacing: -0.03em !important;
+  }
+  .det .info .meta {
+    justify-content: center !important;
+    text-align: center !important;
+  }
+  .det .tags {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 8px !important;
+  }
+  .det .info h3 {
+    text-align: left !important;
+  }
+  .det .info p {
+    text-align: left !important;
+  }
+  .det .btns {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    margin-top: 22px !important;
+  }
+  .det .btns .btn {
+    flex: 1 1 40% !important;
+    min-height: 46px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+  .det .prov {
+    justify-content: center !important;
+  }
+  .det .prov img {
     width: 42px !important;
     height: 42px !important;
   }
-
-  /* Temporadas / episodios */
   .seasons {
     padding: 10px 4vw !important;
     max-width: none !important;
@@ -297,9 +327,12 @@
     width: 100% !important;
     max-width: none !important;
   }
+  .seasons .ep,
   .ep {
     gap: 10px !important;
   }
+  .seasons .ep img,
+  .seasons .ep .ph,
   .ep img,
   .ep .ph {
     width: 112px !important;
@@ -307,8 +340,6 @@
   .ep small {
     font-size: 0.75rem !important;
   }
-
-
   /* Reproductor: bajar contenido bajo header fijo (volver + título visibles) */
   .player-page,
   .kx-ep-view,
@@ -343,10 +374,7 @@
   .hero h1 {
     font-size: 1.7rem !important;
   }
-  .det .info h1,
-  .info h1 {
-    font-size: 1.45rem !important;
-  }
+  .det .info h1 { font-size: 1.45rem !important; }
 }
 
 @media (hover: none) {
