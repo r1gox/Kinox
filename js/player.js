@@ -59,26 +59,59 @@
         return null;
       }
     }
-    if (typeof payload !== "object") return null;
+    if (typeof payload !== "object" || !payload) return null;
+
+    function isImageUrl(u) {
+      return /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(String(u || ""));
+    }
+    function isMediaUrl(u) {
+      u = String(u || "");
+      if (!/^https?:\/\//i.test(u)) return false;
+      if (isImageUrl(u)) return false;
+      return true;
+    }
+    function pickStr(v) {
+      if (typeof v === "string" && isMediaUrl(v)) return v;
+      if (Array.isArray(v)) {
+        for (var i = 0; i < v.length; i++) {
+          if (typeof v[i] === "string" && isMediaUrl(v[i])) return v[i];
+          if (v[i] && typeof v[i].url === "string" && isMediaUrl(v[i].url)) return v[i].url;
+        }
+      }
+      if (v && typeof v === "object") {
+        if (Array.isArray(v.hls)) {
+          for (var j = 0; j < v.hls.length; j++) {
+            if (typeof v.hls[j] === "string" && isMediaUrl(v.hls[j])) return v.hls[j];
+          }
+        }
+        if (typeof v.url === "string" && isMediaUrl(v.url)) return v.url;
+      }
+      return null;
+    }
+
+    // Prioridad: streams reales / proxy worker antes que "url" genérica
     var keys = [
+      "play_direct",
+      "master",
+      "hls",
       "play_url",
       "proxy_url",
-      "url",
-      "master",
-      "play_direct",
-      "hls",
       "src",
       "file",
-      "link"
+      "link",
+      "url"
     ];
     for (var i = 0; i < keys.length; i++) {
-      var v = payload[keys[i]];
-      if (typeof v === "string" && /^https?:\/\//i.test(v)) return v;
-      if (Array.isArray(v) && v[0] && typeof v[0] === "string") return v[0];
-      if (v && typeof v === "object" && Array.isArray(v.hls) && v.hls[0]) return v.hls[0];
+      var got = pickStr(payload[keys[i]]);
+      if (got) return got;
     }
-    if (payload.videos && payload.videos.hls && payload.videos.hls[0]) {
-      return payload.videos.hls[0];
+    if (payload.videos) {
+      var g2 = pickStr(payload.videos);
+      if (g2) return g2;
+      if (payload.videos.hls) {
+        var g3 = pickStr(payload.videos.hls);
+        if (g3) return g3;
+      }
     }
     return null;
   }
@@ -968,27 +1001,58 @@
       }
 
       function renderVideo(src) {
+        if (!src || /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(src)) {
+          box.innerHTML =
+            '<div class="player-empty">URL de video inválida (parece una imagen).</div>';
+          return;
+        }
         if (box.querySelector("video") && box.querySelector("video")._hls) {
           try {
             box.querySelector("video")._hls.destroy();
           } catch (_) {}
         }
+        // preload auto + sin depender solo del poster (si HLS falla, avisar)
         box.innerHTML =
-          '<video id="mzVideo" class="kx-video" controls playsinline autoplay preload="metadata"' +
+          '<video id="mzVideo" class="kx-video" controls playsinline autoplay preload="auto"' +
           (poster ? ' poster="' + poster + '"' : "") +
           "></video>";
         var video = $("#mzVideo");
-        if (/\.m3u8(?:\?|$)/i.test(src) || /m3u8/i.test(src)) {
+        function onFail(msg) {
+          console.warn("[player]", msg, src);
+          box.innerHTML =
+            '<div class="player-empty">' +
+            (msg || "No se pudo reproducir el directo.") +
+            '<br><button type="button" class="btn" id="kxRetryDirect" style="margin-top:12px">Reintentar</button></div>';
+          var rb = document.getElementById("kxRetryDirect");
+          if (rb) rb.onclick = function () { renderVideo(src); };
+        }
+        video.addEventListener("error", function () {
+          onFail("Error al cargar el video.");
+        });
+        if (/\.m3u8(?:\?|$)/i.test(src) || /m3u8/i.test(src) || /master\.txt/i.test(src) || /\/proxy\?/i.test(src)) {
           if (video.canPlayType("application/vnd.apple.mpegurl")) {
             video.src = src;
           } else if (window.Hls && Hls.isSupported()) {
-            var hls = new Hls({ enableWorker: true });
+            var hls = new Hls({
+              enableWorker: true,
+              xhrSetup: function (xhr) {
+                try { xhr.withCredentials = false; } catch (_) {}
+              }
+            });
             hls.loadSource(src);
             hls.attachMedia(video);
             video._hls = hls;
+            hls.on(Hls.Events.ERROR, function (_e, data) {
+              if (data && data.fatal) {
+                try { hls.destroy(); } catch (_) {}
+                onFail("Stream HLS no disponible (fatal).");
+              }
+            });
+            hls.on(Hls.Events.MANIFEST_PARSED, function () {
+              video.play().catch(function () {});
+            });
           } else {
-            box.innerHTML =
-              '<div class="player-empty">Tu navegador no puede reproducir HLS.</div>';
+            onFail("Tu navegador no puede reproducir HLS.");
             return;
           }
         } else {
