@@ -714,3 +714,21 @@ body.mz-on-detail header.mz-detail-scrolled{
   }
 }
 
+
+
+/* Direct video: llenar el cuadro (no quedarse solo en el poster) */
+.kx-player,.mz-player.kx-player{
+  position:relative;
+  display:block!important;
+}
+.kx-player video.kx-video,
+.mz-player video.kx-video,
+video.kx-video#mzVideo{
+  position:absolute;
+  inset:0;
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain;
+  background:#000;
+  display:block!important;
+}
