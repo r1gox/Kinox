@@ -343,7 +343,6 @@ function mzEnsureMobileBottomNav(active){
     bar = document.createElement('nav');
     bar.id = 'mz-bottom-nav';
     bar.setAttribute('aria-label', 'Secciones');
-    bar.setAttribute('data-mz-icons', 'svg');
     document.body.appendChild(bar);
   }
   var I = {
@@ -362,7 +361,6 @@ function mzEnsureMobileBottomNav(active){
     { id: 'favoritos', href: appLink('/favoritos'), label: 'Favoritos' },
     { id: 'historial', href: appLink('/historial'), label: 'Historial' }
   ];
-  bar.setAttribute('data-mz-icons', 'svg');
   bar.innerHTML = items.map(function (it) {
     return '<a data-section="' + it.id + '" href="' + it.href + '">' + I[it.id] + '<span>' + it.label + '</span></a>';
   }).join('');
@@ -378,4 +376,22 @@ function keyPage(){const v=$('#view');v.innerHTML=`<section class="page" style="
 
 nav();
 
-/* mobile-ui.js desactivado: sobrescribía iconos SVG de la barra inferior */
+/* Mobile UI después de armar el header */
+(function loadMobileUi(){
+  if (document.getElementById('mz-mobile-ui-js')) return;
+  var s = document.createElement('script');
+  s.id = 'mz-mobile-ui-js';
+  try {
+    var scripts = document.getElementsByTagName('script');
+    var base = 'js/mobile-ui.js';
+    for (var i = 0; i < scripts.length; i++) {
+      var src = scripts[i].src || '';
+      if (/common\.js/i.test(src)) { base = src.replace(/common\.js(\?.*)?$/i, 'mobile-ui.js'); break; }
+    }
+    s.src = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'v=6';
+  } catch (_) {
+    s.src = (location.pathname.indexOf('/pages/') !== -1) ? '../js/mobile-ui.js?v=6' : 'js/mobile-ui.js?v=6';
+  }
+  document.body.appendChild(s);
+})();
+
