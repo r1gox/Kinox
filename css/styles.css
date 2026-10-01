@@ -646,22 +646,58 @@ body.mz-on-detail header.mz-detail-scrolled{
 }
 
 
-/* Mi lista: fila propia debajo de Reproducir + Tráiler */
+
+  .btns-fav .btn,.btns-fav #favBtn{width:100%!important;flex:none!important}
+}
+
+/* PC: Reproducir + Tráiler + Mi lista misma fila | Móvil: lista abajo sola */
+.det .btns{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:center;
+  margin-top:22px;
+}
 .btns-fav{
   display:flex;
+  gap:10px;
   margin-top:10px;
-  width:100%;
 }
-.btns-fav .btn,
 .btns-fav #favBtn{
-  width:100%;
   min-height:46px;
   display:inline-flex;
   align-items:center;
   justify-content:center;
   box-sizing:border-box;
 }
-@media (max-width:900px){
-  .btns-fav{margin-top:10px}
-  .btns-fav .btn,.btns-fav #favBtn{width:100%!important;flex:none!important}
+@media (min-width:901px){
+  /* Misma fila en PC: btns y fav como flex row compartida */
+  .det .info{
+    /* keep */
+  }
+  .det .btns{
+    display:inline-flex;
+    margin-bottom:0;
+  }
+  .det .btns-fav{
+    display:inline-flex;
+    margin-top:22px;
+    margin-left:10px;
+  }
+  .det .btns-fav #favBtn{
+    width:auto;
+  }
 }
+@media (max-width:900px){
+  /* Móvil: tal cual — play/trailer fila, lista fila abajo */
+  .det .btns-fav{
+    display:flex!important;
+    width:100%!important;
+    margin-top:10px!important;
+    margin-left:0!important;
+  }
+  .det .btns-fav #favBtn{
+    width:100%!important;
+  }
+}
+
