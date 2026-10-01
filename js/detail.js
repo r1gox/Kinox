@@ -230,7 +230,7 @@ function workerBaseUrl() {
 
 
 async function findYoutubeTrailer(type, tmdbId) {
-  if (!tmdbId || typeof tmdb !== 'function' || !KEY) return null;
+  if (!tmdbId || typeof tmdb !== 'function') return null;
   async function pick(results) {
     var list = results || [];
     var order = ['Trailer', 'Teaser', 'Clip'];
@@ -659,7 +659,19 @@ async function loadDetail(type) {
       });
     }
 
-    if (!KEY) return keyPage();
+    // Proxy Vercel: no pedir key al usuario
+    if (!KEY) {
+      try {
+        if (typeof ensureTmdbReady === 'function') await ensureTmdbReady();
+      } catch (_) {}
+    }
+    if (!KEY) {
+      // Último intento: una llamada al proxy marca KEY=__server__
+      try {
+        if (typeof tmdb === 'function') await tmdb('/configuration', {});
+      } catch (_) {}
+    }
+    if (!KEY) throw Error('TMDB no disponible (revisa /api/tmdb en Vercel)');
     if (!id) throw Error('Falta el ID del título');
     var x = await tmdb('/' + type + '/' + id, { append_to_response: 'videos,watch/providers,recommendations' });
     var it = norm(x, type);

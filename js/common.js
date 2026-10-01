@@ -69,21 +69,18 @@ async function tmdbViaServer(path,params={}){
   return j;
 }
 async function tmdb(path,params={}){
-  // 1) Proxy Vercel (TMDB_API_KEY en env) — no pide key al usuario
+  // 1) Siempre intentar proxy Vercel primero
   try{
     const via=await tmdbViaServer(path,params);
     if(via) return via;
   }catch(e){
-    if(KEY&&KEY!=='__server__'){ /* caer a key local */ }
-    else if(String(e.message||'').indexOf('503')>=0||String(e.message||'').indexOf('Falta')>=0){
-      /* sin server key */
-    }else{
-      // error real del proxy: rethrow si no hay key local
-      if(!KEY||KEY==='__server__') throw e;
-    }
+    // Si hay key local real, caer; si modo servidor, re-lanzar (no pedir key)
+    if(!(KEY&&KEY!=='__server__')) throw e;
   }
-  // 2) Key local (localStorage / TMDB_KEY embebida)
-  if(!KEY||KEY==='__server__') return keyPage();
+  // 2) Key local en el navegador (solo si el usuario la guardó)
+  if(!KEY||KEY==='__server__'){
+    throw Error('Sin TMDB: el proxy /api/tmdb no respondió');
+  }
   const u=new URL(API+path);
   u.searchParams.set('api_key',KEY);
   u.searchParams.set('language',params.language||'es-MX');
@@ -180,7 +177,11 @@ function cleanAnimeTitle(title) {
 }
 
 async function resolveTmdbIdForTitle(title, type, year, opts) {
-  if (!KEY || !title) return null;
+  if (!title) return null;
+  if (!KEY) {
+    try { await ensureTmdbReady(); } catch(_){}
+  }
+  if (!KEY) return null;
   opts = opts || {};
   try {
     const path = type === 'tv' || type === 'anime' ? '/search/tv' : '/search/movie';
@@ -309,6 +310,7 @@ function nav(){
   window.addEventListener('scroll',()=>$('#top').classList.toggle('solid',scrollY>30),{passive:true});
   // Barra de secciones ABAJO solo móvil (no depende de mobile-ui.js)
   try{ mzEnsureMobileBottomNav(active); }catch(e){}
+  try{ ensureTmdbReady(); }catch(e){}
 }
 
 /** Barra inferior de secciones — solo viewport ≤900px. PC no se toca. */
@@ -343,6 +345,7 @@ function mzEnsureMobileBottomNav(active){
     bar = document.createElement('nav');
     bar.id = 'mz-bottom-nav';
     bar.setAttribute('aria-label', 'Secciones');
+    bar.setAttribute('data-mz-icons', 'svg');
     document.body.appendChild(bar);
   }
   var I = {
@@ -361,6 +364,7 @@ function mzEnsureMobileBottomNav(active){
     { id: 'favoritos', href: appLink('/favoritos'), label: 'Favoritos' },
     { id: 'historial', href: appLink('/historial'), label: 'Historial' }
   ];
+  bar.setAttribute('data-mz-icons', 'svg');
   bar.innerHTML = items.map(function (it) {
     return '<a data-section="' + it.id + '" href="' + it.href + '">' + I[it.id] + '<span>' + it.label + '</span></a>';
   }).join('');
@@ -376,22 +380,4 @@ function keyPage(){const v=$('#view');v.innerHTML=`<section class="page" style="
 
 nav();
 
-/* Mobile UI después de armar el header */
-(function loadMobileUi(){
-  if (document.getElementById('mz-mobile-ui-js')) return;
-  var s = document.createElement('script');
-  s.id = 'mz-mobile-ui-js';
-  try {
-    var scripts = document.getElementsByTagName('script');
-    var base = 'js/mobile-ui.js';
-    for (var i = 0; i < scripts.length; i++) {
-      var src = scripts[i].src || '';
-      if (/common\.js/i.test(src)) { base = src.replace(/common\.js(\?.*)?$/i, 'mobile-ui.js'); break; }
-    }
-    s.src = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'v=6';
-  } catch (_) {
-    s.src = (location.pathname.indexOf('/pages/') !== -1) ? '../js/mobile-ui.js?v=6' : 'js/mobile-ui.js?v=6';
-  }
-  document.body.appendChild(s);
-})();
-
+/* mobile-ui.js desactivado: sobrescribía iconos SVG de la barra inferior */
