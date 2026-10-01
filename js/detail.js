@@ -765,7 +765,9 @@ async function loadDetail(type) {
       (hasTrailer
         ? '<button type="button" class="btn" id="btnTrailer">Ver tráiler</button>'
         : '') +
-      '<button id="favBtn" class="btn alt ' +
+      '</div>' +
+      '<div class="btns-fav">' +
+      '<button id="favBtn" type="button" class="btn alt ' +
       (favs().some(function (f) { return f.id === it.id && f.type === type; }) ? 'on' : '') +
       '">' +
       (favs().some(function (f) { return f.id === it.id && f.type === type; }) ? '✓ En mi lista' : '+ Mi lista') +
