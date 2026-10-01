@@ -1,10 +1,10 @@
 /**
- * Interfaz móvil estilo MovieZone (attachment) — datos Kinox.
- * Solo ≤900px. PC no se toca.
+ * Interfaz móvil — barra inferior + header.
+ * NO toca detalle (.det / .bd / .seasons / .ep): ya estaba bien.
+ * Solo ≤900px.
  */
 @media (max-width: 900px) {
   :root {
-    --cw: 112px;
     --mz-header-h: 56px;
     --mz-bottom-h: 58px;
   }
@@ -37,7 +37,7 @@
     flex: 0 0 auto !important;
   }
   header nav {
-    display: none !important; /* secciones abajo */
+    display: none !important;
   }
   header #sf {
     flex: 1 1 auto !important;
@@ -57,7 +57,7 @@
     flex: none !important;
   }
 
-  /* Barra inferior con iconos (como attachment) */
+  /* Barra inferior con iconos SVG */
   #mz-bottom-nav {
     position: fixed !important;
     inset: auto 0 0 !important;
@@ -73,10 +73,6 @@
     background: rgba(10, 6, 17, 0.98) !important;
     border-top: 1px solid var(--line, #2a1f3d) !important;
     overflow: visible !important;
-    scrollbar-width: none !important;
-  }
-  #mz-bottom-nav::-webkit-scrollbar {
-    display: none !important;
   }
   #mz-bottom-nav a {
     flex: 1 1 0 !important;
@@ -97,7 +93,7 @@
     border-radius: 0 !important;
   }
   #mz-bottom-nav a svg,
-nav#mz-bottom-nav a svg {
+  nav#mz-bottom-nav a svg {
     display: block !important;
     width: 22px !important;
     height: 22px !important;
@@ -106,9 +102,11 @@ nav#mz-bottom-nav a svg {
     stroke-width: 1.8 !important;
     stroke-linecap: round !important;
     stroke-linejoin: round !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
   #mz-bottom-nav a .ico {
-    display: none !important; /* usamos SVG */
+    display: none !important;
   }
   #mz-bottom-nav a.on {
     color: var(--ac, #a66bff) !important;
@@ -119,174 +117,23 @@ nav#mz-bottom-nav a svg {
     padding-bottom: calc(84px + env(safe-area-inset-bottom)) !important;
   }
 
-  /* Catálogo / páginas */
+  /* Catálogo: espacio bajo header (no detalle) */
   .page {
-    padding: calc(76px + env(safe-area-inset-top)) 4vw 20px !important;
-  }
-  .page h1 {
-    font-size: 1.5rem !important;
-  }
-  .grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-    gap: 16px 10px !important;
-    justify-content: stretch !important;
-  }
-  .grid .card {
-    width: auto !important;
-  }
-  .filters {
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    scrollbar-width: none !important;
-    margin: 0 -4vw 18px !important;
-    padding: 0 4vw !important;
-  }
-  .filters select {
-    flex: 0 0 auto !important;
-    font-size: 16px !important;
-    min-height: 44px !important;
-  }
-
-  /* Rows / tracks */
-  .row {
-    padding-top: 18px !important;
-  }
-  .row h2 {
-    font-size: 1.05rem !important;
-  }
-  .track {
-    margin: 0 -4vw !important;
-    padding: 0 4vw 10px !important;
-    scroll-snap-type: x proximity !important;
-    -webkit-overflow-scrolling: touch !important;
-  }
-  .track .card {
-    scroll-snap-align: start !important;
-    width: var(--cw) !important;
-    flex: 0 0 var(--cw) !important;
-  }
-
-  /* Hero inicio */
-  .hero {
-    min-height: 74dvh !important;
-    padding: 0 4vw 5vh !important;
-    background-position: center top !important;
-  }
-  .hero:after {
-    background: linear-gradient(
-      0deg,
-      var(--bg) 8%,
-      rgba(10, 6, 17, 0.55) 50%,
-      rgba(10, 6, 17, 0.1)
-    ) !important;
-  }
-  .hero > div {
-    max-width: none !important;
-    width: 100% !important;
-  }
-  .hero h1 {
-    font-size: 2rem !important;
-  }
-  .hero .btn,
-  .btns .btn {
-    flex: 1 !important;
-    text-align: center !important;
-    min-height: 46px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-  }
-
-  /* Detalle */
-  .det {
-    padding-top: calc(72px + env(safe-area-inset-top)) !important;
-    padding-left: 4vw !important;
-    padding-right: 4vw !important;
-  }
-  .bd {
-    opacity: 0.5 !important;
-    height: 55vh !important;
-  }
-  .dw {
-    gap: 16px !important;
-    flex-direction: column !important;
-    align-items: center !important;
-  }
-  .pos {
-    width: 150px !important;
-    align-self: center !important;
-  }
-  .info {
-    min-width: 0 !important;
-    width: 100% !important;
-  }
-  .info h1 {
-    text-align: center !important;
-    font-size: 1.6rem !important;
-  }
-  .info .meta,
-  .tags {
-    justify-content: center !important;
-    text-align: center !important;
-  }
-  .tags {
-    display: flex !important;
-  }
-  .btns {
-    justify-content: center !important;
-    display: flex !important;
-    flex-wrap: wrap !important;
-  }
-  .btns .btn {
-    flex: 1 1 40% !important;
-    min-height: 46px !important;
-  }
-  .det-back,
-  .back {
-    min-height: 40px !important;
-  }
-  .seasons {
-    padding: 10px 4vw !important;
-  }
-  .seasons select {
-    font-size: 16px !important;
-    min-height: 44px !important;
-    width: 100% !important;
-  }
-  .ep {
-    gap: 10px !important;
-  }
-  .ep img,
-  .ep .ph {
-    width: 112px !important;
-  }
-  .ep small {
-    font-size: 0.75rem !important;
-  }
-
-  /* Player */
-  .player-page {
-    padding-top: calc(70px + env(safe-area-inset-top)) !important;
-    padding-left: 10px !important;
-    padding-right: 10px !important;
-    padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+    padding-top: calc(76px + env(safe-area-inset-top)) !important;
   }
 }
 
-@media (max-width: 360px) {
-  :root {
-    --cw: 104px;
-  }
-  .grid {
-    gap: 14px 8px !important;
-  }
-  .hero h1 {
-    font-size: 1.7rem !important;
-  }
-}
-
-@media (hover: none) {
-  .card:hover img {
-    transform: none !important;
+/* SVG barra inferior siempre visibles en móvil */
+@media (max-width: 900px) {
+  #mz-bottom-nav a svg,
+  nav#mz-bottom-nav a svg {
+    display: block !important;
+    width: 22px !important;
+    height: 22px !important;
+    fill: none !important;
+    stroke: currentColor !important;
+    stroke-width: 1.8 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 }
