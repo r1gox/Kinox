@@ -145,7 +145,7 @@ main{flex:1;width:100%;min-width:0}footer{color:var(--mute);font-size:.78rem;tex
 
 /* Reproductor MovieZone */
 .player-page{max-width:1100px;margin:0 auto;padding-top:90px}.player-head{margin-bottom:18px}.player-head h1{margin:8px 0 4px}.player-head small{color:var(--mute)}.back{color:var(--ac);text-decoration:none}.mz-player{width:100%;aspect-ratio:16/9;background:#000;border:1px solid var(--line);border-radius:14px;overflow:hidden;display:grid;place-items:center}.mz-player video{width:100%;height:100%;display:block;background:#000}.player-loading,.player-empty{padding:24px;text-align:center;color:var(--mute);line-height:1.6}.servers{margin-top:18px}.servers h3{margin:0 0 10px}.server-list{display:flex;flex-wrap:wrap;gap:10px}.server-btn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:10px;padding:10px 14px;cursor:pointer;font:inherit;transition:.2s}.server-btn:hover,.server-btn.active{border-color:var(--ac);background:rgba(139,92,246,.14)}.server-btn small{display:block;color:var(--mute);font-size:.72rem;margin-top:3px}
-@media(max-width:600px){.player-page{padding:calc(72px + env(safe-area-inset-top,0px)) 12px 24px}.mz-player{border-radius:9px}.server-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.server-btn{width:100%;padding:9px 8px}}
+@media(max-width:600px){.player-page{padding:calc(76px + env(safe-area-inset-top,0px)) 12px 24px}.mz-player{border-radius:9px}.server-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.server-btn{width:100%;padding:9px 8px}}
 
 
 /* ============================================================
@@ -618,4 +618,12 @@ body.mz-on-detail header.mz-detail-scrolled{
   .det .btns{justify-content:center}
   .det .btns .btn{flex:1;min-height:46px;text-align:center}
   .seasons .ep img,.seasons .ep .ph,.ep img,.ep .ph{width:112px}
+}
+
+
+/* kx player: no ocultar volver/título bajo header (móvil) */
+@media (max-width:900px){
+  .kx-ep-view,.kx-movie-view,.player-page{
+    padding-top:calc(76px + env(safe-area-inset-top,0px))!important;
+  }
 }

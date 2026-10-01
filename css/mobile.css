@@ -404,3 +404,43 @@
   .kx-info .kx-synopsis { order: 6 !important; margin-top: 16px !important; }
   .kx-info .kx-block { order: 4 !important; }
 }
+
+/* SOLO player: espacio bajo header (volver + título) */
+@media (max-width: 900px) {
+  .player-page,
+  .kx-ep-view,
+  .kx-movie-view,
+  section.player-page,
+  section.kx-ep-view {
+    padding-top: calc(76px + env(safe-area-inset-top, 0px)) !important;
+  }
+  .kx-topbar {
+    position: relative !important;
+    z-index: 2 !important;
+    padding-top: 4px !important;
+  }
+}
+
+/* SOLO detalle: Reproducir + Tráiler misma fila */
+@media (max-width: 900px) {
+  .det .btns {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    justify-content: center !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+  .det .btns .btn {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    min-height: 46px !important;
+    height: 46px !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    padding: 0 12px !important;
+  }
+}
