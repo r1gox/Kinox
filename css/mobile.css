@@ -421,26 +421,19 @@
   }
 }
 
-/* SOLO detalle: Reproducir + Tráiler misma fila */
+/* Reproducir + Ver tráiler: misma fila, cada uno su burbuja */
 @media (max-width: 900px) {
   .det .btns {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: nowrap !important;
-    justify-content: center !important;
-    align-items: stretch !important;
     gap: 10px !important;
   }
   .det .btns .btn {
-    flex: 1 1 0 !important;
-    min-width: 0 !important;
+    flex: 1 1 50% !important;
+    width: auto !important;
+    max-width: none !important;
     min-height: 46px !important;
-    height: 46px !important;
     margin: 0 !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    box-sizing: border-box !important;
-    padding: 0 12px !important;
   }
 }

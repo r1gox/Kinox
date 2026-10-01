@@ -139,8 +139,25 @@ main{flex:1;width:100%;min-width:0}footer{color:var(--mute);font-size:.78rem;tex
 .btn.play:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .btns{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 @media (max-width:700px){
-  .btns{display:grid;grid-template-columns:1fr;gap:8px}
-  .btns .btn{width:100%;text-align:center;box-sizing:border-box}
+  /* Reproducir + Tráiler en la misma fila, cada uno su botón */
+  .btns,.det .btns{
+    display:flex!important;
+    flex-direction:row!important;
+    flex-wrap:nowrap!important;
+    gap:10px!important;
+    align-items:stretch!important;
+  }
+  .btns .btn,.det .btns .btn{
+    flex:1 1 0!important;
+    width:auto!important;
+    min-width:0!important;
+    min-height:46px!important;
+    text-align:center!important;
+    box-sizing:border-box!important;
+    display:inline-flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+  }
 }
 
 /* Reproductor MovieZone */
