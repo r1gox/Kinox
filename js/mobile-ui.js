@@ -70,6 +70,11 @@
   function ensureBottomNav() {
     removeTopSecBar();
     var existing = document.getElementById("mz-bottom-nav");
+    // No pisar la barra con iconos SVG que armó common.js
+    if (existing && (existing.getAttribute("data-mz-icons") === "svg" || existing.querySelector("svg"))) {
+      document.body.classList.add("mz-has-bottom-nav");
+      return;
+    }
 
     if (!MQ.matches) {
       if (existing) existing.remove();
