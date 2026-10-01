@@ -188,22 +188,34 @@
   .hero h1 {
     font-size: 2rem !important;
   }
+  .hero > div {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+  }
+  .hero > div > small,
+  .hero > div > h1,
+  .hero > div > .meta,
+  .hero > div > p {
+    width: 100% !important;
+  }
   .hero .btn,
+  .hero a.btn,
   .btns .btn {
     min-height: 46px !important;
+    height: 46px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
     text-align: center !important;
+    box-sizing: border-box !important;
+    padding: 0 16px !important;
+    margin: 0 !important;
+    flex: 1 1 calc(50% - 6px) !important;
+    max-width: calc(50% - 6px) !important;
   }
-  .hero > div > .btn,
-  .hero > div > a.btn {
-    width: calc(50% - 5px) !important;
-    margin-right: 0 !important;
-  }
-  .hero > div > .btn:first-of-type,
-  .hero > div > a.btn:first-of-type {
-    margin-right: 6px !important;
+  .hero a.btn:first-of-type {
+    margin-right: 12px !important;
   }
 
   /* ===== DETALLE (como attachment) ===== */

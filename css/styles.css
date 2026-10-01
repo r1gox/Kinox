@@ -22,7 +22,13 @@ main{flex:1;width:100%;min-width:0}footer{color:var(--mute);font-size:.78rem;tex
 .page{width:min(var(--max),100%);margin:0 auto;padding:105px max(18px,4vw) 25px}.page h1{font-size:clamp(1.55rem,3vw,2rem);letter-spacing:-.04em;margin-bottom:18px}.page p{line-height:1.7}
 
 /* HOME / HERO */
-.hero{position:relative;min-height:78vh;display:flex;align-items:flex-end;padding:0 max(18px,4vw) 8vh;background-size:cover;background-position:center 20%}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--bg) 4%,rgba(10,6,17,.5) 48%,transparent 75%),linear-gradient(0deg,var(--bg),transparent 55%)}.hero>div{position:relative;z-index:1;width:min(600px,100%)}.hero small{color:var(--ac);font-weight:600}.hero h1{font-size:clamp(2rem,5vw,3.6rem);letter-spacing:-.05em;line-height:1.05;margin:8px 0}.hero p{color:#d8d0e6;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:20px}.hero .btn{margin-right:8px;margin-bottom:6px}
+.hero{position:relative;min-height:78vh;display:flex;align-items:flex-end;padding:0 max(18px,4vw) 8vh;background-size:cover;background-position:center 20%}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--bg) 4%,rgba(10,6,17,.5) 48%,transparent 75%),linear-gradient(0deg,var(--bg),transparent 55%)}.hero>div{position:relative;z-index:1;width:min(600px,100%)}.hero small{color:var(--ac);font-weight:600}.hero h1{font-size:clamp(2rem,5vw,3.6rem);letter-spacing:-.05em;line-height:1.05;margin:8px 0}.hero p{color:#d8d0e6;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:20px}.hero .btn{
+  margin-right:8px;margin-bottom:6px;
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:46px;min-width:148px;padding:11px 20px;
+  box-sizing:border-box;text-align:center;font-weight:600;
+}
+.hero .btn.alt{min-height:46px;min-width:148px;padding:11px 20px}
 
 /* ROWS */
 .row{width:min(var(--max),100%);margin:0 auto;padding:22px max(18px,4vw) 0}.row h2{font-size:1.15rem;margin-bottom:13px}.track{display:grid;grid-auto-flow:column;grid-auto-columns:150px;grid-template-rows:auto;gap:14px;overflow-x:auto;padding:0 1px 13px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}.track .card{width:150px}
