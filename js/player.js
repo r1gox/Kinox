@@ -117,24 +117,20 @@
   }
 
   function savePref(p, mode) {
+    /* Ya no persistimos servidor entre títulos: al volver se limpia */
     try {
-      localStorage.setItem(
-        PREF_KEY,
-        JSON.stringify({
-          name: serverLabel(p).toLowerCase(),
-          mode: mode || (isDirectPlayer(p) ? "direct" : "iframe"),
-          lang: langLabel(p).toLowerCase()
-        })
-      );
+      localStorage.removeItem(PREF_KEY);
+    } catch (_) {}
+  }
+
+  function clearPref() {
+    try {
+      localStorage.removeItem(PREF_KEY);
     } catch (_) {}
   }
 
   function loadPref() {
-    try {
-      return JSON.parse(localStorage.getItem(PREF_KEY) || "null");
-    } catch (_) {
-      return null;
-    }
+    return null;
   }
 
   function matchPref(players, pref) {
@@ -721,7 +717,7 @@
           "</div>" +
           '<div class="kx-stage">' +
           '<div class="kx-hero">' +
-          '<div id="playerBox" class="kx-player mz-player"><div class="player-loading">Buscando reproductores…</div></div>' +
+          '<div id="playerBox" class="kx-player mz-player"><div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Buscando reproductores…</span></div></div>' +
           "</div>" +
           '<aside class="kx-sidebar" id="kxSidebar">' +
           '<div class="kx-sidebar-head">Episodios · T' +
@@ -764,7 +760,7 @@
           "</div>" +
           '<div class="kx-top-actions"></div>' +
           "</div>" +
-          '<div id="playerBox" class="mz-player kx-player"><div class="player-loading">Buscando reproductores…</div></div>' +
+          '<div id="playerBox" class="mz-player kx-player"><div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Buscando reproductores…</span></div></div>' +
           '<div class="kx-block"><h3 class="kx-block-title">Reproductores</h3><div class="kx-chips" id="kxServers"></div></div>' +
           '<div class="kx-block"><h3 class="kx-block-title">Directos</h3><div class="kx-chips" id="kxDirects"></div></div>' +
           (overview
@@ -774,6 +770,14 @@
       }
 
       var box = $("#playerBox");
+      // Al volver: limpiar preferencia de servidor (no auto-elegir el anterior)
+      $all("a.kx-back, a.back").forEach(function (a) {
+        a.addEventListener("click", function () {
+          clearPref();
+        });
+      });
+      window.addEventListener("pagehide", clearPref);
+
       // Anime multi-temp: respetar season de la URL (T2 E12). Flat One Piece: 1.
       var playSeasonMz = season || 1;
       var playEpisodeMz = episode;
@@ -788,7 +792,7 @@
       var players = data.reproductores || [];
       if (!players.length) {
         box.innerHTML =
-          '<div class="player-empty">No hay reproductores disponibles.</div>';
+          '<div class="player-empty"><span class="kx-empty-ico">!</span><span class="kx-load-text">No hay reproductores disponibles.</span></div>';
         return;
       }
 
@@ -1013,16 +1017,14 @@
         }
         // preload auto + sin depender solo del poster (si HLS falla, avisar)
         box.innerHTML =
-          '<video id="mzVideo" class="kx-video" controls playsinline autoplay preload="auto"' +
-          (poster ? ' poster="' + poster + '"' : "") +
-          "></video>";
+          '<video id="mzVideo" class="kx-video" controls playsinline autoplay preload="auto"></video>';
         var video = $("#mzVideo");
         function onFail(msg) {
           console.warn("[player]", msg, src);
           box.innerHTML =
-            '<div class="player-empty">' +
+            '<div class="player-empty"><span class="kx-empty-ico">!</span><span class="kx-load-text">' +
             (msg || "No se pudo reproducir el directo.") +
-            '<br><button type="button" class="btn" id="kxRetryDirect" style="margin-top:12px">Reintentar</button></div>';
+            '</span><button type="button" class="btn kx-retry-btn" id="kxRetryDirect">Reintentar</button></div>';
           var rb = document.getElementById("kxRetryDirect");
           if (rb) rb.onclick = function () { renderVideo(src); };
         }
@@ -1075,7 +1077,7 @@
         if (btn) btn.classList.add("active");
         savePref(p, mode);
         box.innerHTML =
-          '<div class="player-loading">Resolviendo video…</div>';
+          '<div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Resolviendo video…</span></div>';
         var endpoint = p.hls_resolve || p.stream_url;
         if (mode === "direct" && endpoint) {
           try {
@@ -1116,7 +1118,7 @@
           } catch (_) {}
         }
         box.innerHTML =
-          '<div class="player-empty">No se pudo iniciar este servidor.</div>';
+          '<div class="player-empty"><span class="kx-empty-ico">!</span><span class="kx-load-text">No se pudo iniciar este servidor.<br>Prueba otro.</span></div>';
       }
 
       $all(".kx-chip").forEach(function (btn) {
@@ -1157,11 +1159,10 @@
         return null;
       }
 
-      var pref = loadPref();
       var auto = null;
       var autoMode = "iframe";
 
-      // Anime (4/5): SIEMPRE preferir UPNShare (ignora VOE guardado)
+      // Anime (4/5): preferir UPNShare solo en esta sesión (no localStorage)
       if (isAnimeSourceId(sourceId)) {
         auto =
           pickUpnShare(normals) ||
@@ -1176,11 +1177,7 @@
                 : "iframe";
         }
       }
-      // Otras fuentes: preferencia guardada (VOE, etc.)
-      if (!auto) {
-        auto = matchPref(players, pref);
-        autoMode = pref && pref.mode === "direct" ? "direct" : "iframe";
-      }
+      // Otras fuentes: primer servidor de la lista (NO recordar el de otra peli/serie)
       if (!auto) {
         auto = normals[0] || directs[0] || players[0];
         autoMode =
@@ -1193,7 +1190,7 @@
         '.kx-chip[data-i="' + autoIdx + '"][data-mode="' + autoMode + '"]'
       ) || $('.kx-chip[data-i="' + autoIdx + '"]');
       if (auto) play(auto, autoMode, autoBtn);
-      else box.innerHTML = '<div class="player-empty">Selecciona un servidor.</div>';
+      else box.innerHTML = '<div class="player-empty"><span class="kx-empty-ico">▶</span><span class="kx-load-text">Selecciona un servidor.</span></div>';
     } catch (e) {
       $("#view").innerHTML =
         '<div class="load">' + esc(e.message || String(e)) + "</div>";
