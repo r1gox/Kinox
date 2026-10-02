@@ -545,6 +545,9 @@ async function loadDetailFromWorker(type, params) {
   var portadaHint = params.portada || '';
 
   $('#view').innerHTML = '<div class="load">Cargando detalle…</div>';
+  try {
+    if (typeof ensureTmdbReady === 'function') await ensureTmdbReady();
+  } catch (_) {}
   var data = await fetchWorkerDetail(slug, type, sourceId);
   var title = data.titulo || data.title || titleHint;
   var original = data.titulo_original || '';
@@ -615,21 +618,69 @@ async function loadDetailFromWorker(type, params) {
       tryTitles.push(title);
       for (var ti = 0; ti < tryTitles.length && !tmdbIdForTrailer; ti++) {
         try {
-          tmdbIdForTrailer = await resolveTmdbIdForTitle(tryTitles[ti], tmdbType, year);
+          // Serie base (Youjo Senki) SIN año de la T2 (2026), si no TMDB no encuentra la T1
+          var yTry = null;
+          var qn = String(tryTitles[ti] || '').toLowerCase();
+          var isBase =
+            titleBase && qn === String(titleBase).toLowerCase();
+          if (!isBase && year) yTry = year;
+          tmdbIdForTrailer = await resolveTmdbIdForTitle(
+            tryTitles[ti],
+            tmdbType,
+            yTry
+          );
+        } catch (_) {}
+      }
+      // Último intento: solo base sin año
+      if (!tmdbIdForTrailer && titleBase) {
+        try {
+          tmdbIdForTrailer = await resolveTmdbIdForTitle(titleBase, tmdbType, null);
         } catch (_) {}
       }
       if (tmdbIdForTrailer) {
-        var tr = await findYoutubeTrailer(tmdbType, tmdbIdForTrailer);
-        if (tr && tr.key) trailerKey = tr.key;
-        // Preferir SIEMPRE backdrop TMDB si existe (mejor que el del worker)
+        try {
+          var tr = await findYoutubeTrailer(tmdbType, tmdbIdForTrailer);
+          if (tr && tr.key) trailerKey = tr.key;
+        } catch (_) {}
+        // Backdrop de la serie principal (T1)
         if (typeof tmdb === 'function') {
           try {
-            var tx = await tmdb('/' + tmdbType + '/' + tmdbIdForTrailer);
+            var tx = await tmdb('/' + tmdbType + '/' + tmdbIdForTrailer, {
+              append_to_response: 'videos'
+            });
             if (tx && tx.backdrop_path) {
               backdrop =
                 (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
-                'w1280' +
+                'original' +
                 tx.backdrop_path;
+            }
+            if (!trailerKey && tx && tx.videos && tx.videos.results) {
+              var vids = tx.videos.results;
+              var hitV =
+                vids.find(function (v) {
+                  return v.site === 'YouTube' && v.type === 'Trailer' && v.key;
+                }) ||
+                vids.find(function (v) {
+                  return v.site === 'YouTube' && v.key;
+                });
+              if (hitV) trailerKey = hitV.key;
+            }
+            // Videos en-US si no hay en es-MX
+            if (!trailerKey) {
+              try {
+                var vEn = await tmdb('/' + tmdbType + '/' + tmdbIdForTrailer + '/videos', {
+                  language: 'en-US'
+                });
+                var list = (vEn && vEn.results) || [];
+                var hitEn =
+                  list.find(function (v) {
+                    return v.site === 'YouTube' && v.type === 'Trailer' && v.key;
+                  }) ||
+                  list.find(function (v) {
+                    return v.site === 'YouTube' && v.key;
+                  });
+                if (hitEn) trailerKey = hitEn.key;
+              } catch (_) {}
             }
             if (tx && tx.overview && (!overview || overview === 'Sin sinopsis.' || overview.length < 40)) {
               overview = tx.overview;
@@ -645,10 +696,12 @@ async function loadDetailFromWorker(type, params) {
 
   var temps = Array.isArray(data.temporadas) ? data.temporadas : [];
 
-  // Preferir backdrop TMDB w1280
+  // Backdrop: TMDB de la serie base (T1) preferido
   var bdUrl = backdrop || '';
-  if (bdUrl && bdUrl.indexOf('/t/p/') !== -1 && bdUrl.indexOf('w1280') === -1) {
-    bdUrl = bdUrl.replace(/\/t\/p\/\w+\//, '/t/p/w1280/');
+  if (bdUrl && bdUrl.indexOf('/t/p/') !== -1) {
+    if (bdUrl.indexOf('original') === -1 && bdUrl.indexOf('w1280') === -1) {
+      bdUrl = bdUrl.replace(/\/t\/p\/\w+\//, '/t/p/original/');
+    }
   }
   $('#view').innerHTML =
     '<section class="det">' +
