@@ -257,34 +257,54 @@ function preferAnimeSource(results) {
 }
 
 function workerCard(it){
-  const tipo=String(it.type||it.tipo||'').toLowerCase();
-  const isAnime=/anime|ova|ona|especial/.test(tipo);
-  const isTv=/serie|tv|anime|dorama|ova|ona/.test(tipo);
-  const type=isTv?'tv':'movie';
+  const tipo=String(it.type||it.tipo||it.formato||'').toLowerCase();
+  const sidRaw=String(it.source_id||it.sourceId||it.source||it.fuente||'').toLowerCase();
+  // Worker manda: type Anime / source 4|5 → SIEMPRE anime (aunque TMDB diga "serie")
+  const isAnimeSource=sidRaw==='4'||sidRaw==='5'||sidRaw==='animeav1'||sidRaw==='jkanime';
+  const isAnime=/anime|ova|ona|especial|special/.test(tipo)||isAnimeSource;
+  const isMovie=/peli|movie|film/.test(tipo)&&!isAnime;
+  const isTv=!isMovie&&(/serie|tv|dorama|anime|ova|ona/.test(tipo)||isAnime);
   const slug=it.slug||slugify(it.title||it.titulo||'');
   let sid=it.source_id||it.sourceId||'';
-  // Animes → fuente 4 (animeav1) si el resultado ya es de ahí; no forzar 9
-  if (isAnime && (!sid || sid === '9') && (it.source === 'animeav1' || it.fuente === 'animeav1')) sid = '4';
-  if (isAnime && (String(it.source||'').toLowerCase()==='animeav1' || sid==='4')) sid = '4';
+  if(isAnime){
+    if(sidRaw==='5'||sidRaw==='jkanime') sid='5';
+    else sid='4'; // animeav1 por defecto en animes del worker
+  }
   const title=it.title||it.titulo||'Sin título';
   const img=it.portada||it.poster||'';
   const year=it.year||'';
-  const src=it.source||it.fuente||'';
-  // Preferir id TMDB (misma UI que catálogo); slug+source para el worker
-  const tmdbId=it.tmdb_id||it.tmdbId||it.id||null;
-  const href=isTv
-    ? (tmdbId
-        ? pageHref('detalle-serie.html',{id:tmdbId,slug,source_id:sid||undefined})
-        : pageHref('detalle-serie.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined}))
-    : (tmdbId
-        ? pageHref('detalle-pelicula.html',{id:tmdbId,slug,source_id:sid||undefined})
-        : pageHref('detalle-pelicula.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined}));
+  // TMDB id solo como extra; el catálogo/enlace prioriza worker
+  const tmdbId=it.tmdb_id||it.tmdbId||null;
+
+  let href;
+  if(isAnime){
+    // Enlace worker (slug+source+type=anime). No reclasificar como serie TMDB.
+    href=pageHref('detalle-serie.html',{
+      slug:slug,
+      source_id:sid||'4',
+      title:title,
+      type:'anime',
+      portada:img||undefined,
+      year:year||undefined,
+      id:tmdbId||undefined
+    });
+  }else if(isTv){
+    href=tmdbId
+      ? pageHref('detalle-serie.html',{id:tmdbId,slug,source_id:sid||undefined,title:title,type:'tv'})
+      : pageHref('detalle-serie.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined,type:'tv'});
+  }else{
+    href=tmdbId
+      ? pageHref('detalle-pelicula.html',{id:tmdbId,slug,source_id:sid||undefined,title:title})
+      : pageHref('detalle-pelicula.html',{slug,source_id:sid||undefined,title:title,portada:img||undefined,year:year||undefined});
+  }
+
   let tipoLabel='Película';
   if(/ova/.test(tipo)) tipoLabel='OVA';
   else if(/ona/.test(tipo)) tipoLabel='ONA';
   else if(/especial|special/.test(tipo)) tipoLabel='Especial';
-  else if(/anime/.test(tipo) && !/peli|movie|film/.test(tipo)) tipoLabel='Anime';
+  else if(isAnime) tipoLabel='Anime';
   else if(isTv) tipoLabel='Serie';
+
   const rating=it.rating||it.vote_average||it.rating_tmdb;
   const ratingBadge=(rating && Number(rating)>0)?`<span class="badge badge-rating">★ ${Number(rating).toFixed(1)}</span>`:'';
   return `<a class="card" href="${href}"><div class="im">${img?`<img loading="lazy" src="${esc(img)}" alt="">`:''}<span class="badge badge-type">${esc(tipoLabel)}</span>${ratingBadge}</div><b>${esc(title)}</b><small>${esc(tipoLabel)}${year?' · '+esc(year):''}</small></a>`;
