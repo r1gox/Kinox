@@ -1,5 +1,15 @@
 
-  function isGenericEpName(n) {
+  function guessSeasonFromTitle(title) {
+  var s = String(title || '');
+  if (/\bIII\b|3rd\s*season|season\s*3|temporada\s*3|第3/i.test(s)) return 3;
+  if (/\bII\b|2nd\s*season|season\s*2|temporada\s*2|第2/i.test(s)) return 2;
+  if (/\bIV\b|4th\s*season|season\s*4|temporada\s*4/i.test(s)) return 4;
+  var m = s.match(/(?:season|temporada|\bs)\s*(\d{1,2})\b/i);
+  if (m) return parseInt(m[1], 10) || 1;
+  return 1;
+}
+
+function isGenericEpName(n) {
     n = String(n || '').trim();
     if (!n) return true;
     // "Episodio 1", "Episode 12", "Capítulo 3", etc.
@@ -589,12 +599,28 @@ async function loadDetailFromWorker(type, params) {
   var tmdbType = type === 'anime' || isAnimeDetail ? 'tv' : type;
   try {
     if (typeof resolveTmdbIdForTitle === 'function') {
-      tmdbIdForTrailer = await resolveTmdbIdForTitle(title, tmdbType, year);
+      // Probar título completo y sin "II / 2nd Season" (TMDB suele unificar temporadas)
+      var titleBase = String(title || '')
+        .replace(/\s*[：:]\s*.*$/, '')
+        .replace(/\s*(2nd|3rd|4th)\s*season.*$/i, '')
+        .replace(/\s*season\s*\d+.*$/i, '')
+        .replace(/\s*temporada\s*\d+.*$/i, '')
+        .replace(/\s+\b(II|III|IV|2|3|4)\b\s*$/i, '')
+        .trim();
+      var tryTitles = [title];
+      if (titleBase && titleBase.toLowerCase() !== String(title).toLowerCase()) {
+        tryTitles.push(titleBase);
+      }
+      for (var ti = 0; ti < tryTitles.length && !tmdbIdForTrailer; ti++) {
+        try {
+          tmdbIdForTrailer = await resolveTmdbIdForTitle(tryTitles[ti], tmdbType, year);
+        } catch (_) {}
+      }
       if (tmdbIdForTrailer) {
         var tr = await findYoutubeTrailer(tmdbType, tmdbIdForTrailer);
         if (tr && tr.key) trailerKey = tr.key;
-        // Backdrop w1280 desde TMDB si el worker no trae
-        if (!backdrop && typeof tmdb === 'function') {
+        // Preferir SIEMPRE backdrop TMDB si existe (mejor que el del worker)
+        if (typeof tmdb === 'function') {
           try {
             var tx = await tmdb('/' + tmdbType + '/' + tmdbIdForTrailer);
             if (tx && tx.backdrop_path) {
@@ -602,6 +628,9 @@ async function loadDetailFromWorker(type, params) {
                 (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
                 'w1280' +
                 tx.backdrop_path;
+            }
+            if (tx && tx.overview && (!overview || overview === 'Sin sinopsis.' || overview.length < 40)) {
+              overview = tx.overview;
             }
             if ((!rating || rating === '') && tx && tx.vote_average) {
               rating = tx.vote_average;
@@ -661,6 +690,9 @@ async function loadDetailFromWorker(type, params) {
       ? '<button type="button" class="btn" id="btnTrailer">Ver tráiler</button>'
       : '') +
     '</div>' +
+    '<div class="btns-fav">' +
+    '<button id="favBtn" type="button" class="btn alt">+ Mi lista</button>' +
+    '</div>' +
     '<p style="color:var(--mute);font-size:.85rem;margin-top:8px">Fuente: ' +
     esc(hit.source || hit.source_id || '') +
     ' · ' +
@@ -671,11 +703,24 @@ async function loadDetailFromWorker(type, params) {
         temps
           .map(function (t, i) {
             var n = t.temporada != null ? t.temporada : i + 1;
-            var label = 'Temporada ' + n;
-            if (t.episodios != null && !Array.isArray(t.episodios)) {
-              label += ' (' + t.episodios + ' eps)';
-            } else if (Array.isArray(t.lista)) {
-              label += ' (' + t.lista.length + ' eps)';
+            var epCount =
+              t.episodios != null && !Array.isArray(t.episodios)
+                ? t.episodios
+                : Array.isArray(t.lista)
+                  ? t.lista.length
+                  : 0;
+            // Worker separa T2 en otro slug (youjo-senki-ii): no forzar "Temporada 1"
+            var label;
+            if (temps.length === 1 && isAnimeDetail) {
+              var gs = guessSeasonFromTitle(title);
+              label =
+                gs > 1
+                  ? 'Episodios · T' + gs + ' en TMDB'
+                  : 'Episodios';
+              if (epCount) label += ' (' + epCount + ')';
+            } else {
+              label = 'Temporada ' + n;
+              if (epCount) label += ' (' + epCount + ' eps)';
             }
             return (
               '<option value="' +
@@ -696,6 +741,43 @@ async function loadDetailFromWorker(type, params) {
     if (btW) btW.onclick = function () { openTrailerModal(trailerKey); };
   }
 
+  // Favoritos (slug+source; no depende de id TMDB)
+  var favItem = {
+    id: 'w-' + String(hit.source_id || sourceId || 'x') + '-' + String(hit.slug || slug),
+    type: isAnimeDetail ? 'anime' : type === 'movie' ? 'movie' : 'tv',
+    title: title,
+    poster: portada || null,
+    slug: hit.slug || slug,
+    source_id: hit.source_id || sourceId,
+    year: year || ''
+  };
+  var favBtnEl = document.getElementById('favBtn');
+  if (favBtnEl && typeof favs === 'function') {
+    var favOn = favs().some(function (f) {
+      return f && (f.id === favItem.id || (f.slug && f.slug === favItem.slug && String(f.source_id) === String(favItem.source_id)));
+    });
+    favBtnEl.textContent = favOn ? '✓ En mi lista' : '+ Mi lista';
+    favBtnEl.classList.toggle('on', favOn);
+    favBtnEl.onclick = function () {
+      var a = favs();
+      var has = a.some(function (f) {
+        return f && (f.id === favItem.id || (f.slug && f.slug === favItem.slug && String(f.source_id) === String(favItem.source_id)));
+      });
+      a = has
+        ? a.filter(function (f) {
+            return !(
+              f &&
+              (f.id === favItem.id ||
+                (f.slug && f.slug === favItem.slug && String(f.source_id) === String(favItem.source_id)))
+            );
+          })
+        : [favItem].concat(a);
+      store.set(pk('favs'), a);
+      favBtnEl.textContent = has ? '+ Mi lista' : '✓ En mi lista';
+      favBtnEl.classList.toggle('on', !has);
+    };
+  }
+
   // Similares desde la misma fuente del worker
   try {
     var simW = await fetchWorkerSimilar(hit, type === 'anime' ? 'anime' : type);
@@ -711,7 +793,7 @@ async function loadDetailFromWorker(type, params) {
 if ((type === 'tv' || type === 'anime') && temps.length) {
     var tmdbIdWorker = null;
     if (typeof resolveTmdbIdForTitle === 'function') {
-      resolveTmdbIdForTitle(title, type, year).then(function (tid) {
+      resolveTmdbIdForTitle(title, type === 'anime' ? 'tv' : type, year).then(function (tid) {
         tmdbIdWorker = tid;
         renderEps();
       }).catch(function () {});
@@ -728,13 +810,19 @@ if ((type === 'tv' || type === 'anime') && temps.length) {
       var tid = tmdbIdWorker;
       if (!tid && typeof resolveTmdbIdForTitle === 'function') {
         try {
-          tid = await resolveTmdbIdForTitle(title, type, year);
+          tid = await resolveTmdbIdForTitle(title, type === 'anime' ? 'tv' : type, year);
           tmdbIdWorker = tid;
         } catch (_) {}
       }
       if (tid && typeof tmdb === 'function') {
         try {
-          var s = await tmdb('/tv/' + tid + '/season/' + want);
+          // Si el worker trae 1 sola temporada pero el título es "II", pedir T2 a TMDB
+          var tmdbSeasonNum = want;
+          if (temps.length === 1) {
+            var guessed = guessSeasonFromTitle(title);
+            if (guessed > 1) tmdbSeasonNum = guessed;
+          }
+          var s = await tmdb('/tv/' + tid + '/season/' + tmdbSeasonNum);
           (s.episodes || []).forEach(function (ep) {
             tmdbByEp[ep.episode_number] = ep;
           });
@@ -743,7 +831,7 @@ if ((type === 'tv' || type === 'anime') && temps.length) {
           });
           if (missing) {
             try {
-              var sEn = await tmdb('/tv/' + tid + '/season/' + want, { language: 'en-US' });
+              var sEn = await tmdb('/tv/' + tid + '/season/' + tmdbSeasonNum, { language: 'en-US' });
               (sEn.episodes || []).forEach(function (ep) {
                 var prev = tmdbByEp[ep.episode_number] || {};
                 tmdbByEp[ep.episode_number] = Object.assign({}, prev, {
@@ -776,18 +864,24 @@ if ((type === 'tv' || type === 'anime') && temps.length) {
               // Forzar título del worker si es real (español de la fuente)
               if (e.titulo && !isGenericEpName(e.titulo)) name = e.titulo;
               var overview = e.descripcion || e.overview || tm.overview || '';
-              // Imagen: TMDB primero; worker (back_img) solo si no hay
-              var still =
-                (tm.still_path ? IMG + 'w300' + tm.still_path : '') ||
-                e.still ||
-                e.image ||
-                e.back_img ||
-                '';
+              // Anime worker: preferir back_img de la fuente; si no, still TMDB
+              var stillWorker = e.back_img || e.still || e.image || '';
+              var stillTmdb = tm.still_path ? IMG + 'w300' + tm.still_path : '';
+              var still = isAnimeDetail
+                ? stillWorker || stillTmdb
+                : stillTmdb || stillWorker;
+              // Repro: temporada del WORKER (slug aparte). Etiqueta: T real si se puede inferir
+              var snPlay = sn;
+              var snLabel = sn;
+              if (temps.length === 1 && isAnimeDetail) {
+                var gLab = guessSeasonFromTitle(title);
+                if (gLab > 1) snLabel = gLab;
+              }
               var href = workerPlayHref(
                 Object.assign({}, hit || {}, { source_id: (data && data.source_id) || sourceId }),
                 'tv',
                 tid || null,
-                sn,
+                snPlay,
                 en
               );
               return (
@@ -798,7 +892,7 @@ if ((type === 'tv' || type === 'anime') && temps.length) {
                   ? '<img loading="lazy" src="' + esc(still) + '" alt="">'
                   : '<div class="ph"></div>') +
                 '<div><b>T' +
-                sn +
+                snLabel +
                 ' E' +
                 en +
                 ' — ' +
