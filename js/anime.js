@@ -114,12 +114,78 @@
     );
   }
 
+
+  /** publishedAt → "Hoy · 16:49", "Ayer · 10:20", "2 oct · 18:05" */
+  function formatRelativeWhen(raw) {
+    if (!raw) return "";
+    var s = String(raw).trim();
+    // "2026-10-02 16:49:32.156+00" o ISO
+    var m = s.match(
+      /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/
+    );
+    var d;
+    if (m) {
+      // interpretar como UTC si trae +00 / Z, si no como local
+      var iso =
+        m[1] +
+        "-" +
+        m[2] +
+        "-" +
+        m[3] +
+        "T" +
+        m[4] +
+        ":" +
+        m[5] +
+        ":00";
+      if (/[zZ]|[+\-]\d{2}/.test(s)) {
+        if (s.indexOf("+") >= 0 || s.indexOf("Z") >= 0 || s.indexOf("z") >= 0) {
+          // mantener offset si existe
+          var off = s.match(/([zZ]|[+\-]\d{2}:?\d{0,2})$/);
+          if (off && off[1] && off[1].toUpperCase() !== "Z") {
+            iso = m[1] + "-" + m[2] + "-" + m[3] + "T" + m[4] + ":" + m[5] + ":00" + (s.match(/([+\-]\d{2}:?\d{2})/) || ["","+00:00"])[1].replace(/([+\-]\d{2})(\d{2})$/, "$1:$2");
+          } else {
+            iso += "Z";
+          }
+        }
+      }
+      d = new Date(iso);
+      if (isNaN(d.getTime())) {
+        d = new Date(s);
+      }
+    } else {
+      d = new Date(s);
+    }
+    if (isNaN(d.getTime())) {
+      return s.slice(0, 16).replace("T", " ");
+    }
+    var now = new Date();
+    function startOfDay(x) {
+      return new Date(x.getFullYear(), x.getMonth(), x.getDate());
+    }
+    var dayDiff = Math.round(
+      (startOfDay(now) - startOfDay(d)) / 86400000
+    );
+    var hh = String(d.getHours()).padStart(2, "0");
+    var mm = String(d.getMinutes()).padStart(2, "0");
+    var hora = hh + ":" + mm;
+    if (dayDiff === 0) return "Hoy · " + hora;
+    if (dayDiff === 1) return "Ayer · " + hora;
+    if (dayDiff > 1 && dayDiff < 7) return "Hace " + dayDiff + " días · " + hora;
+    var months = [
+      "ene","feb","mar","abr","may","jun",
+      "jul","ago","sep","oct","nov","dic"
+    ];
+    return d.getDate() + " " + months[d.getMonth()] + " · " + hora;
+  }
+
   function cardReciente(item) {
     var animeTitle = item.titulo_anime || item.titulo || item.title || item.slug || "Anime";
     var ep = item.episodio || item.number || "?";
     var img = posterUrl(item);
     var href = episodeHref(item);
-    var when = item.publishedAt ? String(item.publishedAt).slice(0, 16).replace("T", " ") : "";
+    var when = formatRelativeWhen(
+      item.publishedAt || item.fecha || item.fecha_relativa || item.published_label || ""
+    );
     return (
       '<a class="mz-cal-card" href="' +
       esc(href) +
