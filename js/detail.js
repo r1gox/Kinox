@@ -229,6 +229,142 @@ function workerBaseUrl() {
 }
 
 
+/** Similares desde el mismo source del worker (4 anime, 9/3 pelis-series, etc.) */
+async function fetchWorkerSimilar(hit, type) {
+  var base = typeof workerBaseUrl === 'function' ? workerBaseUrl() : 'https://moviezone.tvjz.workers.dev';
+  var sid = String(
+    (hit && (hit.source_id || hit.source)) ||
+      (type === 'anime' ? '4' : typeof MZ_SOURCE !== 'undefined' ? MZ_SOURCE : '9')
+  );
+  if (sid === 'animeav1') sid = '4';
+  if (sid === 'jkanime') sid = '5';
+  if (sid === 'pelisplushd') sid = '3';
+  if (sid === 'pelisplushd_bz') sid = '9';
+
+  var title = (hit && (hit.title || hit.titulo || hit.nombre || hit.slug)) || '';
+  var curSlug = String((hit && hit.slug) || '').toLowerCase();
+  var q = String(title)
+    .replace(/[:\-–—].*$/, '')
+    .replace(/\(\s*\d{4}\s*\)/g, '')
+    .trim();
+  var words = q.split(/\s+/).filter(Boolean);
+  if (words.length > 5) q = words.slice(0, 4).join(' ');
+
+  var out = [];
+  var seen = Object.create(null);
+
+  function sameFamily(isid) {
+    isid = String(isid || '');
+    if (sid === '4' || sid === '5') {
+      return isid === '4' || isid === '5' || isid === 'animeav1' || isid === 'jkanime' || !isid;
+    }
+    if (sid === '9' || sid === '3') {
+      return isid === '9' || isid === '3' || isid === 'pelisplushd' || isid === 'pelisplushd_bz' || !isid;
+    }
+    return !isid || isid === sid;
+  }
+
+  async function addFrom(path) {
+    try {
+      var r = await fetch(base.replace(/\/$/, '') + path, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store'
+      });
+      if (!r.ok) return;
+      var data = await r.json();
+      var list =
+        data.results ||
+        data.resultados ||
+        data.agregados ||
+        data.recientes ||
+        [];
+      if (!Array.isArray(list)) return;
+      for (var i = 0; i < list.length; i++) {
+        var it = list[i];
+        if (!it || !it.slug) continue;
+        if (curSlug && String(it.slug).toLowerCase() === curSlug) continue;
+        var isid = String(it.source_id || it.source || sid);
+        if (!sameFamily(isid)) continue;
+        var key = isid + '|' + String(it.slug).toLowerCase();
+        if (seen[key]) continue;
+        seen[key] = 1;
+        if (!it.source_id) it.source_id = sid;
+        out.push(it);
+      }
+    } catch (_) {}
+  }
+
+  if (q) {
+    await addFrom('/' + sid + '/buscar?q=' + encodeURIComponent(q));
+  }
+  if (out.length < 8) {
+    if (sid === '4' || sid === '5') {
+      await addFrom('/4/home');
+    } else if (type === 'movie') {
+      await addFrom('/' + sid + '/peliculas?page=1');
+      if (out.length < 6) await addFrom('/' + sid + '/peliculas?page=2');
+    } else {
+      await addFrom('/' + sid + '/series?page=1');
+      if (out.length < 6) await addFrom('/' + sid + '/series?page=2');
+    }
+  }
+  return out.slice(0, 14);
+}
+
+function rowWorkerSimilar(label, items) {
+  items = (items || []).filter(function (x) {
+    return x && x.slug;
+  });
+  if (!items.length) return '';
+  var cards = items
+    .map(function (it) {
+      var title = it.title || it.titulo || it.nombre || it.slug || 'Sin título';
+      var img = it.portada || it.poster || it.image || '';
+      var year = it.year || it.anio || '';
+      var sid = String(it.source_id || it.source || '');
+      var tipo = String(it.type || it.tipo || '').toLowerCase();
+      var isMovie = /peli|movie|film/.test(tipo);
+      var page = isMovie ? 'detalle-pelicula.html' : 'detalle-serie.html';
+      var href =
+        typeof pageHref === 'function'
+          ? pageHref(page, {
+              slug: it.slug,
+              source_id: sid || undefined,
+              title: title,
+              type: isMovie ? 'movie' : 'tv',
+              portada: img || undefined,
+              year: year || undefined
+            })
+          : '#';
+      return (
+        '<a class="card" href="' +
+        esc(href) +
+        '"><div class="im">' +
+        (img
+          ? '<img loading="lazy" src="' +
+            esc(img) +
+            '" alt="" onerror="this.style.opacity=.25">'
+          : '') +
+        '</div><b>' +
+        esc(title) +
+        '</b><small>' +
+        esc(year ? String(year).slice(0, 4) : sid ? 'Fuente ' + sid : '') +
+        '</small></a>'
+      );
+    })
+    .join('');
+  return (
+    '<section class="row"><h2>' +
+    esc(label || 'Títulos similares') +
+    '</h2><div class="track">' +
+    cards +
+    '</div></section>'
+  );
+}
+
+
+
+
 async function findYoutubeTrailer(type, tmdbId) {
   if (!tmdbId || typeof tmdb !== 'function') return null;
   async function pick(results) {
@@ -511,6 +647,18 @@ async function loadDetailFromWorker(type, params) {
     if (btW) btW.onclick = function () { openTrailerModal(trailerKey); };
   }
 
+  // Similares desde la misma fuente del worker
+  try {
+    var simW = await fetchWorkerSimilar(hit, type === 'anime' ? 'anime' : type);
+    var htmlSimW = rowWorkerSimilar('Títulos similares', simW);
+    if (htmlSimW) {
+      var viewW = document.getElementById('view');
+      if (viewW) viewW.insertAdjacentHTML('beforeend', htmlSimW);
+    }
+  } catch (eSim) {
+    console.warn('similares worker detail', eSim);
+  }
+
 if (type === 'tv' && temps.length) {
     var tmdbIdWorker = null;
     if (typeof resolveTmdbIdForTitle === 'function') {
@@ -673,7 +821,7 @@ async function loadDetail(type) {
     }
     if (!KEY) throw Error('TMDB no disponible (revisa /api/tmdb en Vercel)');
     if (!id) throw Error('Falta el ID del título');
-    var x = await tmdb('/' + type + '/' + id, { append_to_response: 'videos,watch/providers,recommendations' });
+    var x = await tmdb('/' + type + '/' + id, { append_to_response: 'videos,watch/providers' });
     var it = norm(x, type);
     document.title = it.title + ' — Kinox';
     store.set(pk('hist'), [it].concat(hist().filter(function (h) { return !(h.id === it.id && h.type === type); })).slice(0, 40));
@@ -798,7 +946,7 @@ async function loadDetail(type) {
           }).join('') +
           '</select><div id="eps"></div></section>'
         : '') +
-      rowHtml('Títulos similares', list(x.recommendations, type));
+      '' // similares worker se agregan abajo;
 
     $('#favBtn').onclick = function () {
       var a = favs();
@@ -808,6 +956,27 @@ async function loadDetail(type) {
       $('#favBtn').textContent = has ? '+ Mi lista' : '✓ En mi lista';
       $('#favBtn').classList.toggle('on', !has);
     };
+
+    // Títulos similares: misma fuente del worker (no TMDB)
+    (async function () {
+      try {
+        var baseHit = hit || {
+          title: it.title,
+          slug: (typeof slugify === 'function' ? slugify(it.title) : ''),
+          source_id: sourceIdParam || (type === 'anime' ? '4' : (typeof MZ_SOURCE !== 'undefined' ? MZ_SOURCE : '9'))
+        };
+        if (!baseHit.slug && params.get('slug')) baseHit.slug = params.get('slug');
+        if (!baseHit.source_id && params.get('source_id')) baseHit.source_id = params.get('source_id');
+        var sim = await fetchWorkerSimilar(baseHit, type === 'anime' ? 'anime' : type);
+        var htmlSim = rowWorkerSimilar('Títulos similares', sim);
+        if (htmlSim) {
+          var view = document.getElementById('view');
+          if (view) view.insertAdjacentHTML('beforeend', htmlSim);
+        }
+      } catch (err) {
+        console.warn('similares worker', err);
+      }
+    })();
 
     if (hasTrailer && trailerVid && trailerVid.key && typeof openTrailerModal === 'function') {
       var btT = document.getElementById('btnTrailer');
