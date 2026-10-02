@@ -403,33 +403,63 @@ async function fetchWorkerDetail(slug, type, sourceId) {
     sid = sid === '5' || sid === 'jkanime' ? '5' : '4';
     kind = 'anime';
   } else {
-    kind = type === 'tv' ? 'serie' : 'pelicula';
+    kind = type === 'tv' || type === 'anime' ? 'serie' : 'pelicula';
+    if (isAnime) kind = 'anime';
   }
-  var base = workerBaseUrl();
-  // url_vid (/b/) trae titulo + back_img por episodio (más completo para listados)
+  var base = String(workerBaseUrl() || '').replace(/\/$/, '');
+  // /b/ es rápido (basic + episodios). El detalle full a veces cuelga en animeav1.
   var pathB = '/' + sid + '/' + kind + '/b/' + encodeURIComponent(slug);
   var pathFull = '/' + sid + '/' + kind + '/' + encodeURIComponent(slug);
-  async function get(path) {
-    var r = await fetch(base + path, { headers: { Accept: 'application/json' } });
-    if (!r.ok) return null;
-    var data = await r.json();
-    if (data && data.success === false) return null;
-    return data;
+
+  function fetchWithTimeout(url, ms) {
+    ms = ms || 12000;
+    var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = setTimeout(function () {
+      try { if (ctrl) ctrl.abort(); } catch (_) {}
+    }, ms);
+    return fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal: ctrl ? ctrl.signal : undefined,
+      cache: 'no-store'
+    })
+      .then(function (r) {
+        clearTimeout(timer);
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then(function (data) {
+        if (data && data.success === false) return null;
+        return data;
+      })
+      .catch(function () {
+        clearTimeout(timer);
+        return null;
+      });
   }
-  var basic = null;
+
+  // 1) Siempre intentar /b/ primero (rápido)
+  var basic = await fetchWithTimeout(base + pathB, 10000);
+  // 2) Full solo si hace falta meta extra; timeout corto para no dejar la UI en blanco
   var full = null;
-  try { basic = await get(pathB); } catch (_) {}
-  try { full = await get(pathFull); } catch (_) {}
-  if (!basic && !full) throw new Error('No encontrado en el worker');
-  // Fusionar: meta de full + temporadas/episodios de basic (titulos ES)
+  if (!basic || !basic.descripcion || !(basic.temporadas && basic.temporadas.length)) {
+    full = await fetchWithTimeout(base + pathFull, isAnime ? 8000 : 12000);
+  }
+
+  if (!basic && !full) throw new Error('No encontrado en el worker (' + sid + '/' + kind + '/' + slug + ')');
+
   var data = Object.assign({}, full || {}, basic || {});
+  // Preferir temporadas del basic (/b/) si trae lista
   if (basic && Array.isArray(basic.temporadas) && basic.temporadas.length) {
     data.temporadas = basic.temporadas;
   } else if (full && Array.isArray(full.temporadas)) {
     data.temporadas = full.temporadas;
   }
   if (basic && basic.url_vid) data.url_vid = basic.url_vid;
+  if (basic && basic.url_extract && !data.url_extract) data.url_extract = basic.url_extract;
   if (full && full.descripcion && !data.descripcion) data.descripcion = full.descripcion;
+  if (!data.titulo && data.title) data.titulo = data.title;
+  if (!data.slug) data.slug = slug;
+  if (!data.source_id) data.source_id = sid;
   return data;
 }
 
@@ -498,6 +528,7 @@ function mzSetDetailChrome(on) {
 
 async function loadDetailFromWorker(type, params) {
   mzSetDetailChrome(true);
+  try {
   var slug = params.slug;
   var sourceId = params.source_id || params.source || null;
   var titleHint = params.title || slug.replace(/-/g, ' ');
@@ -784,6 +815,14 @@ if ((type === 'tv' || type === 'anime') && temps.length) {
       renderEps();
     };
     renderEps();
+  }
+  } catch (e) {
+    console.error('loadDetailFromWorker', e);
+    var msg = (e && e.message) || String(e);
+    $('#view').innerHTML =
+      '<div class="load">No se pudo cargar el detalle.<br>' +
+      esc(msg) +
+      '<br><a class="btn" href="javascript:history.back()" style="margin-top:12px">Volver</a></div>';
   }
 }
 
