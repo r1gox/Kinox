@@ -655,7 +655,7 @@ async function loadDetailFromWorker(type, params) {
     '<a class="btn play" id="btnPlay" href="' +
     playHref +
     '">' +
-    (type === 'tv' ? '▶ Comenzar E1' : '▶ Reproducir') +
+    (type === 'tv' || type === 'anime' ? '▶ Comenzar E1' : '▶ Reproducir') +
     '</a>' +
     (trailerKey
       ? '<button type="button" class="btn" id="btnTrailer">Ver tráiler</button>'
@@ -666,7 +666,7 @@ async function loadDetailFromWorker(type, params) {
     ' · ' +
     esc(hit.slug || '') +
     '</p></div></div></section>' +
-    (type === 'tv' || type === 'anime') && temps.length
+    (((type === 'tv' || type === 'anime') && temps.length)
       ? '<section class="seasons"><h2>Temporadas y capítulos</h2><select id="sel">' +
         temps
           .map(function (t, i) {
