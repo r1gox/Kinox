@@ -607,10 +607,12 @@ async function loadDetailFromWorker(type, params) {
         .replace(/\s*temporada\s*\d+.*$/i, '')
         .replace(/\s+\b(II|III|IV|2|3|4)\b\s*$/i, '')
         .trim();
-      var tryTitles = [title];
+      // Primero la serie base (Youjo Senki) para backdrop/tráiler/T2 eps
+      var tryTitles = [];
       if (titleBase && titleBase.toLowerCase() !== String(title).toLowerCase()) {
         tryTitles.push(titleBase);
       }
+      tryTitles.push(title);
       for (var ti = 0; ti < tryTitles.length && !tmdbIdForTrailer; ti++) {
         try {
           tmdbIdForTrailer = await resolveTmdbIdForTitle(tryTitles[ti], tmdbType, year);
@@ -713,10 +715,7 @@ async function loadDetailFromWorker(type, params) {
             var label;
             if (temps.length === 1 && isAnimeDetail) {
               var gs = guessSeasonFromTitle(title);
-              label =
-                gs > 1
-                  ? 'Episodios · T' + gs + ' en TMDB'
-                  : 'Episodios';
+              label = gs > 1 ? ('Temporada ' + gs) : 'Episodios';
               if (epCount) label += ' (' + epCount + ')';
             } else {
               label = 'Temporada ' + n;
@@ -793,10 +792,27 @@ async function loadDetailFromWorker(type, params) {
 if ((type === 'tv' || type === 'anime') && temps.length) {
     var tmdbIdWorker = null;
     if (typeof resolveTmdbIdForTitle === 'function') {
-      resolveTmdbIdForTitle(title, type === 'anime' ? 'tv' : type, year).then(function (tid) {
-        tmdbIdWorker = tid;
+      (async function () {
+        try {
+          var tmdbKind = type === 'anime' ? 'tv' : type;
+          var baseForTmdb = String(title || '')
+            .replace(/\s*[：:]\s*.*$/, '')
+            .replace(/\s*(2nd|3rd|4th)\s*season.*$/i, '')
+            .replace(/\s*season\s*\d+.*$/i, '')
+            .replace(/\s*temporada\s*\d+.*$/i, '')
+            .replace(/\s+\b(II|III|IV|2|3|4)\b\s*$/i, '')
+            .trim();
+          var tries = [];
+          if (baseForTmdb && baseForTmdb.toLowerCase() !== String(title).toLowerCase()) tries.push(baseForTmdb);
+          tries.push(title);
+          var tid = null;
+          for (var ri = 0; ri < tries.length && !tid; ri++) {
+            tid = await resolveTmdbIdForTitle(tries[ri], tmdbKind, null);
+          }
+          tmdbIdWorker = tid;
+        } catch (_) {}
         renderEps();
-      }).catch(function () {});
+      })();
     }
     var renderEps = async function () {
       var want = parseInt($('#sel').value, 10) || 1;
@@ -810,13 +826,29 @@ if ((type === 'tv' || type === 'anime') && temps.length) {
       var tid = tmdbIdWorker;
       if (!tid && typeof resolveTmdbIdForTitle === 'function') {
         try {
-          tid = await resolveTmdbIdForTitle(title, type === 'anime' ? 'tv' : type, year);
+          var tmdbKind = type === 'anime' ? 'tv' : type;
+          var baseForTmdb = String(title || '')
+            .replace(/\s*[：:]\s*.*$/, '')
+            .replace(/\s*(2nd|3rd|4th)\s*season.*$/i, '')
+            .replace(/\s*season\s*\d+.*$/i, '')
+            .replace(/\s*temporada\s*\d+.*$/i, '')
+            .replace(/\s+\b(II|III|IV|2|3|4)\b\s*$/i, '')
+            .trim();
+          // Serie base primero (Youjo Senki), luego título completo
+          var tries = [];
+          if (baseForTmdb && baseForTmdb.toLowerCase() !== String(title).toLowerCase()) {
+            tries.push(baseForTmdb);
+          }
+          tries.push(title);
+          for (var ri = 0; ri < tries.length && !tid; ri++) {
+            tid = await resolveTmdbIdForTitle(tries[ri], tmdbKind, null);
+          }
           tmdbIdWorker = tid;
         } catch (_) {}
       }
       if (tid && typeof tmdb === 'function') {
         try {
-          // Si el worker trae 1 sola temporada pero el título es "II", pedir T2 a TMDB
+          // Worker: 1 temporada en slug "ii" → pedir temporada real a TMDB
           var tmdbSeasonNum = want;
           if (temps.length === 1) {
             var guessed = guessSeasonFromTitle(title);
@@ -861,8 +893,11 @@ if ((type === 'tv' || type === 'anime') && temps.length) {
               if (isGenericEpName(name) && tm.name && !isGenericEpName(tm.name)) name = tm.name;
               if (isGenericEpName(name) && tm.name_en && !isGenericEpName(tm.name_en)) name = tm.name_en;
               if (isGenericEpName(name)) name = 'Episodio ' + en;
-              // Forzar título del worker si es real (español de la fuente)
+              // Solo forzar worker si el título es real (no "Episodio 1")
               if (e.titulo && !isGenericEpName(e.titulo)) name = e.titulo;
+              // Si worker trae genérico y TMDB tiene nombre, usar TMDB
+              if (isGenericEpName(name) && tm.name && !isGenericEpName(tm.name)) name = tm.name;
+              if (isGenericEpName(name) && tm.name_en && !isGenericEpName(tm.name_en)) name = tm.name_en;
               var overview = e.descripcion || e.overview || tm.overview || '';
               // Anime worker: preferir back_img de la fuente; si no, still TMDB
               var stillWorker = e.back_img || e.still || e.image || '';
