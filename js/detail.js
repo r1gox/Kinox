@@ -447,12 +447,18 @@ async function fetchWorkerDetail(slug, type, sourceId) {
       });
   }
 
-  // 1) Siempre intentar /b/ primero (rápido)
+  // 1) /b/ rápido (lista parcial)
   var basic = await fetchWithTimeout(base + pathB, 10000);
-  // 2) Full solo si hace falta meta extra; timeout corto para no dejar la UI en blanco
+  // 2) Full siempre en anime (total_episodios real, sinopsis). En resto si falta meta.
   var full = null;
-  if (!basic || !basic.descripcion || !(basic.temporadas && basic.temporadas.length)) {
-    full = await fetchWithTimeout(base + pathFull, isAnime ? 8000 : 12000);
+  var needFull =
+    isAnime ||
+    !basic ||
+    !basic.descripcion ||
+    !(basic.temporadas && basic.temporadas.length) ||
+    (parseInt(basic.total_episodios, 10) || 0) < 60;
+  if (needFull) {
+    full = await fetchWithTimeout(base + pathFull, isAnime ? 15000 : 12000);
   }
 
   if (!basic && !full) throw new Error('No encontrado en el worker (' + sid + '/' + kind + '/' + slug + ')');
@@ -716,8 +722,60 @@ async function loadDetailFromWorker(type, params) {
 
   var temps = Array.isArray(data.temporadas) ? data.temporadas : [];
 
+
+  // --- Arcos TMDB para anime largo (One Piece) ANTES del HTML ---
+  var totalEpsWorker = parseInt(data.total_episodios, 10) || 0;
+  var lista0pre = (temps[0] && (temps[0].lista || temps[0].episodios)) || [];
+  var lista0LenPre = Array.isArray(lista0pre) ? lista0pre.length : 0;
+  var tmdbArcos = null; // { tid, seasons, offsets, total }
+  var wantArcos =
+    isAnimeDetail &&
+    temps.length <= 1 &&
+    (totalEpsWorker > 60 || lista0LenPre >= 40 || totalEpsWorker > lista0LenPre + 10);
+  if (wantArcos && typeof tmdb === 'function' && typeof resolveTmdbIdForTitle === 'function') {
+    try {
+      var baseTitleArc = String(title || '')
+        .replace(/\s*[：:]\s*.*$/, '')
+        .replace(/\s*(2nd|3rd|4th)\s*season.*$/i, '')
+        .replace(/\s+\b(II|III|IV)\b\s*$/i, '')
+        .trim();
+      var tidArc = await resolveTmdbIdForTitle(baseTitleArc || title, 'tv', null);
+      if (tidArc) {
+        var tvArc = await tmdb('/tv/' + tidArc);
+        var seasonsArc = (tvArc.seasons || []).filter(function (s) {
+          return s && s.season_number > 0;
+        });
+        if (seasonsArc.length) {
+          var offsetsArc = {};
+          var accArc = 0;
+          seasonsArc.forEach(function (s) {
+            offsetsArc[s.season_number] = accArc;
+            accArc += parseInt(s.episode_count, 10) || 0;
+          });
+          tmdbArcos = {
+            tid: tidArc,
+            seasons: seasonsArc,
+            offsets: offsetsArc,
+            total: Math.max(
+              totalEpsWorker || 0,
+              parseInt(tvArc.number_of_episodes, 10) || 0,
+              accArc
+            )
+          };
+          // meta run: total real
+          if (tmdbArcos.total && (!run || /episodios/.test(run))) {
+            run = tmdbArcos.total + ' episodios';
+          }
+        }
+      }
+    } catch (eArc) {
+      console.warn('tmdb arcos preload', eArc);
+    }
+  }
+
   // Backdrop: TMDB de la serie base (T1) preferido
   var bdUrl = backdrop || '';
+
   if (bdUrl && bdUrl.indexOf('/t/p/') !== -1) {
     if (bdUrl.indexOf('original') === -1 && bdUrl.indexOf('w1280') === -1) {
       bdUrl = bdUrl.replace(/\/t\/p\/\w+\//, '/t/p/original/');
@@ -773,44 +831,63 @@ async function loadDetailFromWorker(type, params) {
     ' · ' +
     esc(hit.slug || '') +
     '</p></div></div></section>' +
-    (((type === 'tv' || type === 'anime') && temps.length)
-      ? '<section class="seasons"><h2>Temporadas y capítulos</h2><select id="sel">' +
-        temps
-          .map(function (t, i) {
-            var n = t.temporada != null ? t.temporada : i + 1;
-            var epCount =
-              t.episodios != null && !Array.isArray(t.episodios)
-                ? t.episodios
-                : Array.isArray(t.lista)
-                  ? t.lista.length
-                  : 0;
-            // Worker separa T2 en otro slug (youjo-senki-ii): no forzar "Temporada 1"
-            var label;
-            var totalEpsMeta = parseInt(data.total_episodios, 10) || 0;
-            if (temps.length === 1 && isAnimeDetail && totalEpsMeta > 60) {
-              // One Piece etc.: no "Episodios (50)" — el selector se rellena con arcos TMDB abajo
-              label = 'Episodios (lista worker)';
-              if (epCount && totalEpsMeta) label = 'Disponibles en lista (' + epCount + ' de ' + totalEpsMeta + ')';
-              else if (epCount) label += ' (' + epCount + ')';
-            } else if (temps.length === 1 && isAnimeDetail) {
-              var gs = guessSeasonFromTitle(title);
-              label = gs > 1 ? ('Temporada ' + gs) : 'Episodios';
-              if (epCount) label += ' (' + epCount + ')';
-            } else {
-              label = 'Temporada ' + n;
-              if (epCount) label += ' (' + epCount + ' eps)';
-            }
-            return (
-              '<option value="' +
-              n +
-              '"' +
-              (i === 0 ? ' selected' : '') +
-              '>' +
-              esc(label) +
-              '</option>'
-            );
-          })
-          .join('') +
+    (((type === 'tv' || type === 'anime') && (temps.length || (tmdbArcos && tmdbArcos.seasons && tmdbArcos.seasons.length)))
+      ? '<section class="seasons"><h2>Temporadas y capítulos</h2>' +
+        (tmdbArcos
+          ? '<p class="mz-eps-total" style="color:var(--mute);font-size:.85rem;margin:0 0 12px">' +
+            esc(
+              (tmdbArcos.total ? tmdbArcos.total + ' episodios disponibles' : '') +
+                (totalEpsWorker ? ' · en fuente: ' + totalEpsWorker : '')
+            ) +
+            '</p>'
+          : '') +
+        '<select id="sel">' +
+        (tmdbArcos && tmdbArcos.seasons
+          ? tmdbArcos.seasons
+              .map(function (s, i) {
+                var n = s.season_number;
+                var cnt = s.episode_count || 0;
+                var label = (s.name || ('Temporada ' + n)) + (cnt ? ' (' + cnt + ' eps)' : '');
+                return (
+                  '<option value="' +
+                  n +
+                  '"' +
+                  (i === 0 ? ' selected' : '') +
+                  '>' +
+                  esc(label) +
+                  '</option>'
+                );
+              })
+              .join('')
+          : temps
+              .map(function (t, i) {
+                var n = t.temporada != null ? t.temporada : i + 1;
+                var epCount =
+                  t.episodios != null && !Array.isArray(t.episodios)
+                    ? t.episodios
+                    : Array.isArray(t.lista)
+                      ? t.lista.length
+                      : 0;
+                var label;
+                if (temps.length === 1 && isAnimeDetail) {
+                  var gs = guessSeasonFromTitle(title);
+                  label = gs > 1 ? 'Temporada ' + gs : 'Episodios';
+                  if (epCount) label += ' (' + epCount + ')';
+                } else {
+                  label = 'Temporada ' + n;
+                  if (epCount) label += ' (' + epCount + ' eps)';
+                }
+                return (
+                  '<option value="' +
+                  n +
+                  '"' +
+                  (i === 0 ? ' selected' : '') +
+                  '>' +
+                  esc(label) +
+                  '</option>'
+                );
+              })
+              .join('')) +
         '</select><div id="eps"></div></section>'
       : '');
 
@@ -869,176 +946,106 @@ async function loadDetailFromWorker(type, params) {
   }
 
 
-  // Anime largo (One Piece): arcos desde TMDB + total del worker
-  var totalEpsWorker = parseInt(data.total_episodios, 10) || 0;
-  var lista0 = (temps[0] && (temps[0].lista || temps[0].episodios)) || [];
-  var lista0Len = Array.isArray(lista0) ? lista0.length : 0;
-  var isLongAnime =
-    isAnimeDetail &&
-    totalEpsWorker > 60 &&
-    (temps.length <= 1 || lista0Len < totalEpsWorker * 0.5);
+
+  // Bind arcos TMDB (precargados) o lista worker
   var usedTmdbArcos = false;
-
-  if (isLongAnime && typeof tmdb === 'function') {
-    try {
-      var baseTitleOP = String(title || '')
-        .replace(/\s*[：:]\s*.*$/, '')
-        .replace(/\s*(2nd|3rd|4th)\s*season.*$/i, '')
-        .replace(/\s+\b(II|III|IV)\b\s*$/i, '')
-        .trim();
-      var tidOP = null;
-      if (typeof resolveTmdbIdForTitle === 'function') {
-        tidOP = await resolveTmdbIdForTitle(baseTitleOP || title, 'tv', null);
-      }
-      if (tidOP) {
-        var tvOP = await tmdb('/tv/' + tidOP);
-        var seasonsOP = (tvOP.seasons || []).filter(function (s) {
-          return s && s.season_number > 0;
+  var lista0 = (temps[0] && (temps[0].lista || temps[0].episodios)) || [];
+  if (tmdbArcos && tmdbArcos.seasons && tmdbArcos.seasons.length) {
+    usedTmdbArcos = true;
+    var sel = document.getElementById('sel');
+    var epsBox = document.getElementById('eps');
+    var tidOP = tmdbArcos.tid;
+    var offsets = tmdbArcos.offsets || {};
+    var workerByAbs = Object.create(null);
+    (lista0 || []).forEach(function (e) {
+      var num = parseInt(e.episodio != null ? e.episodio : e.episode, 10);
+      if (num) workerByAbs[num] = e;
+    });
+    var renderArco = async function () {
+      if (!sel || !epsBox) return;
+      var sn = parseInt(sel.value, 10) || 1;
+      var off = offsets[sn] || 0;
+      epsBox.innerHTML = '<div class="load">Cargando episodios…</div>';
+      try {
+        var seasonData = await tmdb('/tv/' + tidOP + '/season/' + sn);
+        var byN = {};
+        (seasonData.episodes || []).forEach(function (ep) {
+          byN[ep.episode_number] = ep;
         });
-        if (seasonsOP.length) {
-          // Reconstruir selector con arcos TMDB
-          var sel = document.getElementById('sel');
-          var epsBox = document.getElementById('eps');
-          if (sel) {
-            // offset absoluto por temporada TMDB
-            var offsets = {};
-            var acc = 0;
-            seasonsOP.forEach(function (s) {
-              offsets[s.season_number] = acc;
-              acc += parseInt(s.episode_count, 10) || 0;
+        try {
+          var sEn = await tmdb('/tv/' + tidOP + '/season/' + sn, { language: 'en-US' });
+          (sEn.episodes || []).forEach(function (ep) {
+            var prev = byN[ep.episode_number] || {};
+            byN[ep.episode_number] = Object.assign({}, prev, {
+              episode_number: ep.episode_number,
+              name:
+                prev.name && !isGenericEpName(prev.name) ? prev.name : ep.name || prev.name,
+              overview: prev.overview || ep.overview,
+              still_path: prev.still_path || ep.still_path,
+              runtime: prev.runtime || ep.runtime
             });
-            sel.innerHTML = seasonsOP
-              .map(function (s, i) {
-                var n = s.season_number;
-                var cnt = s.episode_count || 0;
-                var label = (s.name || ('Temporada ' + n)) + (cnt ? ' (' + cnt + ' eps)' : '');
-                return (
-                  '<option value="' +
-                  n +
-                  '"' +
-                  (i === 0 ? ' selected' : '') +
-                  '>' +
-                  esc(label) +
-                  '</option>'
-                );
-              })
-              .join('');
-            // Nota de total worker
-            var seasonsSec = sel.closest('section.seasons');
-            if (seasonsSec) {
-              var note = seasonsSec.querySelector('.mz-eps-total');
-              if (!note) {
-                note = document.createElement('p');
-                note.className = 'mz-eps-total';
-                note.style.cssText = 'color:var(--mute);font-size:.85rem;margin:0 0 12px';
-                sel.parentNode.insertBefore(note, sel);
-              }
-              note.textContent =
-                (totalEpsWorker ? totalEpsWorker + ' episodios en la fuente' : '') +
-                (lista0Len ? ' · lista inicial: ' + lista0Len : '');
-            }
-
-            var renderArco = async function () {
-              var sn = parseInt(sel.value, 10) || 1;
-              var off = offsets[sn] || 0;
-              if (epsBox) epsBox.innerHTML = '<div class="load">Cargando episodios…</div>';
-              var seasonData = await tmdb('/tv/' + tidOP + '/season/' + sn);
-              var eps = seasonData.episodes || [];
-              // EN fallback nombres
-              var byN = {};
-              eps.forEach(function (ep) {
-                byN[ep.episode_number] = ep;
-              });
-              try {
-                var sEn = await tmdb('/tv/' + tidOP + '/season/' + sn, { language: 'en-US' });
-                (sEn.episodes || []).forEach(function (ep) {
-                  var prev = byN[ep.episode_number] || {};
-                  if (isGenericEpName(prev.name) && ep.name) prev.name = ep.name;
-                  if (!prev.overview && ep.overview) prev.overview = ep.overview;
-                  if (!prev.still_path && ep.still_path) prev.still_path = ep.still_path;
-                  byN[ep.episode_number] = Object.assign({}, prev, {
-                    episode_number: ep.episode_number,
-                    name: prev.name || ep.name,
-                    overview: prev.overview || ep.overview,
-                    still_path: prev.still_path || ep.still_path,
-                    runtime: prev.runtime || ep.runtime
-                  });
-                });
-              } catch (_) {}
-
-              // Mapa de back_img del worker por número absoluto (si está en lista)
-              var workerByAbs = Object.create(null);
-              (lista0 || []).forEach(function (e) {
-                var num = parseInt(e.episodio != null ? e.episodio : e.episode, 10);
-                if (num) workerByAbs[num] = e;
-              });
-
-              var html = Object.keys(byN)
-                .map(function (k) {
-                  return byN[k];
-                })
-                .sort(function (a, b) {
-                  return a.episode_number - b.episode_number;
-                })
-                .map(function (ep) {
-                  var abs = off + ep.episode_number;
-                  // Si el total worker es menor que abs, igual enlazar (worker puede tener más)
-                  var w = workerByAbs[abs] || {};
-                  var name = ep.name || w.titulo || ('Episodio ' + abs);
-                  if (isGenericEpName(name)) name = 'Episodio ' + abs;
-                  var overview = ep.overview || w.descripcion || '';
-                  var still =
-                    (ep.still_path
-                      ? (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
-                        'w300' +
-                        ep.still_path
-                      : '') ||
-                    w.back_img ||
-                    w.still ||
-                    '';
-                  // Worker anime: temporada 1 + número absoluto
-                  var href = workerPlayHref(
-                    Object.assign({}, hit || {}, {
-                      source_id: (data && data.source_id) || sourceId
-                    }),
-                    'tv',
-                    tidOP,
-                    1,
-                    abs
-                  );
-                  return (
-                    '<a class="ep" href="' +
-                    href +
-                    '">' +
-                    (still
-                      ? '<img loading="lazy" src="' + esc(still) + '" alt="">'
-                      : '<div class="ph"></div>') +
-                    '<div><b>E' +
-                    abs +
-                    ' — ' +
-                    esc(name) +
-                    '</b><small>' +
-                    esc((overview || 'Sin sinopsis.').slice(0, 220)) +
-                    '</small></div></a>'
-                  );
-                })
-                .join('');
-              if (epsBox) {
-                epsBox.innerHTML =
-                  html ||
-                  '<p style="color:var(--mute)">Sin episodios en este arco.</p>';
-              }
-            };
-            sel.onchange = function () {
-              renderArco();
-            };
-            await renderArco();
-            usedTmdbArcos = true;
-          }
-        }
+          });
+        } catch (_) {}
+        var html = Object.keys(byN)
+          .map(function (k) {
+            return byN[k];
+          })
+          .sort(function (a, b) {
+            return a.episode_number - b.episode_number;
+          })
+          .map(function (ep) {
+            var abs = off + ep.episode_number;
+            var w = workerByAbs[abs] || {};
+            var name = ep.name || w.titulo || 'Episodio ' + abs;
+            if (isGenericEpName(name)) name = 'Episodio ' + abs;
+            var overview = ep.overview || w.descripcion || '';
+            var still =
+              (ep.still_path
+                ? (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
+                  'w300' +
+                  ep.still_path
+                : '') ||
+              w.back_img ||
+              w.still ||
+              '';
+            var href = workerPlayHref(
+              Object.assign({}, hit || {}, {
+                source_id: (data && data.source_id) || sourceId
+              }),
+              'tv',
+              tidOP,
+              1,
+              abs
+            );
+            return (
+              '<a class="ep" href="' +
+              href +
+              '">' +
+              (still
+                ? '<img loading="lazy" src="' + esc(still) + '" alt="">'
+                : '<div class="ph"></div>') +
+              '<div><b>E' +
+              abs +
+              ' — ' +
+              esc(name) +
+              '</b><small>' +
+              esc((overview || 'Sin sinopsis.').slice(0, 220)) +
+              '</small></div></a>'
+            );
+          })
+          .join('');
+        epsBox.innerHTML =
+          html || '<p style="color:var(--mute)">Sin episodios en este arco.</p>';
+      } catch (err) {
+        epsBox.innerHTML =
+          '<p style="color:var(--mute)">No se pudieron cargar los episodios.</p>';
       }
-    } catch (eLong) {
-      console.warn('long anime arcos', eLong);
+    };
+    if (sel) {
+      sel.onchange = function () {
+        renderArco();
+      };
+      renderArco();
     }
   }
 
