@@ -105,7 +105,43 @@ async function ensureTmdbReady(){
 }
 
 function slugify(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,' y ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
-function detailLink(it){return appLink(`/${it.type==='movie'?'pelicula':'serie'}/${it.id}`)}
+function detailLink(it){
+  if(!it) return appLink('/');
+  var sid = it.source_id != null ? it.source_id : (it.source || '');
+  var slug = it.slug || '';
+  // id sintético de favoritos worker: w-4-youjo-senki
+  var idStr = String(it.id || '');
+  if(!slug && idStr.indexOf('w-') === 0){
+    var parts = idStr.split('-');
+    if(parts.length >= 3){
+      sid = sid || parts[1];
+      slug = parts.slice(2).join('-');
+    }
+  }
+  if(slug && (sid || idStr.indexOf('w-') === 0)){
+    var tipo = String(it.type || it.tipo || '').toLowerCase();
+    var isAnime = tipo === 'anime' || /ova|ona/.test(tipo) || String(sid) === '4' || String(sid) === '5';
+    var isMovie = tipo === 'movie' || /peli|film/.test(tipo);
+    if(isAnime) isMovie = false;
+    var page = isMovie ? 'detalle-pelicula.html' : 'detalle-serie.html';
+    var portada = '';
+    if(it.portada && /^https?:\/\//i.test(String(it.portada))) portada = it.portada;
+    else if(it.poster && /^https?:\/\//i.test(String(it.poster))) portada = it.poster;
+    return pageHref(page, {
+      slug: slug,
+      source_id: sid || undefined,
+      title: it.title || undefined,
+      type: isAnime ? 'anime' : (isMovie ? 'movie' : 'tv'),
+      portada: portada || undefined,
+      year: it.year || undefined
+    });
+  }
+  // TMDB numérico
+  if(it.id != null && String(it.id).indexOf('w-') !== 0){
+    return appLink('/' + (it.type === 'movie' ? 'pelicula' : 'serie') + '/' + it.id);
+  }
+  return appLink('/');
+}
 function tipoFromIt(it){
   var t=String(it.type||it.tipo||it.formato||'').toLowerCase();
   if(/ova/.test(t))return 'OVA';
@@ -119,7 +155,11 @@ function tipoFromIt(it){
 function card(it){
   var tipo=tipoFromIt(it);
   var rating=it.rating?`<span class="badge badge-rating">★ ${Number(it.rating).toFixed(1)}</span>`:'';
-  return `<a class="card" href="${detailLink(it)}"><div class="im">${it.poster?`<img loading="lazy" src="${IMG}w342${it.poster}" alt="">`:''}<span class="badge badge-type">${esc(tipo)}</span>${rating}</div><b>${esc(it.title)}</b><small>${esc(tipo)}${it.year?' · '+esc(it.year):''}</small></a>`;
+  var img='';
+  if(it.poster && /^https?:\/\//i.test(String(it.poster))) img=String(it.poster);
+  else if(it.portada && /^https?:\/\//i.test(String(it.portada))) img=String(it.portada);
+  else if(it.poster) img=(typeof IMG!=='undefined'?IMG:'https://image.tmdb.org/t/p/')+'w342'+it.poster;
+  return `<a class="card" href="${detailLink(it)}"><div class="im">${img?`<img loading="lazy" src="${esc(img)}" alt="">`:''}<span class="badge badge-type">${esc(tipo)}</span>${rating}</div><b>${esc(it.title)}</b><small>${esc(tipo)}${it.year?' · '+esc(it.year):''}</small></a>`;
 }
 
 /** Ventanita modal con tráiler de YouTube */
