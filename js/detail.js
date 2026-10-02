@@ -523,8 +523,7 @@ async function loadDetailFromWorker(type, params) {
     url_vid: data.url_extract || data.link || null,
     title: title
   };
-  document.title = title + ' — Kinox';
-
+  
   var run =
     type === 'movie'
       ? data.duracion_texto || (data.duracion ? data.duracion + ' min' : '')
@@ -535,22 +534,38 @@ async function loadDetailFromWorker(type, params) {
           : '';
 
   var playHref =
-    type === 'tv'
+    type === 'tv' || type === 'anime'
       ? workerPlayHref(hit, 'tv', null, 1, 1)
       : workerPlayHref(hit, 'movie', null);
 
+  var tipoRaw = String(data.tipo || data.type || data.formato || type || '').toLowerCase();
+  var isAnimeDetail =
+    type === 'anime' ||
+    /anime|ova|ona|especial/.test(tipoRaw) ||
+    String(hit.source_id || '') === '4' ||
+    String(hit.source_id || '') === '5';
+  var tipoLabel = 'Serie';
+  if (type === 'movie' && !isAnimeDetail) tipoLabel = 'Película';
+  else if (/ova/.test(tipoRaw)) tipoLabel = 'OVA';
+  else if (/ona/.test(tipoRaw)) tipoLabel = 'ONA';
+  else if (/especial|special/.test(tipoRaw)) tipoLabel = 'Especial';
+  else if (isAnimeDetail) tipoLabel = 'Anime';
+
+  document.title = title + (isAnimeDetail ? ' — Anime' : ' — Kinox');
+
   var trailerKey = null;
   var tmdbIdForTrailer = null;
+  var tmdbType = type === 'anime' || isAnimeDetail ? 'tv' : type;
   try {
     if (typeof resolveTmdbIdForTitle === 'function') {
-      tmdbIdForTrailer = await resolveTmdbIdForTitle(title, type, year);
+      tmdbIdForTrailer = await resolveTmdbIdForTitle(title, tmdbType, year);
       if (tmdbIdForTrailer) {
-        var tr = await findYoutubeTrailer(type, tmdbIdForTrailer);
+        var tr = await findYoutubeTrailer(tmdbType, tmdbIdForTrailer);
         if (tr && tr.key) trailerKey = tr.key;
         // Backdrop w1280 desde TMDB si el worker no trae
         if (!backdrop && typeof tmdb === 'function') {
           try {
-            var tx = await tmdb('/' + type + '/' + tmdbIdForTrailer);
+            var tx = await tmdb('/' + tmdbType + '/' + tmdbIdForTrailer);
             if (tx && tx.backdrop_path) {
               backdrop =
                 (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
@@ -584,6 +599,9 @@ async function loadDetailFromWorker(type, params) {
     '<div class="info"><h1>' +
     esc(title) +
     '</h1>' +
+    '<div class="tags" style="margin:8px 0 4px"><span>' +
+    esc(tipoLabel) +
+    '</span></div>' +
     (original && original !== title
       ? '<p style="color:var(--mute);margin:0 0 8px">Título original: ' + esc(original) + '</p>'
       : '') +
@@ -617,7 +635,7 @@ async function loadDetailFromWorker(type, params) {
     ' · ' +
     esc(hit.slug || '') +
     '</p></div></div></section>' +
-    (type === 'tv' && temps.length
+    (type === 'tv' || type === 'anime') && temps.length
       ? '<section class="seasons"><h2>Temporadas y capítulos</h2><select id="sel">' +
         temps
           .map(function (t, i) {
@@ -659,7 +677,7 @@ async function loadDetailFromWorker(type, params) {
     console.warn('similares worker detail', eSim);
   }
 
-if (type === 'tv' && temps.length) {
+if ((type === 'tv' || type === 'anime') && temps.length) {
     var tmdbIdWorker = null;
     if (typeof resolveTmdbIdForTitle === 'function') {
       resolveTmdbIdForTitle(title, type, year).then(function (tid) {
@@ -776,6 +794,36 @@ async function loadDetail(type) {
     var id = params.get('id');
     var slug = params.get('slug');
     var sourceIdParam = params.get('source_id') || params.get('source') || null;
+
+    // type/source de la URL mandan sobre loadDetail('tv')
+    var urlType = String(params.get('type') || type || '').toLowerCase();
+    var sidP = String(sourceIdParam || '').toLowerCase();
+    if (
+      urlType === 'anime' ||
+      sidP === '4' ||
+      sidP === '5' ||
+      sidP === 'animeav1' ||
+      sidP === 'jkanime'
+    ) {
+      type = 'anime';
+      if (!sourceIdParam) {
+        sourceIdParam = sidP === '5' || sidP === 'jkanime' ? '5' : '4';
+      } else if (sidP === 'animeav1') {
+        sourceIdParam = '4';
+      } else if (sidP === 'jkanime') {
+        sourceIdParam = '5';
+      }
+    }
+
+    // Anime del worker: ficha worker (no detalle serie TMDB)
+    if (type === 'anime' && slug) {
+      return await loadDetailFromWorker('anime', {
+        slug: slug,
+        source_id: sourceIdParam || '4',
+        title: params.get('title'),
+        portada: params.get('portada')
+      });
+    }
 
     // Solo slug: intentar resolver id TMDB y usar la misma UI que /detalle-serie?id=…
     if (!id && slug) {
