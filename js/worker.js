@@ -122,14 +122,34 @@ async function mzFetchDetail(opts) {
     if (data && data.success === false) return null;
     return data;
   }
-  // Preferir /b/ (url_vid) para episodios con titulo ES + back_img
+  // /b/ = lista parcial + url_vid; full = total_episodios real (One Piece 1180)
   var basic = await get(pathB);
   var full = await get(path);
   if (!basic && !full) throw new Error('No encontrado');
-  var data = Object.assign({}, full || {}, basic || {});
-  if (basic && Array.isArray(basic.temporadas) && basic.temporadas.length) {
+  var data = Object.assign({}, basic || {}, full || {});
+  // total: quedarse con el MAYOR (full no debe perderse por /b/)
+  var totB = parseInt(basic && basic.total_episodios, 10) || 0;
+  var totF = parseInt(full && full.total_episodios, 10) || 0;
+  if (totF || totB) data.total_episodios = Math.max(totB, totF);
+  // lista de episodios: preferir la más larga
+  function listaLen(d) {
+    var ts = (d && d.temporadas) || [];
+    if (!ts.length) return 0;
+    var L = ts[0].lista || ts[0].episodios || [];
+    return Array.isArray(L) ? L.length : 0;
+  }
+  var lenB = listaLen(basic);
+  var lenF = listaLen(full);
+  if (lenF > lenB && full && full.temporadas) {
+    data.temporadas = full.temporadas;
+  } else if (basic && Array.isArray(basic.temporadas) && basic.temporadas.length) {
     data.temporadas = basic.temporadas;
+  } else if (full && full.temporadas) {
+    data.temporadas = full.temporadas;
   }
   if (basic && basic.url_vid) data.url_vid = basic.url_vid;
+  if (basic && basic.url_extract && !data.url_extract) data.url_extract = basic.url_extract;
+  if (full && full.descripcion) data.descripcion = full.descripcion;
+  if (full && full.titulo && !data.titulo) data.titulo = full.titulo;
   return data;
 }

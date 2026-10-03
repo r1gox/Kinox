@@ -404,7 +404,12 @@ async function findYoutubeTrailer(type, tmdbId) {
 
 async function fetchWorkerDetail(slug, type, sourceId) {
   if (typeof mzFetchDetail === 'function') {
-    return mzFetchDetail({ slug: slug, type: type, source_id: sourceId });
+    var d0 = await mzFetchDetail({ slug: slug, type: type, source_id: sourceId });
+    // Seguridad: total_episodios nunca debe quedar en 50 si full traía más
+    if (d0 && d0.total_episodios != null) {
+      d0.total_episodios = parseInt(d0.total_episodios, 10) || d0.total_episodios;
+    }
+    return d0;
   }
   var sid = String(sourceId || (typeof MZ_SOURCE !== 'undefined' ? MZ_SOURCE : '9'));
   var isAnime = sid === '4' || sid === 'animeav1' || sid === '5' || sid === 'jkanime' || type === 'anime';
