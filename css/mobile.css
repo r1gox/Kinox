@@ -437,3 +437,13 @@
     margin: 0 !important;
   }
 }
+
+
+/* Título original centrado solo móvil */
+@media (max-width: 900px) {
+  .det .mz-orig-title,
+  .info .mz-orig-title {
+    text-align: center !important;
+    width: 100%;
+  }
+}
