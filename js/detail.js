@@ -973,7 +973,8 @@ async function loadDetailFromWorker(type, params) {
 
 
 
-  // Bind arcos TMDB: títulos/sinopsis TMDB + links worker /1/{abs} hasta total fuente
+
+  // Bind arcos TMDB: en One Piece las temps tardías usan episode_number ABSOLUTO (892…), no 1..N
   var usedTmdbArcos = false;
   var lista0 = (temps[0] && (temps[0].lista || temps[0].episodios)) || [];
   if (tmdbArcos && tmdbArcos.seasons && tmdbArcos.seasons.length) {
@@ -987,50 +988,56 @@ async function loadDetailFromWorker(type, params) {
       parseInt(totalEpsWorker, 10) ||
       0;
     var workerByAbs = Object.create(null);
-    var shotBase = ''; // https://cdn.animeav1.com/screenshots/ID/
+    var shotBase = '';
     (lista0 || []).forEach(function (e) {
       var num = parseInt(e.episodio != null ? e.episodio : e.episode, 10);
       if (num) workerByAbs[num] = e;
       if (!shotBase) {
-        var bi = String(e.back_img || e.still || e.image || '');
+        var bi = String(e.back_img || e.still || '');
         var m = bi.match(/^(https?:\/\/[^?#]+\/screenshots\/\d+)\//i);
         if (m) shotBase = m[1] + '/';
       }
     });
-    // Fallback: covers/ID.jpg → screenshots/ID/
     if (!shotBase && portada) {
       var mc = String(portada).match(/\/covers\/(\d+)\./i);
       if (mc) shotBase = 'https://cdn.animeav1.com/screenshots/' + mc[1] + '/';
     }
 
+    var imgBase =
+      typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/';
+
+    /** Carga episodios de una temporada TMDB (es + en) indexados por episode_number */
     var loadSeasonEps = async function (sn) {
-      var byRel = {};
-      // es-MX + en-US (anime suele tener mejor meta en EN)
+      var byNum = Object.create(null);
       var langs = [{}, { language: 'en-US' }];
       for (var li = 0; li < langs.length; li++) {
         try {
           var seasonData = await tmdb('/tv/' + tidOP + '/season/' + sn, langs[li]);
           (seasonData.episodes || []).forEach(function (ep) {
-            var prev = byRel[ep.episode_number] || {};
+            var n = parseInt(ep.episode_number, 10);
+            if (!n) return;
+            var prev = byNum[n] || {};
             var namePrev = prev.name || '';
             var nameNew = ep.name || '';
             var preferNew =
               !namePrev ||
               isGenericEpName(namePrev) ||
-              (!isGenericEpName(nameNew) && nameNew.length > namePrev.length);
-            byRel[ep.episode_number] = {
-              episode_number: ep.episode_number,
+              (!isGenericEpName(nameNew) && nameNew && nameNew !== namePrev);
+            byNum[n] = {
+              episode_number: n,
               name: preferNew ? nameNew || namePrev : namePrev,
-              overview: prev.overview || ep.overview || '',
+              overview: (prev.overview && prev.overview.length >= (ep.overview || '').length
+                ? prev.overview
+                : ep.overview || prev.overview || ''),
               still_path: prev.still_path || ep.still_path || '',
               runtime: prev.runtime || ep.runtime
             };
           });
         } catch (errS) {
-          console.warn('season', sn, langs[li], errS);
+          console.warn('season', sn, errS);
         }
       }
-      return byRel;
+      return byNum;
     };
 
     var renderArco = async function () {
@@ -1041,44 +1048,82 @@ async function loadDetailFromWorker(type, params) {
         return parseInt(s.season_number, 10) === sn;
       });
       var cnt = (seasonMeta && parseInt(seasonMeta.episode_count, 10)) || 0;
-      var absStart = off + 1;
-      var absEnd = cnt > 0 ? off + cnt : absStart;
-      if (maxEp > 0) absEnd = Math.min(absEnd, maxEp);
-      if (absStart < 1) absStart = 1;
-      if (absEnd < absStart) {
-        epsBox.innerHTML =
-          '<p style="color:var(--mute)">Sin episodios en este arco (fuera del total de la fuente).</p>';
-        return;
-      }
 
       epsBox.innerHTML = '<div class="load">Cargando episodios…</div>';
-      var byRel = await loadSeasonEps(sn);
+      var byNum = await loadSeasonEps(sn);
+      var nums = Object.keys(byNum)
+        .map(function (k) {
+          return parseInt(k, 10);
+        })
+        .filter(function (n) {
+          return n > 0;
+        })
+        .sort(function (a, b) {
+          return a - b;
+        });
+
+      // One Piece: temps tardías traen episode_number = número absoluto del anime
+      var minN = nums.length ? nums[0] : 1;
+      var maxN = nums.length ? nums[nums.length - 1] : cnt;
+      var useAbsolute =
+        nums.length > 0 && (minN > 1 || maxN > cnt + 5 || maxN > (off + cnt + 5));
 
       var parts = [];
-      for (var abs = absStart; abs <= absEnd; abs++) {
-        var rel = abs - off;
-        var ep = byRel[rel] || {};
+      var listNums;
+      if (useAbsolute && nums.length) {
+        listNums = nums.filter(function (n) {
+          return !maxEp || n <= maxEp;
+        });
+      } else {
+        // Relativo 1..cnt → abs = off + rel
+        listNums = [];
+        var relMax = cnt > 0 ? cnt : nums.length || 0;
+        for (var rel = 1; rel <= relMax; rel++) {
+          var abs = off + rel;
+          if (maxEp > 0 && abs > maxEp) break;
+          listNums.push(rel); // guardamos rel; abs se calcula abajo
+        }
+      }
+
+      if (!listNums.length) {
+        // Fallback: generar rango por offset sin meta TMDB
+        var absStart = off + 1;
+        var absEnd = cnt > 0 ? off + cnt : absStart;
+        if (maxEp > 0) absEnd = Math.min(absEnd, maxEp);
+        for (var a = absStart; a <= absEnd; a++) listNums.push(useAbsolute ? a : a - off);
+      }
+
+      listNums.forEach(function (key) {
+        var abs;
+        var ep;
+        if (useAbsolute) {
+          abs = key;
+          ep = byNum[abs] || {};
+        } else {
+          var relN = key;
+          abs = off + relN;
+          ep = byNum[relN] || byNum[abs] || {};
+        }
+        if (maxEp > 0 && abs > maxEp) return;
+        if (abs < 1) return;
+
         var w = workerByAbs[abs] || {};
         var name = '';
-        if (w.titulo && !isGenericEpName(w.titulo)) name = w.titulo;
-        else if (ep.name && !isGenericEpName(ep.name)) name = ep.name;
-        else if (w.titulo) name = w.titulo;
+        if (ep.name && !isGenericEpName(ep.name)) name = ep.name;
+        else if (w.titulo && !isGenericEpName(w.titulo)) name = w.titulo;
         else if (ep.name) name = ep.name;
+        else if (w.titulo) name = w.titulo;
         else name = 'Episodio ' + abs;
 
-        var overview = '';
-        if (w.descripcion) overview = w.descripcion;
-        else if (w.overview) overview = w.overview;
-        else if (ep.overview) overview = ep.overview;
+        var overview = ep.overview || w.descripcion || w.overview || '';
 
         var still = '';
-        if (w.back_img) still = w.back_img;
-        else if (w.still) still = w.still;
-        else if (ep.still_path) {
-          still =
-            (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
-            'w300' +
-            ep.still_path;
+        if (ep.still_path) {
+          still = imgBase + 'w300' + ep.still_path;
+        } else if (w.back_img) {
+          still = w.back_img;
+        } else if (w.still) {
+          still = w.still;
         } else if (shotBase) {
           still = shotBase + abs + '.jpg';
         }
@@ -1092,6 +1137,7 @@ async function loadDetailFromWorker(type, params) {
           1,
           abs
         );
+
         parts.push(
           '<a class="ep" href="' +
             href +
@@ -1099,8 +1145,7 @@ async function loadDetailFromWorker(type, params) {
             (still
               ? '<img loading="lazy" src="' +
                 esc(still) +
-                '" alt="" onerror="this.style.display=\'none\';this.nextElementSibling&&(this.nextElementSibling.style.display=\'block\')">' +
-                '<div class="ph" style="display:none"></div>'
+                '" alt="" onerror="this.replaceWith(Object.assign(document.createElement(\'div\'),{className:\'ph\'}))">'
               : '<div class="ph"></div>') +
             '<div><b>E' +
             abs +
@@ -1110,7 +1155,8 @@ async function loadDetailFromWorker(type, params) {
             esc((overview || 'Sin sinopsis.').slice(0, 220)) +
             '</small></div></a>'
         );
-      }
+      });
+
       epsBox.innerHTML =
         parts.length
           ? parts.join('')
