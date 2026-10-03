@@ -971,7 +971,8 @@ async function loadDetailFromWorker(type, params) {
 
 
 
-  // Bind arcos TMDB (precargados) o lista worker
+
+  // Bind arcos TMDB: títulos/sinopsis TMDB + links worker /1/{abs} hasta total fuente
   var usedTmdbArcos = false;
   var lista0 = (temps[0] && (temps[0].lista || temps[0].episodios)) || [];
   if (tmdbArcos && tmdbArcos.seasons && tmdbArcos.seasons.length) {
@@ -980,99 +981,119 @@ async function loadDetailFromWorker(type, params) {
     var epsBox = document.getElementById('eps');
     var tidOP = tmdbArcos.tid;
     var offsets = tmdbArcos.offsets || {};
+    var maxEp =
+      parseInt(tmdbArcos.total, 10) ||
+      parseInt(totalEpsWorker, 10) ||
+      0;
     var workerByAbs = Object.create(null);
     (lista0 || []).forEach(function (e) {
       var num = parseInt(e.episodio != null ? e.episodio : e.episode, 10);
       if (num) workerByAbs[num] = e;
     });
+
     var renderArco = async function () {
       if (!sel || !epsBox) return;
       var sn = parseInt(sel.value, 10) || 1;
-      var off = offsets[sn] || 0;
+      var off = offsets[sn] != null ? offsets[sn] : 0;
+      var seasonMeta = (tmdbArcos.seasons || []).find(function (s) {
+        return parseInt(s.season_number, 10) === sn;
+      });
+      var cnt =
+        (seasonMeta && parseInt(seasonMeta.episode_count, 10)) ||
+        0;
+      // Rango absoluto de este arco, limitado al total del worker
+      var absStart = off + 1;
+      var absEnd = cnt > 0 ? off + cnt : absStart;
+      if (maxEp > 0) {
+        absEnd = Math.min(absEnd, maxEp);
+      }
+      if (absStart < 1) absStart = 1;
+      if (absEnd < absStart) {
+        epsBox.innerHTML =
+          '<p style="color:var(--mute)">Sin episodios en este arco (fuera del total de la fuente).</p>';
+        return;
+      }
+
       epsBox.innerHTML = '<div class="load">Cargando episodios…</div>';
+
+      // Datos TMDB por número DENTRO de la temporada (1..cnt)
+      var byRel = {};
       try {
         var seasonData = await tmdb('/tv/' + tidOP + '/season/' + sn);
-        var byN = {};
         (seasonData.episodes || []).forEach(function (ep) {
-          byN[ep.episode_number] = ep;
+          byRel[ep.episode_number] = ep;
         });
         try {
-          var sEn = await tmdb('/tv/' + tidOP + '/season/' + sn, { language: 'en-US' });
+          var sEn = await tmdb('/tv/' + tidOP + '/season/' + sn, {
+            language: 'en-US'
+          });
           (sEn.episodes || []).forEach(function (ep) {
-            var prev = byN[ep.episode_number] || {};
-            byN[ep.episode_number] = Object.assign({}, prev, {
+            var prev = byRel[ep.episode_number] || {};
+            byRel[ep.episode_number] = Object.assign({}, prev, {
               episode_number: ep.episode_number,
               name:
-                prev.name && !isGenericEpName(prev.name) ? prev.name : ep.name || prev.name,
+                prev.name && !isGenericEpName(prev.name)
+                  ? prev.name
+                  : ep.name || prev.name,
               overview: prev.overview || ep.overview,
               still_path: prev.still_path || ep.still_path,
               runtime: prev.runtime || ep.runtime
             });
           });
         } catch (_) {}
-        var html = Object.keys(byN)
-          .map(function (k) {
-            return byN[k];
-          })
-          .sort(function (a, b) {
-            return a.episode_number - b.episode_number;
-          })
-          .map(function (ep) {
-            var abs = off + ep.episode_number;
-            var maxEp =
-              (tmdbArcos && tmdbArcos.total) ||
-              totalEpsWorker ||
-              0;
-            // No inventar caps fuera del total del worker
-            if (maxEp > 0 && abs > maxEp) return '';
-            if (abs < 1) return '';
-            var w = workerByAbs[abs] || {};
-            var name = ep.name || w.titulo || 'Episodio ' + abs;
-            if (isGenericEpName(name)) name = 'Episodio ' + abs;
-            var overview = ep.overview || w.descripcion || '';
-            var still =
-              (ep.still_path
-                ? (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
-                  'w300' +
-                  ep.still_path
-                : '') ||
-              w.back_img ||
-              w.still ||
-              '';
-            var href = workerPlayHref(
-              Object.assign({}, hit || {}, {
-                source_id: (data && data.source_id) || sourceId
-              }),
-              'tv',
-              tidOP,
-              1,
-              abs
-            );
-            return (
-              '<a class="ep" href="' +
-              href +
-              '">' +
-              (still
-                ? '<img loading="lazy" src="' + esc(still) + '" alt="">'
-                : '<div class="ph"></div>') +
-              '<div><b>E' +
-              abs +
-              ' — ' +
-              esc(name) +
-              '</b><small>' +
-              esc((overview || 'Sin sinopsis.').slice(0, 220)) +
-              '</small></div></a>'
-            );
-          })
-          .filter(Boolean)
-          .join('');
-        epsBox.innerHTML =
-          html || '<p style="color:var(--mute)">Sin episodios en este arco.</p>';
-      } catch (err) {
-        epsBox.innerHTML =
-          '<p style="color:var(--mute)">No se pudieron cargar los episodios.</p>';
+      } catch (errTmdb) {
+        console.warn('season tmdb', errTmdb);
       }
+
+      var parts = [];
+      for (var abs = absStart; abs <= absEnd; abs++) {
+        var rel = abs - off; // 1-based dentro del arco
+        var ep = byRel[rel] || {};
+        var w = workerByAbs[abs] || {};
+        var name = ep.name || w.titulo || w.name || '';
+        if (isGenericEpName(name)) name = 'Episodio ' + abs;
+        var overview = ep.overview || w.descripcion || w.overview || '';
+        var still =
+          (ep.still_path
+            ? (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
+              'w300' +
+              ep.still_path
+            : '') ||
+          w.back_img ||
+          w.still ||
+          '';
+        // Worker: siempre temporada 1 + número absoluto (/1/51, /1/52…)
+        var href = workerPlayHref(
+          Object.assign({}, hit || {}, {
+            source_id: (data && data.source_id) || sourceId
+          }),
+          'tv',
+          tidOP,
+          1,
+          abs
+        );
+        parts.push(
+          '<a class="ep" href="' +
+            href +
+            '">' +
+            (still
+              ? '<img loading="lazy" src="' + esc(still) + '" alt="">'
+              : '<div class="ph"></div>') +
+            '<div><b>E' +
+            abs +
+            ' — ' +
+            esc(name) +
+            '</b><small>' +
+            esc((overview || 'Sin sinopsis.').slice(0, 220)) +
+            '</small></div></a>'
+        );
+      }
+      epsBox.innerHTML =
+        parts.length
+          ? parts.join('')
+          : '<p style="color:var(--mute)">Sin episodios en este arco.</p>';
     };
+
     if (sel) {
       sel.onchange = function () {
         renderArco();
