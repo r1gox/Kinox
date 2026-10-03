@@ -1009,8 +1009,10 @@ async function loadDetailFromWorker(type, params) {
     /** Carga episodios de una temporada TMDB (es + en) indexados por episode_number */
     var loadSeasonEps = async function (sn) {
       var byNum = Object.create(null);
-      var langs = [{}, { language: 'en-US' }];
+      // 1) Español primero (como antes). 2) en-US solo rellena huecos.
+      var langs = [{ language: 'es-MX' }, { language: 'es-ES' }, { language: 'en-US' }];
       for (var li = 0; li < langs.length; li++) {
+        var isEn = langs[li].language === 'en-US';
         try {
           var seasonData = await tmdb('/tv/' + tidOP + '/season/' + sn, langs[li]);
           (seasonData.episodes || []).forEach(function (ep) {
@@ -1019,16 +1021,26 @@ async function loadDetailFromWorker(type, params) {
             var prev = byNum[n] || {};
             var namePrev = prev.name || '';
             var nameNew = ep.name || '';
-            var preferNew =
-              !namePrev ||
-              isGenericEpName(namePrev) ||
-              (!isGenericEpName(nameNew) && nameNew && nameNew !== namePrev);
+            var overPrev = prev.overview || '';
+            var overNew = ep.overview || '';
+            var name = namePrev;
+            // Solo tomar nombre nuevo si no hay español válido
+            if (!name || isGenericEpName(name)) {
+              if (nameNew && !isGenericEpName(nameNew)) name = nameNew;
+              else if (nameNew && !name) name = nameNew;
+            }
+            // EN no pisa un título ES ya bueno
+            if (isEn && namePrev && !isGenericEpName(namePrev)) {
+              name = namePrev;
+            }
+            var overview = overPrev;
+            if (!overview) overview = overNew;
+            // EN no pisa sinopsis ES
+            if (isEn && overPrev) overview = overPrev;
             byNum[n] = {
               episode_number: n,
-              name: preferNew ? nameNew || namePrev : namePrev,
-              overview: (prev.overview && prev.overview.length >= (ep.overview || '').length
-                ? prev.overview
-                : ep.overview || prev.overview || ''),
+              name: name,
+              overview: overview,
               still_path: prev.still_path || ep.still_path || '',
               runtime: prev.runtime || ep.runtime
             };
