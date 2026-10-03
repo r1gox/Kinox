@@ -746,25 +746,41 @@ async function loadDetailFromWorker(type, params) {
           return s && s.season_number > 0;
         });
         if (seasonsArc.length) {
+          // Total real = worker (1180). TMDB a veces infla con especiales/OVAs.
+          var workerTotal = totalEpsWorker || 0;
+          var tmdbNum = parseInt(tvArc.number_of_episodes, 10) || 0;
+          // Si el worker da total, manda; si no, TMDB
+          var realTotal = workerTotal > 0 ? workerTotal : tmdbNum;
+
           var offsetsArc = {};
           var accArc = 0;
+          var seasonsFit = [];
           seasonsArc.forEach(function (s) {
+            if (realTotal > 0 && accArc >= realTotal) return;
+            var cnt = parseInt(s.episode_count, 10) || 0;
+            if (cnt <= 0) return;
+            // Recortar última temporada al total del worker
+            if (realTotal > 0 && accArc + cnt > realTotal) {
+              cnt = realTotal - accArc;
+            }
+            if (cnt <= 0) return;
             offsetsArc[s.season_number] = accArc;
-            accArc += parseInt(s.episode_count, 10) || 0;
+            seasonsFit.push(
+              Object.assign({}, s, { episode_count: cnt })
+            );
+            accArc += cnt;
           });
-          tmdbArcos = {
-            tid: tidArc,
-            seasons: seasonsArc,
-            offsets: offsetsArc,
-            total: Math.max(
-              totalEpsWorker || 0,
-              parseInt(tvArc.number_of_episodes, 10) || 0,
-              accArc
-            )
-          };
-          // meta run: total real
-          if (tmdbArcos.total && (!run || /episodios/.test(run))) {
-            run = tmdbArcos.total + ' episodios';
+
+          if (seasonsFit.length) {
+            tmdbArcos = {
+              tid: tidArc,
+              seasons: seasonsFit,
+              offsets: offsetsArc,
+              total: realTotal > 0 ? realTotal : accArc
+            };
+            if (tmdbArcos.total && (!run || /episodios/.test(run))) {
+              run = tmdbArcos.total + ' episodios';
+            }
           }
         }
       }
@@ -836,8 +852,11 @@ async function loadDetailFromWorker(type, params) {
         (tmdbArcos
           ? '<p class="mz-eps-total" style="color:var(--mute);font-size:.85rem;margin:0 0 12px">' +
             esc(
-              (tmdbArcos.total ? tmdbArcos.total + ' episodios disponibles' : '') +
-                (totalEpsWorker ? ' · en fuente: ' + totalEpsWorker : '')
+              (totalEpsWorker
+                ? totalEpsWorker + ' episodios en la fuente'
+                : tmdbArcos.total
+                  ? tmdbArcos.total + ' episodios'
+                  : '') 
             ) +
             '</p>'
           : '') +
@@ -995,6 +1014,13 @@ async function loadDetailFromWorker(type, params) {
           })
           .map(function (ep) {
             var abs = off + ep.episode_number;
+            var maxEp =
+              (tmdbArcos && tmdbArcos.total) ||
+              totalEpsWorker ||
+              0;
+            // No inventar caps fuera del total del worker
+            if (maxEp > 0 && abs > maxEp) return '';
+            if (abs < 1) return '';
             var w = workerByAbs[abs] || {};
             var name = ep.name || w.titulo || 'Episodio ' + abs;
             if (isGenericEpName(name)) name = 'Episodio ' + abs;
@@ -1033,6 +1059,7 @@ async function loadDetailFromWorker(type, params) {
               '</small></div></a>'
             );
           })
+          .filter(Boolean)
           .join('');
         epsBox.innerHTML =
           html || '<p style="color:var(--mute)">Sin episodios en este arco.</p>';
