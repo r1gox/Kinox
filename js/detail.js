@@ -725,6 +725,35 @@ async function loadDetailFromWorker(type, params) {
     }
   } catch (_) {}
 
+  // Dónde verla en México (TMDB watch/providers) — igual que ficha TMDB
+  var provs = [];
+  var provLink = '';
+  try {
+    var tidProv = tmdbIdForTrailer;
+    var tmdbKindProv = type === 'anime' || isAnimeDetail ? 'tv' : type === 'movie' ? 'movie' : 'tv';
+    if (!tidProv && typeof resolveTmdbIdForTitle === 'function') {
+      var baseProv = String(title || '')
+        .replace(/\s*[：:]\s*.*$/, '')
+        .replace(/\s*(2nd|3rd|4th)\s*season.*$/i, '')
+        .replace(/\s+\b(II|III|IV)\b\s*$/i, '')
+        .trim();
+      tidProv = await resolveTmdbIdForTitle(baseProv || title, tmdbKindProv, null);
+    }
+    if (tidProv && typeof tmdb === 'function') {
+      var wp = await tmdb('/' + tmdbKindProv + '/' + tidProv + '/watch/providers');
+      var mx =
+        (wp && wp.results && wp.results.MX) ||
+        (wp && wp.results && wp.results.US) ||
+        {};
+      provs = [].concat(mx.flatrate || [], mx.rent || [], mx.buy || []).filter(function (p, i, a) {
+        return p && p.logo_path && a.findIndex(function (q) { return q.provider_id === p.provider_id; }) === i;
+      });
+      provLink = mx.link || '';
+    }
+  } catch (eProv) {
+    console.warn('providers', eProv);
+  }
+
   var temps = Array.isArray(data.temporadas) ? data.temporadas : [];
 
 
@@ -817,7 +846,9 @@ async function loadDetailFromWorker(type, params) {
     esc(tipoLabel) +
     '</span></div>' +
     (original && original !== title
-      ? '<p style="color:var(--mute);margin:0 0 8px">Título original: ' + esc(original) + '</p>'
+      ? '<p class="mz-orig-title" style="color:var(--mute);margin:0 0 8px">Título original: ' +
+        esc(original) +
+        '</p>'
       : '') +
     '<div class="meta">' +
     esc(year) +
@@ -851,7 +882,33 @@ async function loadDetailFromWorker(type, params) {
     esc(hit.source || hit.source_id || '') +
     ' · ' +
     esc(hit.slug || '') +
-    '</p></div></div></section>' +
+    '</p>' +
+    '<h3>Dónde verla en México</h3>' +
+    (provs.length
+      ? '<div class="prov">' +
+        provs
+          .map(function (p) {
+            return (
+              '<img src="' +
+              (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
+              'w92' +
+              p.logo_path +
+              '" title="' +
+              esc(p.provider_name) +
+              '" alt="' +
+              esc(p.provider_name) +
+              '">'
+            );
+          })
+          .join('') +
+        '</div>' +
+        (provLink
+          ? '<p style="margin-top:10px"><a style="color:var(--ac)" href="' +
+            esc(provLink) +
+            '" target="_blank" rel="noopener">Ver todas las opciones</a></p>'
+          : '')
+      : '<p>No hay plataformas registradas en México.</p>') +
+    '</div></div></section>' +
     (((type === 'tv' || type === 'anime') && (temps.length || (tmdbArcos && tmdbArcos.seasons && tmdbArcos.seasons.length)))
       ? '<section class="seasons"><h2>Temporadas y capítulos</h2>' +
         (tmdbArcos
