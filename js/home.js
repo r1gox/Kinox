@@ -12,29 +12,58 @@
       (typeof MZ_WORKER !== "undefined" && MZ_WORKER) ||
       (typeof MZ_SEARCH !== "undefined" && MZ_SEARCH) ||
       "https://moviezone.tvjz.workers.dev";
-    var SID =
-      (typeof MZ_SOURCE !== "undefined" && String(MZ_SOURCE)) ||
-      (typeof store !== "undefined" && store.get && store.get("mz_source", null)) ||
-      "9";
+    // Catálogo inicio: siempre 9 (pelis/series). No usar mz_source=5 (JK) aquí.
+    var SID = "9";
+    var SID_FALLBACK = "3";
 
-    function workerGet(path) {
-      var url = path.indexOf("http") === 0 ? path : WORKER.replace(/\/$/, "") + path;
+    function workerGet(path, tries) {
+      tries = tries == null ? 2 : tries;
+      var base = String(WORKER || "").replace(/\/$/, "");
+      var url = path.indexOf("http") === 0 ? path : base + path;
+      var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+      var timer = setTimeout(function () {
+        try {
+          if (ctrl) ctrl.abort();
+        } catch (_) {}
+      }, 20000);
       return fetch(url, {
-        headers: { Accept: "application/json", "User-Agent": "KinoxHome/1.0" },
-        cache: "no-store",
-      }).then(function (r) {
-        if (!r.ok) throw new Error("Worker " + r.status);
-        return r.json();
-      });
+        method: "GET",
+        headers: { Accept: "application/json" },
+        mode: "cors",
+        credentials: "omit",
+        cache: "default",
+        signal: ctrl ? ctrl.signal : undefined,
+      })
+        .then(function (r) {
+          clearTimeout(timer);
+          if (!r.ok) throw new Error("Worker " + r.status + " " + path);
+          return r.json();
+        })
+        .catch(function (err) {
+          clearTimeout(timer);
+          if (tries > 1) {
+            return new Promise(function (res) {
+              setTimeout(res, 500);
+            }).then(function () {
+              return workerGet(path, tries - 1);
+            });
+          }
+          console.warn("workerGet fail", path, err);
+          throw err;
+        });
     }
 
     function pickList(data) {
       if (!data) return [];
+      if (Array.isArray(data)) return data;
       if (Array.isArray(data.results)) return data.results;
       if (Array.isArray(data.resultados)) return data.resultados;
+      if (Array.isArray(data.items)) return data.items;
+      if (Array.isArray(data.data)) return data.data;
       if (Array.isArray(data.agregados)) return data.agregados;
       if (Array.isArray(data.recientes)) return data.recientes;
       if (Array.isArray(data.estrenos)) return data.estrenos;
+      if (data.success && Array.isArray(data.lista)) return data.lista;
       return [];
     }
 
@@ -122,10 +151,20 @@
       workerGet("/" + SID + "/peliculas?page=1"),
       workerGet("/" + SID + "/series?page=1"),
       workerGet("/4/home"),
-      // fallback fuente 3 si 9 falla o viene vacío
-      workerGet("/3/peliculas?page=1"),
-      workerGet("/3/series?page=1"),
+      workerGet("/" + SID_FALLBACK + "/peliculas?page=1"),
+      workerGet("/" + SID_FALLBACK + "/series?page=1"),
     ]);
+    // Log en consola para depurar móvil
+    try {
+      console.log(
+        "[Kinox home] worker",
+        WORKER,
+        "ok",
+        settled.map(function (s, i) {
+          return i + ":" + s.status;
+        }).join(" ")
+      );
+    } catch (_) {}
 
     function ok(i) {
       return settled[i].status === "fulfilled" ? settled[i].value : null;
@@ -231,12 +270,27 @@
 
     if (!pelis.length && !series.length && !animeAgregados.length) {
       html +=
-        '<div class="load">No se pudo cargar el catálogo del worker. Revisa la API.</div>';
+        '<div class="load">No se pudo cargar el catálogo del worker.<br>' +
+        '<small style="opacity:.8">Revisa red o toca reintentar.</small><br>' +
+        '<button type="button" class="btn" style="margin-top:14px" onclick="location.reload()">Reintentar</button></div>';
     }
 
-    $("#view").innerHTML = html;
+    if (typeof $ === "function" && $("#view")) {
+      $("#view").innerHTML = html;
+    } else {
+      var v = document.getElementById("view");
+      if (v) v.innerHTML = html;
+    }
   } catch (e) {
-    $("#view").innerHTML =
-      '<div class="load">' + esc(e.message || String(e)) + "</div>";
+    var msg = (e && e.message) || String(e);
+    var errHtml =
+      '<div class="load">' +
+      (typeof esc === "function" ? esc(msg) : msg) +
+      '<br><button type="button" class="btn" style="margin-top:14px" onclick="location.reload()">Reintentar</button></div>';
+    if (typeof $ === "function" && $("#view")) $("#view").innerHTML = errHtml;
+    else {
+      var v2 = document.getElementById("view");
+      if (v2) v2.innerHTML = errHtml;
+    }
   }
 })();

@@ -10,21 +10,46 @@
     "https://moviezone.tvjz.workers.dev";
 
   function sourceId() {
+    // Películas/Series: nunca usar fuente JK (5). Preferir 9, fallback 3 en loadPage.
     var s =
       (typeof MZ_SOURCE !== "undefined" && MZ_SOURCE) ||
-      (typeof store !== "undefined" && store.get && store.get("mz_source", null)) ||
       "9";
-    return String(s);
+    s = String(s || "9");
+    if (s === "5" || s === "4" || s === "jkanime" || s === "animeav1") return "9";
+    return s;
   }
 
-  function workerGet(path) {
+    function workerGet(path, tries) {
+    tries = tries == null ? 2 : tries;
     var url = path.indexOf("http") === 0 ? path : WORKER.replace(/\/$/, "") + path;
-    return fetch(url, { headers: { Accept: "application/json" }, cache: "no-store" }).then(
-      function (r) {
+    var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var timer = setTimeout(function () {
+      try { if (ctrl) ctrl.abort(); } catch (_) {}
+    }, 18000);
+    return fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      mode: "cors",
+      credentials: "omit",
+      cache: "default",
+      signal: ctrl ? ctrl.signal : undefined
+    })
+      .then(function (r) {
+        clearTimeout(timer);
         if (!r.ok) throw new Error("Worker " + r.status);
         return r.json();
-      }
-    );
+      })
+      .catch(function (err) {
+        clearTimeout(timer);
+        if (tries > 1) {
+          return new Promise(function (res) {
+            setTimeout(res, 600);
+          }).then(function () {
+            return workerGet(path, tries - 1);
+          });
+        }
+        throw err;
+      });
   }
 
   function esc(s) {
