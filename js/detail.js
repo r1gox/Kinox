@@ -584,7 +584,8 @@ async function loadDetailFromWorker(type, params) {
   var original = data.titulo_original || '';
   var year = data.year || '';
   var rating = data.rating != null ? data.rating : data.calificacion;
-  var overview = data.descripcion || data.overview || 'Sin sinopsis.';
+  var workerOverview = String(data.descripcion || data.overview || '').trim();
+  var overview = workerOverview || 'Sin sinopsis.';
   var portada = data.portada || portadaHint || '';
   var backdrop = data.backdrop || '';
   var generos = data.generos || [];
@@ -713,7 +714,12 @@ async function loadDetailFromWorker(type, params) {
                 if (hitEn) trailerKey = hitEn.key;
               } catch (_) {}
             }
-            if (tx && tx.overview && (!overview || overview === 'Sin sinopsis.' || overview.length < 40)) {
+            // Sinopsis: TMDB solo si el worker no trajo una real
+            if (
+              tx &&
+              tx.overview &&
+              (!overview || overview === 'Sin sinopsis.' || !String(overview).trim())
+            ) {
               overview = tx.overview;
             }
             if ((!rating || rating === '') && tx && tx.vote_average) {
@@ -725,33 +731,52 @@ async function loadDetailFromWorker(type, params) {
     }
   } catch (_) {}
 
-  // Dónde verla en México (TMDB watch/providers) — igual que ficha TMDB
+  // Dónde verla en México — se rellena tras tener id TMDB (abajo se puede actualizar)
   var provs = [];
   var provLink = '';
+  async function loadProvidersForId(tid) {
+    if (!tid || typeof tmdb !== 'function') return;
+    var tmdbKindProv =
+      type === 'anime' || isAnimeDetail ? 'tv' : type === 'movie' ? 'movie' : 'tv';
+    try {
+      var wp = await tmdb('/' + tmdbKindProv + '/' + tid + '/watch/providers');
+      var results = (wp && wp.results) || {};
+      var mx = results.MX || results.US || results.ES || {};
+      var list = [].concat(mx.flatrate || [], mx.rent || [], mx.buy || []).filter(function (p, i, a) {
+        return (
+          p &&
+          p.provider_id &&
+          a.findIndex(function (q) {
+            return q.provider_id === p.provider_id;
+          }) === i
+        );
+      });
+      if (list.length) {
+        provs = list;
+        provLink = mx.link || provLink || '';
+      }
+    } catch (eProv) {
+      console.warn('providers', eProv);
+    }
+  }
   try {
     var tidProv = tmdbIdForTrailer;
-    var tmdbKindProv = type === 'anime' || isAnimeDetail ? 'tv' : type === 'movie' ? 'movie' : 'tv';
+    var tmdbKindProv0 =
+      type === 'anime' || isAnimeDetail ? 'tv' : type === 'movie' ? 'movie' : 'tv';
     if (!tidProv && typeof resolveTmdbIdForTitle === 'function') {
       var baseProv = String(title || '')
         .replace(/\s*[：:]\s*.*$/, '')
         .replace(/\s*(2nd|3rd|4th)\s*season.*$/i, '')
         .replace(/\s+\b(II|III|IV)\b\s*$/i, '')
         .trim();
-      tidProv = await resolveTmdbIdForTitle(baseProv || title, tmdbKindProv, null);
+      tidProv = await resolveTmdbIdForTitle(baseProv || title, tmdbKindProv0, null);
+      if (!tidProv && title !== baseProv) {
+        tidProv = await resolveTmdbIdForTitle(title, tmdbKindProv0, null);
+      }
     }
-    if (tidProv && typeof tmdb === 'function') {
-      var wp = await tmdb('/' + tmdbKindProv + '/' + tidProv + '/watch/providers');
-      var mx =
-        (wp && wp.results && wp.results.MX) ||
-        (wp && wp.results && wp.results.US) ||
-        {};
-      provs = [].concat(mx.flatrate || [], mx.rent || [], mx.buy || []).filter(function (p, i, a) {
-        return p && p.logo_path && a.findIndex(function (q) { return q.provider_id === p.provider_id; }) === i;
-      });
-      provLink = mx.link || '';
-    }
-  } catch (eProv) {
-    console.warn('providers', eProv);
+    await loadProvidersForId(tidProv);
+  } catch (eProv0) {
+    console.warn('providers0', eProv0);
   }
 
   var temps = Array.isArray(data.temporadas) ? data.temporadas : [];
@@ -814,6 +839,9 @@ async function loadDetailFromWorker(type, params) {
             };
             if (tmdbArcos.total && (!run || /episodios/.test(run))) {
               run = tmdbArcos.total + ' episodios';
+            }
+            if (!provs.length && tidArc) {
+              await loadProvidersForId(tidArc);
             }
           }
         }
@@ -883,21 +911,31 @@ async function loadDetailFromWorker(type, params) {
     ' · ' +
     esc(hit.slug || '') +
     '</p>' +
-    '<h3>Dónde verla en México</h3>' +
+    '<div class="mz-where-watch" style="display:block;margin-top:18px;clear:both">' +
+    '<h3 style="margin:0 0 10px">Dónde verla en México</h3>' +
     (provs.length
-      ? '<div class="prov">' +
+      ? '<div class="prov" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">' +
         provs
           .map(function (p) {
+            var imgB =
+              typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/';
+            if (p.logo_path) {
+              return (
+                '<img src="' +
+                imgB +
+                'w92' +
+                p.logo_path +
+                '" title="' +
+                esc(p.provider_name) +
+                '" alt="' +
+                esc(p.provider_name) +
+                '" style="height:40px;width:auto;border-radius:8px;background:#111">'
+              );
+            }
             return (
-              '<img src="' +
-              (typeof IMG !== 'undefined' ? IMG : 'https://image.tmdb.org/t/p/') +
-              'w92' +
-              p.logo_path +
-              '" title="' +
-              esc(p.provider_name) +
-              '" alt="' +
-              esc(p.provider_name) +
-              '">'
+              '<span style="padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.08);font-size:.85rem">' +
+              esc(p.provider_name || 'Plataforma') +
+              '</span>'
             );
           })
           .join('') +
@@ -907,7 +945,8 @@ async function loadDetailFromWorker(type, params) {
             esc(provLink) +
             '" target="_blank" rel="noopener">Ver todas las opciones</a></p>'
           : '')
-      : '<p>No hay plataformas registradas en México.</p>') +
+      : '<p style="color:var(--mute);margin:0">No hay plataformas registradas en México.</p>') +
+    '</div>' +
     '</div></div></section>' +
     (((type === 'tv' || type === 'anime') && (temps.length || (tmdbArcos && tmdbArcos.seasons && tmdbArcos.seasons.length)))
       ? '<section class="seasons"><h2>Temporadas y capítulos</h2>' +
