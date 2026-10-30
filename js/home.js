@@ -227,7 +227,7 @@
     var html = "";
     html +=
       '<section class="hero" style="background-image:url(' +
-      esc(heroBg) +
+      esc(/^https?:\/\//i.test(heroBg) ? encodeURI(heroBg).replace(/[()'"]/g, encodeURIComponent) : "") +
       ')"><div><small>EN EL CATÁLOGO</small><h1>' +
       esc(heroTitle) +
       "</h1><div class=\"meta\">" +

@@ -10,15 +10,8 @@ export const config = {
 };
 
 export default async function handler(request) {
-  const cors = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Accept, Content-Type',
-  };
-
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: cors });
-  }
+  // Solo se usa desde el mismo origen, así que no se habilita CORS abierto.
+  const cors = {};
   if (request.method !== 'GET') {
     return Response.json({ error: 'Method not allowed' }, { status: 405, headers: cors });
   }
@@ -50,7 +43,7 @@ export default async function handler(request) {
     const target = new URL('https://api.themoviedb.org/3' + path);
     target.searchParams.set('api_key', key);
     url.searchParams.forEach((v, k) => {
-      if (k === 'path') return;
+      if (k === 'path' || k === 'api_key') return; // la key nunca viene del cliente
       if (v) target.searchParams.set(k, v);
     });
     if (!target.searchParams.get('language')) {

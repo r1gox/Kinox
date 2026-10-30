@@ -924,7 +924,7 @@ async function loadDetailFromWorker(type, params) {
                 '<img src="' +
                 imgB +
                 'w92' +
-                p.logo_path +
+                esc(p.logo_path) +
                 '" title="' +
                 esc(p.provider_name) +
                 '" alt="' +
@@ -1599,11 +1599,11 @@ async function loadDetail(type) {
         : '') +
       '<a class="kx-back det-back" href="javascript:history.back()">← Volver</a>' +
       '<div class="dw">' +
-      (x.poster_path ? '<img class="pos" src="' + IMG + 'w500' + x.poster_path + '" alt="Póster de ' + esc(it.title) + '">' : '') +
+      (x.poster_path ? '<img class="pos" src="' + IMG + 'w500' + esc(x.poster_path) + '" alt="Póster de ' + esc(it.title) + '">' : '') +
       '<div class="info"><h1>' +
       esc(it.title) +
       '</h1><div class="meta">' +
-      it.year +
+      esc(it.year) +
       ' · <span class="r">★ ' +
       it.rating.toFixed(1) +
       '</span>' +

@@ -1,5 +1,19 @@
 {
-  "name": "kinox",
+  "name": "moviezone",
   "private": true,
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "description": "Catálogo de películas, series y anime (sitio estático para Vercel con proxy TMDB)",
+  "scripts": {
+    "dev": "vercel dev",
+    "test": "node --test tests/*.test.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10"
+  }
 }
