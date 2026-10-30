@@ -15,6 +15,28 @@
     let items = Array.isArray(data.results) ? data.results : Array.isArray(data) ? data : [];
     if (typeof preferAnimeSource === 'function') items = preferAnimeSource(items);
 
+    // Un solo resultado por slug (mismo título suele venir de varias fuentes: 4, 9, etc.)
+    // Tras preferAnimeSource se conserva el primero = fuente prioritaria.
+    (function dedupeBySlug() {
+      var seen = Object.create(null);
+      var out = [];
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        var slug = String(it.slug || '').toLowerCase().trim();
+        if (!slug && typeof slugify === 'function') {
+          slug = slugify(it.title || it.titulo || '');
+        }
+        if (!slug) {
+          out.push(it);
+          continue;
+        }
+        if (seen[slug]) continue;
+        seen[slug] = true;
+        out.push(it);
+      }
+      items = out;
+    })();
+
     // Enriquecer con id TMDB (nombres anime suelen diferir → cleanAnimeTitle + original)
     if (typeof resolveTmdbIdForTitle === 'function' && KEY) {
       items = await Promise.all(
