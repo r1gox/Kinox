@@ -53,7 +53,7 @@ El workflow `.github/workflows/ci.yml` ejecuta lint y pruebas en cada push y pul
 
 ## Cuenta y sincronización (Supabase, opcional)
 
-Sin cuenta, todo se guarda en el navegador. Con cuenta, los perfiles, favoritos, historial y episodios vistos se sincronizan entre dispositivos.
+Sin cuenta, todo se guarda en el navegador (en Perfil aparece una tarjeta para crear cuenta). Con cuenta, los perfiles, favoritos, historial y episodios vistos se sincronizan entre dispositivos.
 
 1. **Crea la tabla**: en Supabase abre *SQL Editor*, pega `supabase/schema.sql` y ejecútalo. Activa RLS: cada usuario solo accede a su fila.
 2. **Copia tus claves**: *Project Settings → API*. Necesitas la **Project URL** y la clave **anon / public**.
@@ -65,3 +65,9 @@ Sin cuenta, todo se guarda en el navegador. Con cuenta, los perfiles, favoritos,
 6. Despliega y abre `/cuenta`.
 
 Notas: el sistema es "gana lo último que guardaste" (no fusiona cambios hechos a la vez en dos dispositivos). La librería `@supabase/supabase-js` está incluida en `js/vendor/` para no depender de un CDN.
+
+### Perfiles
+
+La pantalla `/perfil` funciona como "¿Quién está viendo?": hasta 5 perfiles con nombre, avatar (16 incluidos) o foto propia (se reduce a 192 px en el navegador). Los perfiles, avatares y fotos se sincronizan con la cuenta; el perfil activo es propio de cada dispositivo.
+
+Al iniciar sesión la sincronización es automática: si la cuenta ya tenía datos y este dispositivo también, se combinan (favoritos, historial, perfiles y episodios vistos) sin borrar nada de ninguno de los dos lados.

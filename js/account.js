@@ -1,7 +1,7 @@
 /* Página de cuenta: registro, inicio de sesión, recuperar contraseña y estado de sincronización. */
 (function () {
   var view = document.getElementById('view');
-  var mode = 'login'; // login | register | recover | reset
+  var mode = /[?&]modo=registro/.test(location.search) ? 'register' : 'login'; // login | register | recover | reset
   var cloud = null;
   // El enlace del correo llega con #...type=recovery; supabase-js limpia el hash al leerlo.
   var isRecovery = /type=recovery/.test(location.hash);
@@ -104,7 +104,17 @@
         mode = 'login';
       }
       cloud.user = (await auth.getSession()).data.session?.user || null;
-      if (cloud.user) { await cloud.pull({ reload: false }); render(); }
+      if (cloud.user) {
+        say('Sincronizando tus datos…');
+        try {
+          await cloud.pull({ reload: false });
+        } catch (e) {
+          render();
+          return say('Iniciaste sesión, pero no se pudo sincronizar: ' + friendly(e), true);
+        }
+        say('¡Listo! Ahora elige tu perfil…');
+        setTimeout(function () { location.href = pageHref('perfil.html'); }, 800);
+      }
     } catch (e) {
       go.disabled = false;
       say(friendly(e), true);
@@ -158,8 +168,7 @@
 
   async function start() {
     view.innerHTML = '<div class="load is-loading" role="status">Cargando cuenta…</div>';
-    if (!window.mzCloud) await new Promise(function (r) { document.addEventListener('mz:cloud-loaded', r, { once: true }); setTimeout(r, 4000); });
-    cloud = window.mzCloud;
+    cloud = await mzCloudLoaded();
     if (!cloud || !cloud.configured) return renderNotConfigured();
     try { await cloud.ready; } catch (e) { return frame('<p class="ac-note">' + esc(friendly(e)) + '</p>'); }
     document.addEventListener('mz:auth', function (ev) {

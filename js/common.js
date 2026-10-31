@@ -353,7 +353,7 @@ function workerCard(it){
 function rowHtml(t,items){return items?.length?`<section class="row"><h2>${esc(t)}</h2><div class="track">${items.map(card).join('')}</div></section>`:''}
 function list(res,type){return (res.results||[]).filter(x=>x.poster_path&&x.media_type!=='person').map(x=>norm(x,type))}
 function nav(){
-  $('#top').innerHTML=`<a class="logo" href="${appLink('/')}" >Movie<span>Zone</span></a><nav><a data-section="inicio" href="${appLink('/')}" >Inicio</a><a data-section="peliculas" href="${appLink('/peliculas')}">Películas</a><a data-section="series" href="${appLink('/series')}">Series</a><a data-section="anime" href="${appLink('/anime')}">Anime</a><a data-section="jk" href="${appLink('/jk')}">JK</a><a data-section="favoritos" href="${appLink('/favoritos')}">Favoritos</a><a data-section="historial" href="${appLink('/historial')}">Historial</a></nav><form id="sf"><input id="q" type="search" placeholder="Buscar…" aria-label="Buscar"></form><a id="prof" href="${appLink('/perfil')}" aria-label="Perfil">${esc((profiles.find(p=>p.id===pid)||profiles[0]).name[0].toUpperCase())}</a>`;
+  $('#top').innerHTML=`<a class="logo" href="${appLink('/')}" >Movie<span>Zone</span></a><nav><a data-section="inicio" href="${appLink('/')}" >Inicio</a><a data-section="peliculas" href="${appLink('/peliculas')}">Películas</a><a data-section="series" href="${appLink('/series')}">Series</a><a data-section="anime" href="${appLink('/anime')}">Anime</a><a data-section="jk" href="${appLink('/jk')}">JK</a><a data-section="favoritos" href="${appLink('/favoritos')}">Favoritos</a><a data-section="historial" href="${appLink('/historial')}">Historial</a></nav><form id="sf"><input id="q" type="search" placeholder="Buscar…" aria-label="Buscar"></form><a id="prof" href="${appLink('/perfil')}" aria-label="Perfil">${mzAvatarHtml(profiles.find(p=>p.id===pid)||profiles[0])}</a>`;
   const path=location.pathname.toLowerCase();
   let active='';
   if(path.includes('peliculas')||path.includes('detalle-pelicula')) active='peliculas';
@@ -581,7 +581,7 @@ function mzBackupParse(text) {
     var origSet = store.set;
     store.set = function (k, v) {
       origSet.call(store, k, v);
-      if (typeof k === 'string' && mzBackupKeyOk(k) && window.mzCloud && window.mzCloud.schedulePush) window.mzCloud.schedulePush();
+      if (typeof k === 'string' && k !== 'mz_pid' && mzBackupKeyOk(k) && window.mzCloud && window.mzCloud.schedulePush) window.mzCloud.schedulePush();
     };
     var cs = document.currentScript;
     if (cs && cs.src) {
@@ -592,3 +592,125 @@ function mzBackupParse(text) {
     }
   } catch (e) { /* sin cuenta: la app funciona igual */ }
 })();
+
+
+/* ---------------------------------------------------------------------
+   Perfiles: avatares, foto y saneamiento (los datos pueden venir de la nube)
+   --------------------------------------------------------------------- */
+function mzAvatars() {
+  return [
+    { id: 'fox', e: '🦊', a: '#ff8a3d', b: '#e5384f' }, { id: 'panda', e: '🐼', a: '#5b6b7f', b: '#1f2a3a' },
+    { id: 'tiger', e: '🐯', a: '#ffb02e', b: '#e8590c' }, { id: 'frog', e: '🐸', a: '#7ed957', b: '#1b9e5a' },
+    { id: 'lion', e: '🦁', a: '#ffd23f', b: '#f08a24' }, { id: 'octopus', e: '🐙', a: '#c46bff', b: '#6a3df0' },
+    { id: 'unicorn', e: '🦄', a: '#ff9ad5', b: '#8e7bff' }, { id: 'penguin', e: '🐧', a: '#4ac3ff', b: '#2b59ff' },
+    { id: 'robot', e: '🤖', a: '#8fa3b8', b: '#3b4a5e' }, { id: 'alien', e: '👽', a: '#6dffb1', b: '#0e9f8a' },
+    { id: 'pumpkin', e: '🎃', a: '#ff9f1c', b: '#b5390b' }, { id: 'cactus', e: '🌵', a: '#9be564', b: '#2f8f4e' },
+    { id: 'popcorn', e: '🍿', a: '#ff6b6b', b: '#c0245c' }, { id: 'clapper', e: '🎬', a: '#4a4e69', b: '#14141f' },
+    { id: 'rocket', e: '🚀', a: '#7b61ff', b: '#e54dbd' }, { id: 'moon', e: '🌙', a: '#3a2c7a', b: '#0f1b4d' },
+  ];
+}
+function mzAvatarDef(id) {
+  var l = mzAvatars();
+  for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+  return null;
+}
+// Solo fotos pequeñas en data URL (la app las genera ya reducidas).
+function mzSafePhoto(s) {
+  return typeof s === 'string' && s.length <= 70000 && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(s) ? s : '';
+}
+function mzProfileClean(p) {
+  if (!p || typeof p !== 'object') return null;
+  var id = String(p.id == null ? '' : p.id);
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) return null;
+  var name = String(p.name == null ? '' : p.name).replace(/\p{Cc}/gu, '').trim().slice(0, 16) || 'Perfil';
+  var av = mzAvatarDef(p.avatar);
+  return { id: id, name: name, avatar: av ? av.id : '', photo: mzSafePhoto(p.photo) };
+}
+function mzAvatarHtml(p, cls) {
+  p = p || {};
+  var photo = mzSafePhoto(p.photo), def = mzAvatarDef(p.avatar), name = String(p.name || '?');
+  var inner, style = '';
+  if (photo) inner = '<img src="' + esc(photo) + '" alt="">';
+  else if (def) { inner = esc(def.e); style = ' style="--g1:' + def.a + ';--g2:' + def.b + '"'; }
+  else inner = esc((Array.from(name)[0] || '?').toUpperCase());
+  return '<span class="av' + (cls ? ' ' + esc(cls) : '') + '" aria-hidden="true"' + style + '>' + inner + '</span>';
+}
+
+/* Combina los datos locales con los de la nube la PRIMERA vez que se sincroniza
+   un dispositivo que ya tenía datos (sin borrar nada de ninguno de los dos lados). */
+function mzMergeData(local, remote) {
+  local = local || {};
+  remote = remote || {};
+  var BAD = { __proto__: 1, constructor: 1, prototype: 1 };
+  function parse(s) { if (typeof s !== 'string') return undefined; try { return JSON.parse(s); } catch (e) { return undefined; } }
+  function unionBy(arr, keyFn) {
+    var seen = Object.create(null), out = [];
+    arr.forEach(function (x) {
+      if (!x || typeof x !== 'object') return;
+      var k = keyFn(x);
+      if (k in seen) return;
+      seen[k] = 1;
+      out.push(x);
+    });
+    return out;
+  }
+  var out = {};
+  var keys = Object.create(null);
+  Object.keys(local).concat(Object.keys(remote)).forEach(function (k) { if (!(k in BAD)) keys[k] = 1; });
+  Object.keys(keys).forEach(function (k) {
+    var a = parse(local[k]), b = parse(remote[k]);
+    if (a === undefined) { if (b !== undefined) out[k] = remote[k]; return; }
+    if (b === undefined) { out[k] = local[k]; return; }
+    var m;
+    if (k === 'mz_profiles' && Array.isArray(a) && Array.isArray(b)) {
+      m = unionBy(b.concat(a), function (p) { return p.id; }).slice(0, 8);
+    } else if (/_(favs|hist)$/.test(k) && Array.isArray(a) && Array.isArray(b)) {
+      m = unionBy(a.concat(b), function (x) { return x.type + ':' + x.id; });
+      if (/_hist$/.test(k)) m = m.slice(0, 40);
+    } else if (/_seen$/.test(k) && a && b && typeof a === 'object' && typeof b === 'object') {
+      m = Object.create(null);
+      [a, b].forEach(function (src) {
+        Object.keys(src).forEach(function (t) {
+          if (t in BAD || !Array.isArray(src[t])) return;
+          m[t] = unionBy((m[t] || []).concat(src[t]).map(function (v) { return { id: String(v) }; }), function (x) { return x.id; }).map(function (x) { return x.id; });
+        });
+      });
+    } else if (/_last$/.test(k) && a && b && typeof a === 'object' && typeof b === 'object') {
+      m = Object.create(null);
+      [b, a].forEach(function (src) {
+        Object.keys(src).forEach(function (t) {
+          if (t in BAD || !src[t] || typeof src[t] !== 'object') return;
+          if (!m[t] || Number(src[t].ts || 0) > Number(m[t].ts || 0)) m[t] = src[t];
+        });
+      });
+    } else {
+      m = b; // el resto: manda lo de la nube
+    }
+    out[k] = JSON.stringify(m);
+  });
+  return out;
+}
+
+
+/* ---------------------------------------------------------------------
+   Utilidades de cuenta: esperar a que cloud.js sepa si hay cuenta, y "hace X"
+   --------------------------------------------------------------------- */
+function mzCloudLoaded() {
+  return new Promise(function (res) {
+    if (window.mzCloud && window.mzCloud.loaded) return window.mzCloud.loaded.then(function () { res(window.mzCloud); });
+    var done = false;
+    function fin() { if (!done) { done = true; res(window.mzCloud || null); } }
+    document.addEventListener('mz:cloud-loaded', fin, { once: true });
+    setTimeout(fin, 4000);
+  });
+}
+function mzTimeAgo(iso, now) {
+  var t = Date.parse(iso);
+  if (!t) return '';
+  var s = Math.max(0, Math.round(((now == null ? Date.now() : now) - t) / 1000));
+  if (s < 45) return 'hace unos segundos';
+  if (s < 3600) return 'hace ' + Math.round(s / 60) + ' min';
+  if (s < 86400) return 'hace ' + Math.round(s / 3600) + ' h';
+  if (s < 86400 * 7) return 'hace ' + Math.round(s / 86400) + ' d';
+  return new Date(t).toLocaleDateString('es');
+}

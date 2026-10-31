@@ -45,3 +45,35 @@ test('config.js no trae claves reales ni la service_role', () => {
     assert.doesNotMatch(read(f), /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\./, `JWT en ${f}`);
   }
 });
+
+test('mzTimeAgo() da tiempos relativos legibles', () => {
+  const { mzTimeAgo } = load(['js/common.js'], 'this.__a = { mzTimeAgo };').__a;
+  const now = Date.parse('2026-10-30T12:00:00Z');
+  assert.equal(mzTimeAgo('2026-10-30T11:59:50Z', now), 'hace unos segundos');
+  assert.equal(mzTimeAgo('2026-10-30T11:50:00Z', now), 'hace 10 min');
+  assert.equal(mzTimeAgo('2026-10-30T09:00:00Z', now), 'hace 3 h');
+  assert.equal(mzTimeAgo('2026-10-28T12:00:00Z', now), 'hace 2 d');
+  assert.equal(mzTimeAgo('no es fecha', now), '');
+});
+
+test('la pantalla de perfil ya no ofrece exportar/importar y usa la tarjeta de cuenta', () => {
+  const html = read('pages/perfil.html');
+  assert.doesNotMatch(html, /backup\.js/);
+  assert.match(html, /sync-card\.js/);
+  assert.equal(fs.existsSync(path.join(__dirname, '..', 'js/backup.js')), false);
+  assert.doesNotMatch(read('js/sync-card.js'), /Exportar|Importar/);
+});
+
+test('la tarjeta de cuenta escapa el correo del usuario', () => {
+  const src = read('js/sync-card.js');
+  assert.match(src, /esc\(user\.email/);
+  assert.match(src, /esc\(name \? name/);
+});
+
+test('la tarjeta de cuenta se pinta al instante, sin esperar a la nube', () => {
+  const src = read('js/sync-card.js');
+  const first = src.indexOf('host.innerHTML = hasStoredSession()');
+  assert.ok(first > 0);
+  assert.ok(first < src.indexOf('await mzCloudLoaded()'), 'debe pintarse antes de esperar');
+  assert.match(src, /aún no está configurada/);
+});
