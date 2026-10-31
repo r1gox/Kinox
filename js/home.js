@@ -4,9 +4,13 @@
  */
 (async () => {
   try {
-    if (typeof ensureTmdbReady === "function") {
-      try { await ensureTmdbReady(); } catch (_) {}
-    }
+    // Pantalla de carga inmediata (antes quedaba en negro hasta que terminaba todo).
+    var viewEl = document.getElementById("view");
+    if (viewEl) viewEl.innerHTML = '<div class="load is-loading" role="status" aria-live="polite">Cargando catálogo…</div>';
+    // TMDB se prepara en segundo plano: ya no bloquea el primer pintado.
+    var tmdbReady = typeof ensureTmdbReady === "function"
+      ? Promise.resolve().then(ensureTmdbReady).catch(function () {})
+      : Promise.resolve();
 
     var WORKER =
       (typeof MZ_WORKER !== "undefined" && MZ_WORKER) ||
@@ -146,24 +150,15 @@
       );
     }
 
-    // Cargar en paralelo lo que SÍ tiene el worker
-    var settled = await Promise.allSettled([
-      workerGet("/" + SID + "/peliculas?page=1"),
-      workerGet("/" + SID + "/series?page=1"),
-      workerGet("/4/home"),
-      workerGet("/" + SID_FALLBACK + "/peliculas?page=1"),
-      workerGet("/" + SID_FALLBACK + "/series?page=1"),
-    ]);
-    // Log en consola para depurar móvil
+    // Todo se pide en paralelo desde el principio (páginas 2 incluidas); se pinta en cuanto llega lo esencial.
+    var pPelis = workerGet("/" + SID + "/peliculas?page=1");
+    var pSeries = workerGet("/" + SID + "/series?page=1");
+    var pAnime = workerGet("/4/home");
+    var pMoreP = workerGet("/" + SID + "/peliculas?page=2").catch(function () { return null; });
+    var pMoreS = workerGet("/" + SID + "/series?page=2").catch(function () { return null; });
+    var settled = await Promise.allSettled([pPelis, pSeries, pAnime]);
     try {
-      console.log(
-        "[Kinox home] worker",
-        WORKER,
-        "ok",
-        settled.map(function (s, i) {
-          return i + ":" + s.status;
-        }).join(" ")
-      );
+      console.log("[Kinox home] worker", WORKER, "ok", settled.map(function (x, i) { return i + ":" + x.status; }).join(" "));
     } catch (_) {}
 
     function ok(i) {
@@ -176,8 +171,15 @@
     var animeAgregados = Array.isArray(animeHome.agregados) ? animeHome.agregados : [];
     var animeRecientes = Array.isArray(animeHome.recientes) ? animeHome.recientes : [];
 
-    if (!pelis.length) pelis = pickList(ok(3));
-    if (!series.length) series = pickList(ok(4));
+    // Respaldo (fuente 3) solo cuando la principal no trajo nada.
+    if (!pelis.length || !series.length) {
+      var fb = await Promise.allSettled([
+        pelis.length ? Promise.resolve(null) : workerGet("/" + SID_FALLBACK + "/peliculas?page=1"),
+        series.length ? Promise.resolve(null) : workerGet("/" + SID_FALLBACK + "/series?page=1"),
+      ]);
+      if (!pelis.length && fb[0].status === "fulfilled") pelis = pickList(fb[0].value);
+      if (!series.length && fb[1].status === "fulfilled") series = pickList(fb[1].value);
+    }
 
     // Mezcla para hero: priorizar ítems con portada del catálogo
     var pool = []
@@ -201,24 +203,6 @@
     var heroOverview =
       (heroItem && (heroItem.descripcion || heroItem.overview || heroItem.sinopsis)) ||
       "Títulos disponibles en el catálogo.";
-
-    // Intentar backdrop TMDB solo para el hero (opcional, no bloquea)
-    if (KEY && heroItem && typeof tmdb === "function") {
-      try {
-        var q = heroItem.title || heroItem.titulo || "";
-        var kind = isMovieItem(heroItem) && !isAnimeItem(heroItem) ? "movie" : "tv";
-        if (q) {
-          var sr = await tmdb("/search/" + kind, { query: q });
-          var hit = (sr.results || [])[0];
-          if (hit && hit.backdrop_path) {
-            heroBg = (typeof IMG !== "undefined" ? IMG : "https://image.tmdb.org/t/p/") + "original" + hit.backdrop_path;
-          }
-          if (hit && hit.overview && (!heroOverview || heroOverview === "Títulos disponibles en el catálogo.")) {
-            heroOverview = hit.overview;
-          }
-        }
-      } catch (_) {}
-    }
 
     // Filas locales (historial / favoritos) siguen con card TMDB si tienen id
     var cont = typeof hist === "function" ? hist().slice(0, 15) : [];
@@ -258,16 +242,6 @@
       html += rowWorker("Episodios recientes (anime)", animeRecientes);
     }
 
-    // Segunda página de pelis/series como “más” (también del worker)
-    try {
-      var moreP = await workerGet("/" + SID + "/peliculas?page=2");
-      var moreS = await workerGet("/" + SID + "/series?page=2");
-      var mp = pickList(moreP);
-      var ms = pickList(moreS);
-      if (mp.length) html += rowWorker("Más películas", mp);
-      if (ms.length) html += rowWorker("Más series", ms);
-    } catch (_) {}
-
     if (!pelis.length && !series.length && !animeAgregados.length) {
       html +=
         '<div class="load">No se pudo cargar el catálogo del worker.<br>' +
@@ -275,12 +249,40 @@
         '<button type="button" class="btn" style="margin-top:14px" onclick="location.reload()">Reintentar</button></div>';
     }
 
-    if (typeof $ === "function" && $("#view")) {
-      $("#view").innerHTML = html;
-    } else {
+    var target = document.getElementById("view");
+    if (target) target.innerHTML = html;
+
+    // ---- Lo siguiente completa la página sin bloquearla ----
+    // Segunda página: se agrega cuando llega.
+    Promise.all([pMoreP, pMoreS]).then(function (res) {
+      var mp = pickList(res[0]);
+      var ms = pickList(res[1]);
+      var extra = "";
+      if (mp.length) extra += rowWorker("Más películas", mp);
+      if (ms.length) extra += rowWorker("Más series", ms);
       var v = document.getElementById("view");
-      if (v) v.innerHTML = html;
-    }
+      if (extra && v) v.insertAdjacentHTML("beforeend", extra);
+    }).catch(function () {});
+
+    // Fondo y sinopsis del hero desde TMDB (opcional).
+    tmdbReady.then(async function () {
+      if (!(typeof KEY !== "undefined" && KEY && heroItem && typeof tmdb === "function")) return;
+      var q = heroItem.title || heroItem.titulo || "";
+      if (!q) return;
+      var kind = isMovieItem(heroItem) && !isAnimeItem(heroItem) ? "movie" : "tv";
+      var sr = await tmdb("/search/" + kind, { query: q });
+      var hit = (sr.results || [])[0];
+      var hero = document.querySelector("#view .hero");
+      if (!hit || !hero) return;
+      if (hit.backdrop_path) {
+        var u = (typeof IMG !== "undefined" ? IMG : "https://image.tmdb.org/t/p/") + "original" + hit.backdrop_path;
+        if (/^https?:\/\//i.test(u)) hero.style.backgroundImage = "url(" + encodeURI(u).replace(/[()'"]/g, encodeURIComponent) + ")";
+      }
+      var p = hero.querySelector("p");
+      if (p && hit.overview && (!heroOverview || heroOverview === "Títulos disponibles en el catálogo.")) {
+        p.textContent = String(hit.overview).slice(0, 220);
+      }
+    }).catch(function () {});
   } catch (e) {
     var msg = (e && e.message) || String(e);
     var errHtml =

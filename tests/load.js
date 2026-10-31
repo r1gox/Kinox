@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const path = require('node:path');
 
-function load(files, extra = '') {
+function load(files, extra = '', overrides = {}) {
   const noop = () => {};
   const el = new Proxy(function () {}, {
     get: (_, k) => (k === Symbol.toPrimitive ? () => '' : el),
@@ -21,6 +21,7 @@ function load(files, extra = '') {
     matchMedia: () => ({ matches: false, addEventListener: noop }),
     addEventListener: noop, removeEventListener: noop, requestAnimationFrame: noop,
   };
+  Object.assign(ctx, overrides);
   ctx.window = ctx;
   vm.createContext(ctx);
   for (const f of files) {

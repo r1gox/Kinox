@@ -4,7 +4,7 @@ const { load } = require('./load.js');
 
 let ctx;
 try {
-  ctx = load(['js/common.js', 'js/worker.js', 'js/detail.js'], 'this.__t = { mzCastRow, mzRecommendedRow };');
+  ctx = load(['js/common.js', 'js/worker.js', 'js/detail.js'], 'this.__t = { mzCastRow };');
 } catch (e) {
   ctx = null;
   console.error('No se pudo cargar detail.js en el sandbox:', e.message);
@@ -32,7 +32,9 @@ test('mzCastRow() limita a 20 personas', () => {
   assert.equal(n, 20);
 });
 
-test('mzRecommendedRow() ignora títulos sin póster y devuelve vacío si no hay nada', () => {
-  assert.equal(ctx.__t.mzRecommendedRow({}, 'movie'), '');
-  assert.equal(ctx.__t.mzRecommendedRow({ recommendations: { results: [{ id: 1, title: 'x' }] } }, 'movie'), '');
+test('las recomendaciones salen solo del catálogo: no se piden ni se muestran las de TMDB', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'js/detail.js'), 'utf8');
+  assert.doesNotMatch(src, /recommendations/);
+  assert.doesNotMatch(src, /mzRecommendedRow/);
+  assert.match(src, /rowWorkerSimilar\('Recomendaciones'/);
 });

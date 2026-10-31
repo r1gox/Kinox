@@ -365,7 +365,7 @@ function rowWorkerSimilar(label, items) {
     .join('');
   return (
     '<section class="row"><h2>' +
-    esc(label || 'Títulos similares') +
+    esc(label || 'Recomendaciones') +
     '</h2><div class="track">' +
     cards +
     '</div></section>'
@@ -1056,7 +1056,7 @@ async function loadDetailFromWorker(type, params) {
   // Similares desde la misma fuente del worker
   try {
     var simW = await fetchWorkerSimilar(hit, type === 'anime' ? 'anime' : type);
-    var htmlSimW = rowWorkerSimilar('Títulos similares', simW);
+    var htmlSimW = rowWorkerSimilar('Recomendaciones', simW);
     if (htmlSimW) {
       var viewW = document.getElementById('view');
       if (viewW) viewW.insertAdjacentHTML('beforeend', htmlSimW);
@@ -1524,7 +1524,7 @@ async function loadDetail(type) {
     }
     if (!KEY) throw Error('TMDB no disponible (revisa /api/tmdb en Vercel)');
     if (!id) throw Error('Falta el ID del título');
-    var x = await tmdb('/' + type + '/' + id, { append_to_response: 'videos,watch/providers,credits,recommendations' });
+    var x = await tmdb('/' + type + '/' + id, { append_to_response: 'videos,watch/providers,credits' });
     var it = norm(x, type);
     document.title = it.title + ' — Kinox';
     store.set(pk('hist'), [it].concat(hist().filter(function (h) { return !(h.id === it.id && h.type === type); })).slice(0, 40));
@@ -1649,8 +1649,7 @@ async function loadDetail(type) {
           }).join('') +
           '</select><div id="eps"></div></section>'
         : '') +
-      mzCastRow(x) +
-      mzRecommendedRow(x, type);
+      mzCastRow(x);
 
     $('#favBtn').onclick = function () {
       var a = favs();
@@ -1661,7 +1660,7 @@ async function loadDetail(type) {
       $('#favBtn').classList.toggle('on', !has);
     };
 
-    // Títulos similares: misma fuente del worker (no TMDB)
+    // Recomendaciones: solo títulos del catálogo (no de TMDB)
     (async function () {
       try {
         var baseHit = hit || {
@@ -1672,7 +1671,7 @@ async function loadDetail(type) {
         if (!baseHit.slug && params.get('slug')) baseHit.slug = params.get('slug');
         if (!baseHit.source_id && params.get('source_id')) baseHit.source_id = params.get('source_id');
         var sim = await fetchWorkerSimilar(baseHit, type === 'anime' ? 'anime' : type);
-        var htmlSim = rowWorkerSimilar('Títulos similares', sim);
+        var htmlSim = rowWorkerSimilar('Recomendaciones', sim);
         if (htmlSim) {
           var view = document.getElementById('view');
           if (view) view.insertAdjacentHTML('beforeend', htmlSim);
@@ -1761,7 +1760,7 @@ async function loadDetail(type) {
 
 
 /* ---------------------------------------------------------------------
-   Reparto y recomendaciones (datos de TMDB) + "Ver más" en la sinopsis
+   Reparto (datos de TMDB) + "Ver más" en la sinopsis
    --------------------------------------------------------------------- */
 function mzCastRow(x) {
   var cast = ((x && x.credits && x.credits.cast) || []).slice(0, 20);
@@ -1785,14 +1784,6 @@ function mzCastRow(x) {
       .join('') +
     '</div></section>'
   );
-}
-
-function mzRecommendedRow(x, type) {
-  var list = ((x && x.recommendations && x.recommendations.results) || [])
-    .filter(function (r) { return r && r.poster_path; })
-    .slice(0, 18)
-    .map(function (r) { return norm(r, type === 'anime' ? 'tv' : type); });
-  return typeof rowHtml === 'function' ? rowHtml('Recomendaciones', list) : '';
 }
 
 // Sinopsis larga: se muestra recortada con botón "Ver más / Ver menos".
