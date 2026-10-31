@@ -19,7 +19,7 @@ const shared = {
 };
 
 module.exports = [
-  { ignores: ['node_modules/**', '.vercel/**'] },
+  { ignores: ['node_modules/**', '.vercel/**', 'js/vendor/**'] },
   js.configs.recommended,
   {
     files: ['js/**/*.js'],

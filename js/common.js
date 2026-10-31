@@ -441,3 +441,154 @@ function keyPage(){const v=$('#view');v.innerHTML=`<section class="page" style="
 nav();
 
 /* mobile-ui.js desactivado: sobrescribía iconos SVG de la barra inferior */
+
+
+/* ---------------------------------------------------------------------
+   Progreso: episodios vistos, último episodio abierto y gestión de listas
+   (todo por perfil, en localStorage; no toca la reproducción)
+   --------------------------------------------------------------------- */
+function mzSeenMap() { return store.get(pk('seen'), {}); }
+function mzIsSeen(tvKey, s, e) {
+  var m = mzSeenMap()[tvKey];
+  return !!(m && m.indexOf(s + 'x' + e) !== -1);
+}
+function mzSetSeenMany(tvKey, keys, on) {
+  var all = mzSeenMap();
+  var cur = (all[tvKey] || []).filter(function (k) { return keys.indexOf(k) === -1; });
+  all[tvKey] = on ? cur.concat(keys) : cur;
+  if (!all[tvKey].length) delete all[tvKey];
+  store.set(pk('seen'), all);
+}
+function mzSetLast(tvKey, data) {
+  var all = store.get(pk('last'), {});
+  all[tvKey] = data;
+  store.set(pk('last'), all);
+}
+function mzGetLast(tvKey) { return store.get(pk('last'), {})[tvKey] || null; }
+// Solo enlaces internos: el valor viene de localStorage y podría estar manipulado.
+function mzSafeHref(h) {
+  h = String(h || '');
+  return /^(\/(?!\/)|\.\/|pages\/)/.test(h) ? h : '';
+}
+function mzSameItem(a, id, type) { return String(a.id) === String(id) && String(a.type) === String(type); }
+function mzHistRemove(id, type) { store.set(pk('hist'), hist().filter(function (h) { return !mzSameItem(h, id, type); })); }
+function mzFavRemove(id, type) { store.set(pk('favs'), favs().filter(function (h) { return !mzSameItem(h, id, type); })); }
+function mzHistClear() { store.set(pk('hist'), []); }
+function mzFavClear() { store.set(pk('favs'), []); }
+
+// "Continuar viendo": las series abren directo en el último episodio que abriste.
+function mzContinueItem(it) {
+  var last = it.type === 'tv' ? mzGetLast('tv' + it.id) : null;
+  var href = last ? mzSafeHref(last.href) : '';
+  var html = card(it);
+  if (href) html = html.replace(/href="[^"]*"/, 'href="' + esc(href) + '"');
+  var label = href ? '<span class="cont-label">T' + Number(last.s) + ' · E' + Number(last.e) + '</span>' : '';
+  return (
+    '<div class="cont-item" data-id="' + esc(it.id) + '" data-type="' + esc(it.type) + '">' +
+    html + label +
+    '<button type="button" class="cont-x" data-list="hist" aria-label="Quitar de continuar viendo">✕</button></div>'
+  );
+}
+function mzContinueRow(items) {
+  if (!items || !items.length) return '';
+  return '<section class="row cont-row"><h2>Continuar viendo</h2><div class="track">' + items.map(mzContinueItem).join('') + '</div></section>';
+}
+
+// Botón ✕ de "Continuar viendo" y de las listas guardadas
+document.addEventListener('click', function (ev) {
+  var b = ev.target && ev.target.closest ? ev.target.closest('.cont-x,.saved-x') : null;
+  if (!b) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  var box = b.closest('[data-id]');
+  if (!box) return;
+  var id = box.getAttribute('data-id'), type = box.getAttribute('data-type');
+  if (b.getAttribute('data-list') === 'favs') mzFavRemove(id, type); else mzHistRemove(id, type);
+  var sec = box.closest('section');
+  box.remove();
+  if (sec && sec.classList.contains('cont-row') && !sec.querySelector('[data-id]')) sec.remove();
+  document.dispatchEvent(new Event('mz:list-changed'));
+}, true);
+
+
+/* ---------------------------------------------------------------------
+   Errores con salida clara: mensaje legible, "Reintentar" e "Ir al inicio"
+   --------------------------------------------------------------------- */
+function mzFriendlyError(msg) {
+  var m = String(msg || '');
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'Parece que no tienes conexión a internet.';
+  if (/failed to fetch|networkerror|load failed|abort/i.test(m)) return 'No pudimos conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.';
+  return m || 'Ocurrió un error inesperado.';
+}
+function mzErrorHtml(msg, title) {
+  return (
+    '<div class="load mz-error" role="alert"><strong>' + esc(title || 'Algo salió mal') + '</strong>' +
+    '<span>' + esc(mzFriendlyError(msg)) + '</span>' +
+    '<div class="mz-error-actions"><button type="button" class="btn" data-mz-retry>Reintentar</button>' +
+    '<a class="btn alt" href="' + esc(appLink('/')) + '">Ir al inicio</a></div></div>'
+  );
+}
+document.addEventListener('click', function (ev) {
+  if (ev.target && ev.target.closest && ev.target.closest('[data-mz-retry]')) location.reload();
+});
+
+
+/* ---------------------------------------------------------------------
+   Copia de datos: construir y validar (usado por Perfil y por la sincronización)
+   --------------------------------------------------------------------- */
+var MZ_BACKUP_MAX = 2 * 1024 * 1024; // 2 MB por valor
+
+// Solo claves propias de la app; nunca la API key (mz_key) ni el marcador de sincronización.
+function mzBackupKeyOk(k) {
+  return /^mz_[A-Za-z0-9_]+$/.test(k) && k !== 'mz_key' && k !== 'mz_sync_at';
+}
+
+function mzBackupBuild(storage) {
+  var data = {};
+  for (var i = 0; i < storage.length; i++) {
+    var k = storage.key(i);
+    if (mzBackupKeyOk(k)) data[k] = storage.getItem(k);
+  }
+  return { app: 'moviezone', version: 1, exported: new Date().toISOString(), data: data };
+}
+
+// Devuelve { ok:true, data:{clave:valor} } o { ok:false, error:'...' }
+function mzBackupParse(text) {
+  var obj;
+  try { obj = JSON.parse(text); } catch (e) { return { ok: false, error: 'El archivo no es un JSON válido.' }; }
+  if (!obj || obj.app !== 'moviezone' || typeof obj.data !== 'object' || obj.data === null || Array.isArray(obj.data)) {
+    return { ok: false, error: 'Este archivo no parece una copia de MovieZone.' };
+  }
+  var out = {};
+  var keys = Object.keys(obj.data);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i], v = obj.data[k];
+    if (!mzBackupKeyOk(k)) continue; // se ignora lo que no sea nuestro
+    if (typeof v !== 'string' || v.length > MZ_BACKUP_MAX) return { ok: false, error: 'El archivo contiene datos inválidos (' + k + ').' };
+    try { JSON.parse(v); } catch (e) { return { ok: false, error: 'El archivo contiene datos dañados (' + k + ').' }; }
+    out[k] = v;
+  }
+  if (!Object.keys(out).length) return { ok: false, error: 'La copia está vacía.' };
+  return { ok: true, data: out };
+}
+
+
+/* ---------------------------------------------------------------------
+   Cuenta (opcional): carga cloud.js y sincroniza cuando cambian los datos
+   --------------------------------------------------------------------- */
+(function () {
+  try {
+    var origSet = store.set;
+    store.set = function (k, v) {
+      origSet.call(store, k, v);
+      if (typeof k === 'string' && mzBackupKeyOk(k) && window.mzCloud && window.mzCloud.schedulePush) window.mzCloud.schedulePush();
+    };
+    var cs = document.currentScript;
+    if (cs && cs.src) {
+      var s = document.createElement('script');
+      s.src = new URL('cloud.js?v=1', cs.src).href;
+      s.async = true;
+      document.head.appendChild(s);
+    }
+  } catch (e) { /* sin cuenta: la app funciona igual */ }
+})();

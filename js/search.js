@@ -61,6 +61,6 @@
       (items.length ? '<div class="grid">' + items.map(workerCard).join('') + '</div>' : '<div class="empty">No se encontraron resultados.</div>') +
       '</section>';
   } catch (e) {
-    $('#view').innerHTML = '<div class="load">' + esc(e.message) + '</div>';
+    $('#view').innerHTML = mzErrorHtml(e.message, 'No se pudo completar la búsqueda');
   }
 })();

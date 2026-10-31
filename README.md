@@ -50,3 +50,18 @@ npm run format   # Prettier (opcional; reformatea todo el repo)
 ```
 
 El workflow `.github/workflows/ci.yml` ejecuta lint y pruebas en cada push y pull request.
+
+## Cuenta y sincronización (Supabase, opcional)
+
+Sin cuenta, todo se guarda en el navegador. Con cuenta, los perfiles, favoritos, historial y episodios vistos se sincronizan entre dispositivos.
+
+1. **Crea la tabla**: en Supabase abre *SQL Editor*, pega `supabase/schema.sql` y ejecútalo. Activa RLS: cada usuario solo accede a su fila.
+2. **Copia tus claves**: *Project Settings → API*. Necesitas la **Project URL** y la clave **anon / public**.
+3. **Edita `js/config.js`** con esos dos valores. La anon key es pública por diseño; **nunca** pongas la `service_role`.
+4. **Autenticación**: *Authentication → URL Configuration*:
+   - *Site URL*: la URL de tu sitio en Vercel (por ejemplo `https://tu-sitio.vercel.app`).
+   - *Redirect URLs*: agrega `https://tu-sitio.vercel.app/pages/cuenta.html` y `https://tu-sitio.vercel.app/cuenta` (y `http://localhost:3000/**` para pruebas).
+5. **Correo de confirmación**: viene activado. Para probar rápido puedes desactivar *Confirm email* en *Authentication → Providers → Email*, pero en producción déjalo activo.
+6. Despliega y abre `/cuenta`.
+
+Notas: el sistema es "gana lo último que guardaste" (no fusiona cambios hechos a la vez en dos dispositivos). La librería `@supabase/supabase-js` está incluida en `js/vendor/` para no depender de un CDN.

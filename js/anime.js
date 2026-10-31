@@ -215,11 +215,11 @@
       '<section class="mz-cal-block">' +
       '<div class="mz-cal-head"><h2>Calendario / Recién emitidos</h2>' +
       '<button type="button" class="btn alt" id="mz-anime-refresh">Actualizar</button></div>' +
-      '<div class="mz-cal-row" id="mz-anime-recientes"><div class="load">Cargando…</div></div>' +
+      '<div class="mz-cal-row" id="mz-anime-recientes"><div class="load is-loading" role="status" aria-live="polite">Cargando…</div></div>' +
       "</section>" +
       '<section class="mz-agregados-block">' +
       "<h2>Recién agregados</h2>" +
-      '<div class="grid" id="mz-anime-agregados"><div class="load">Cargando…</div></div>' +
+      '<div class="grid" id="mz-anime-agregados"><div class="load is-loading" role="status" aria-live="polite">Cargando…</div></div>' +
       "</section>" +
       '<section class="mz-search-block">' +
       "<h2>Buscar en AnimeAV1</h2>" +
@@ -277,7 +277,7 @@
       box.innerHTML = "";
       return;
     }
-    box.innerHTML = '<div class="load">Buscando…</div>';
+    box.innerHTML = '<div class="load is-loading" role="status" aria-live="polite">Buscando…</div>';
     // Preferir buscador de fuente 4
     var path = "/4/buscar?q=" + encodeURIComponent(q);
     return workerGet(path)

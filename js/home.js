@@ -240,8 +240,8 @@
       esc(heroHref) +
       '">Más información</a></div></section>';
 
-    if (typeof rowHtml === "function" && cont.length) {
-      html += rowHtml("Continuar viendo", cont);
+    if (typeof mzContinueRow === "function" && cont.length) {
+      html += mzContinueRow(cont);
     }
     if (typeof rowHtml === "function" && lista.length) {
       html += rowHtml("Mi lista", lista);

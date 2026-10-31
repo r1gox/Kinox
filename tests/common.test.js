@@ -33,3 +33,11 @@ test('pageHref() codifica los parámetros', () => {
   assert.ok(!/["<>]/.test(href), 'no debe contener caracteres peligrosos sin codificar');
   assert.ok(!href.includes('vacio'), 'omite parámetros vacíos');
 });
+
+test('mzErrorHtml() escapa el mensaje y ofrece reintentar', () => {
+  const { mzErrorHtml } = load(['js/common.js'], 'this.__e = { mzErrorHtml };').__e;
+  const html = mzErrorHtml('<img src=x onerror=1>', 'Título');
+  assert.ok(!html.includes('<img'));
+  assert.match(html, /data-mz-retry/);
+  assert.match(html, /role="alert"/);
+});

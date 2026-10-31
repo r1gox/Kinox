@@ -575,7 +575,7 @@ async function loadDetailFromWorker(type, params) {
   var titleHint = params.title || slug.replace(/-/g, ' ');
   var portadaHint = params.portada || '';
 
-  $('#view').innerHTML = '<div class="load">Cargando detalle…</div>';
+  $('#view').innerHTML = '<div class="load is-loading" role="status" aria-live="polite">Cargando detalle…</div>';
   try {
     if (typeof ensureTmdbReady === 'function') await ensureTmdbReady();
   } catch (_) {}
@@ -1157,7 +1157,7 @@ async function loadDetailFromWorker(type, params) {
       });
       var cnt = (seasonMeta && parseInt(seasonMeta.episode_count, 10)) || 0;
 
-      epsBox.innerHTML = '<div class="load">Cargando episodios…</div>';
+      epsBox.innerHTML = '<div class="load is-loading" role="status" aria-live="polite">Cargando episodios…</div>';
       var byNum = await loadSeasonEps(sn);
       var nums = Object.keys(byNum)
         .map(function (k) {
@@ -1438,10 +1438,7 @@ if ((type === 'tv' || type === 'anime') && temps.length && !usedTmdbArcos) {
   } catch (e) {
     console.error('loadDetailFromWorker', e);
     var msg = (e && e.message) || String(e);
-    $('#view').innerHTML =
-      '<div class="load">No se pudo cargar el detalle.<br>' +
-      esc(msg) +
-      '<br><a class="btn" href="javascript:history.back()" style="margin-top:12px">Volver</a></div>';
+    $('#view').innerHTML = mzErrorHtml(msg, 'No se pudo cargar el detalle');
   }
 }
 
@@ -1527,7 +1524,7 @@ async function loadDetail(type) {
     }
     if (!KEY) throw Error('TMDB no disponible (revisa /api/tmdb en Vercel)');
     if (!id) throw Error('Falta el ID del título');
-    var x = await tmdb('/' + type + '/' + id, { append_to_response: 'videos,watch/providers' });
+    var x = await tmdb('/' + type + '/' + id, { append_to_response: 'videos,watch/providers,credits,recommendations' });
     var it = norm(x, type);
     document.title = it.title + ' — Kinox';
     store.set(pk('hist'), [it].concat(hist().filter(function (h) { return !(h.id === it.id && h.type === type); })).slice(0, 40));
@@ -1637,11 +1634,11 @@ async function loadDetail(type) {
       (provs.length
         ? '<div class="prov">' +
           provs.map(function (p) {
-            return '<img src="' + IMG + 'w92' + p.logo_path + '" title="' + esc(p.provider_name) + '" alt="' + esc(p.provider_name) + '">';
+            return '<img src="' + IMG + 'w92' + esc(p.logo_path) + '" loading="lazy" title="' + esc(p.provider_name) + '" alt="' + esc(p.provider_name) + '">';
           }).join('') +
           '</div>' +
           (mx.link
-            ? '<p style="margin-top:10px"><a style="color:var(--ac)" href="' + mx.link + '" target="_blank">Ver todas las opciones</a></p>'
+            ? '<p style="margin-top:10px"><a style="color:var(--ac)" href="' + esc(mx.link) + '" target="_blank" rel="noopener noreferrer">Ver todas las opciones</a></p>'
             : '')
         : '<p>No hay plataformas registradas en México.</p>') +
       '</div></div></section>' +
@@ -1652,7 +1649,8 @@ async function loadDetail(type) {
           }).join('') +
           '</select><div id="eps"></div></section>'
         : '') +
-      '' // similares worker se agregan abajo;
+      mzCastRow(x) +
+      mzRecommendedRow(x, type);
 
     $('#favBtn').onclick = function () {
       var a = favs();
@@ -1730,7 +1728,9 @@ async function loadDetail(type) {
             var epName = wk.titulo || e.name || ('Episodio ' + e.episode_number);
             var still = wk.back_img || (e.still_path ? IMG + 'w300' + e.still_path : '');
             return (
-              '<a class="ep" href="' +
+              '<a class="ep' + (mzIsSeen('tv' + id, e.season_number, e.episode_number) ? ' seen' : '') +
+              '" data-s="' + Number(e.season_number) + '" data-e="' + Number(e.episode_number) +
+              '" href="' +
               href +
               '">' +
               (still
@@ -1748,11 +1748,151 @@ async function loadDetail(type) {
             );
           })
           .join('');
+        mzEpisodeTools('tv' + id, eps);
       };
       $('#sel').onchange = go;
+      mzContinueButton('tv' + id);
       go();
     }
   } catch (e) {
-    $('#view').innerHTML = '<div class="load">' + esc(e.message) + '</div>';
+    $('#view').innerHTML = mzErrorHtml(e.message);
   }
+}
+
+
+/* ---------------------------------------------------------------------
+   Reparto y recomendaciones (datos de TMDB) + "Ver más" en la sinopsis
+   --------------------------------------------------------------------- */
+function mzCastRow(x) {
+  var cast = ((x && x.credits && x.credits.cast) || []).slice(0, 20);
+  if (!cast.length) return '';
+  return (
+    '<section class="row cast-row"><h2>Reparto</h2><div class="cast-track">' +
+    cast
+      .map(function (c) {
+        var name = String(c.name || '');
+        var photo = c.profile_path
+          ? '<img src="' + IMG + 'w185' + esc(c.profile_path) + '" alt="' + esc(name) + '" loading="lazy">'
+          : '<span class="cast-ph" aria-hidden="true">' + esc(name.charAt(0).toUpperCase()) + '</span>';
+        return (
+          '<div class="cast-card">' +
+          photo +
+          '<strong>' + esc(name) + '</strong>' +
+          (c.character ? '<small>' + esc(c.character) + '</small>' : '') +
+          '</div>'
+        );
+      })
+      .join('') +
+    '</div></section>'
+  );
+}
+
+function mzRecommendedRow(x, type) {
+  var list = ((x && x.recommendations && x.recommendations.results) || [])
+    .filter(function (r) { return r && r.poster_path; })
+    .slice(0, 18)
+    .map(function (r) { return norm(r, type === 'anime' ? 'tv' : type); });
+  return typeof rowHtml === 'function' ? rowHtml('Recomendaciones', list) : '';
+}
+
+// Sinopsis larga: se muestra recortada con botón "Ver más / Ver menos".
+function mzCollapseSynopsis(root) {
+  var heads = (root || document).querySelectorAll('.det .info > h3');
+  Array.prototype.forEach.call(heads, function (h) {
+    if (!/^sinopsis$/i.test((h.textContent || '').trim())) return;
+    var p = h.nextElementSibling;
+    if (!p || p.tagName !== 'P' || p.getAttribute('data-syn') === '1') return;
+    p.setAttribute('data-syn', '1');
+    if ((p.textContent || '').length < 220) return;
+    p.classList.add('syn', 'syn-clamp');
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'syn-toggle';
+    btn.setAttribute('aria-expanded', 'false');
+    btn.textContent = 'Ver más';
+    btn.addEventListener('click', function () {
+      var open = p.classList.toggle('syn-clamp') === false;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      btn.textContent = open ? 'Ver menos' : 'Ver más';
+    });
+    p.insertAdjacentElement('afterend', btn);
+    // Si al recortar el texto cabe completo, no hace falta el botón.
+    requestAnimationFrame(function () {
+      if (p.scrollHeight <= p.clientHeight + 2) {
+        p.classList.remove('syn', 'syn-clamp');
+        btn.remove();
+      }
+    });
+  });
+}
+
+(function () {
+  function start() {
+    var view = document.getElementById('view');
+    if (!view || typeof MutationObserver === 'undefined') return;
+    new MutationObserver(function () { mzCollapseSynopsis(view); }).observe(view, { childList: true, subtree: true });
+    mzCollapseSynopsis(view);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+
+
+/* ---------------------------------------------------------------------
+   Series: episodios vistos, "Continuar" y marcar temporada
+   --------------------------------------------------------------------- */
+function mzContinueButton(tvKey) {
+  var old = document.getElementById('btnContinue');
+  if (old) old.remove();
+  var last = mzGetLast(tvKey);
+  var href = last ? mzSafeHref(last.href) : '';
+  var box = document.querySelector('.det .btns');
+  if (!href || !box) return;
+  box.insertAdjacentHTML(
+    'afterbegin',
+    '<a id="btnContinue" class="btn" href="' + esc(href) + '">↺ Continuar T' + Number(last.s) + ' E' + Number(last.e) + '</a>'
+  );
+}
+
+function mzEpisodeTools(tvKey, eps) {
+  var list = document.getElementById('eps');
+  if (!list) return;
+  var keys = (eps || []).map(function (e) { return e.season_number + 'x' + e.episode_number; });
+
+  // Al abrir un episodio: se marca como visto y se recuerda como último.
+  if (!list.__mzWired) {
+    list.__mzWired = true;
+    list.addEventListener('click', function (ev) {
+      var a = ev.target && ev.target.closest ? ev.target.closest('a.ep') : null;
+      if (!a) return;
+      var s = Number(a.getAttribute('data-s')), e = Number(a.getAttribute('data-e'));
+      if (!s || !e) return;
+      mzSetSeenMany(tvKey, [s + 'x' + e], true);
+      mzSetLast(tvKey, { s: s, e: e, href: a.getAttribute('href'), ts: Date.now() });
+      a.classList.add('seen');
+    });
+  }
+
+  // Botón para marcar o desmarcar toda la temporada visible.
+  var tools = document.getElementById('seenTools');
+  if (!tools) {
+    list.insertAdjacentHTML('beforebegin', '<div id="seenTools" class="seen-tools"></div>');
+    tools = document.getElementById('seenTools');
+  }
+  function allSeen() {
+    return keys.length > 0 && keys.every(function (k) { var p = k.split('x'); return mzIsSeen(tvKey, Number(p[0]), Number(p[1])); });
+  }
+  function paint() {
+    tools.innerHTML = keys.length
+      ? '<button type="button" class="btn alt" id="seenAll">' + (allSeen() ? 'Quitar marcas de esta temporada' : 'Marcar temporada como vista') + '</button>'
+      : '';
+    var b = document.getElementById('seenAll');
+    if (b) b.onclick = function () {
+      var on = !allSeen();
+      mzSetSeenMany(tvKey, keys, on);
+      Array.prototype.forEach.call(list.querySelectorAll('a.ep'), function (a) { a.classList.toggle('seen', on); });
+      paint();
+    };
+  }
+  paint();
 }
