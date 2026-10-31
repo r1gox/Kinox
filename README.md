@@ -71,3 +71,10 @@ Notas: el sistema es "gana lo último que guardaste" (no fusiona cambios hechos 
 La pantalla `/perfil` funciona como "¿Quién está viendo?": hasta 5 perfiles con nombre, avatar (16 incluidos) o foto propia (se reduce a 192 px en el navegador). Los perfiles, avatares y fotos se sincronizan con la cuenta; el perfil activo es propio de cada dispositivo.
 
 Al iniciar sesión la sincronización es automática: si la cuenta ya tenía datos y este dispositivo también, se combinan (favoritos, historial, perfiles y episodios vistos) sin borrar nada de ninguno de los dos lados.
+
+## Seguridad y privacidad
+
+- **Proxy de TMDB** (`api/tmdb.js` + `api/_tmdb-guard.js`): solo acepta las rutas y parámetros que usa el sitio (lista blanca), nunca una `api_key` del cliente, y limita a 150 peticiones por minuto por IP (mejor esfuerzo, por instancia). Para un límite estricto agrega una regla de *Rate Limiting* en el Firewall de Vercel sobre `/api/tmdb`.
+- **Política de privacidad**: `pages/privacidad.html` (ruta `/privacidad`). **Antes de publicar rellena** `[TU NOMBRE O ALIAS]` y `[TU CORREO DE CONTACTO]`. Es una plantilla informativa, no asesoría legal.
+- **Eliminar cuenta**: la página `/cuenta` usa la función SQL `delete_my_account()`. Si ya habías ejecutado `supabase/schema.sql`, vuelve a ejecutar el archivo (es idempotente) para instalarla.
+- `robots.txt`, `sitemap.xml`, `favicon.svg`, `og.png` y `404.html` están en la raíz. Las URLs absolutas (`og:image`, sitemap) apuntan a `https://moviezone-teal.vercel.app`: cámbialas si usas otro dominio.

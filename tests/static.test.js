@@ -14,10 +14,10 @@ test('trailer.js valida type, id y key antes de usarlos', () => {
   assert.match(s, /A-Za-z0-9_-/);
 });
 
-test('el proxy de TMDB no deja que el cliente imponga api_key ni abre CORS', () => {
-  const s = read('api/tmdb.js');
-  assert.match(s, /k === 'api_key'/);
-  assert.doesNotMatch(s, /Access-Control-Allow-Origin/);
+test('el proxy de TMDB no abre CORS y la api_key no es un parámetro aceptado del cliente', () => {
+  assert.doesNotMatch(read('api/tmdb.js'), /Access-Control-Allow-Origin/);
+  const guard = read('api/_tmdb-guard.js');
+  assert.doesNotMatch(guard.slice(guard.indexOf('ALLOWED_PARAMS'), guard.indexOf('export function validateTmdbRequest')), /api_key/);
 });
 
 test('ninguna API key queda escrita en el código', () => {

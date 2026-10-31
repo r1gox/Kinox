@@ -65,6 +65,10 @@
     {
       "source": "/cuenta",
       "destination": "/pages/cuenta.html"
+    },
+    {
+      "source": "/privacidad",
+      "destination": "/pages/privacidad.html"
     }
   ]
 }

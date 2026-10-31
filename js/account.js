@@ -52,7 +52,8 @@
       '<div class="ac-form">' + body + '<button type="button" class="btn" id="acGo">' + titles[mode] + '</button></div>' +
       (mode === 'login' ? '<p class="ac-links"><a href="#" data-mode="recover">¿Olvidaste tu contraseña?</a></p>' : '') +
       (mode === 'recover' ? '<p class="ac-links"><a href="#" data-mode="login">← Volver</a></p>' : '') +
-      '<p class="ac-note">Con una cuenta tus perfiles, favoritos, historial y episodios vistos se sincronizan entre dispositivos. No es obligatoria.</p>'
+      '<p class="ac-note">Con una cuenta tus perfiles, favoritos, historial y episodios vistos se sincronizan entre dispositivos. No es obligatoria. ' +
+      (mode === 'register' ? 'Al crearla aceptas nuestra ' : 'Consulta nuestra ') + '<a href="/privacidad">política de privacidad</a>.</p>'
     );
     Array.prototype.forEach.call(view.querySelectorAll('[data-mode]'), function (b) {
       b.onclick = function (e) { e.preventDefault(); mode = b.getAttribute('data-mode'); renderLoggedOut(); };
@@ -129,7 +130,9 @@
       '<div class="ac-card"><div class="ac-avatar" aria-hidden="true"></div><div><strong id="acWho"></strong><small id="acMail"></small></div></div>' +
       '<p class="ac-note" id="acSync"></p>' +
       '<div class="ac-actions"><button type="button" class="btn" id="acSyncNow">Sincronizar ahora</button><button type="button" class="btn alt" id="acOut">Cerrar sesión</button></div>' +
-      '<details class="ac-danger"><summary>Más opciones</summary><p class="ac-note">Borra de la nube los datos sincronizados. No borra tu cuenta ni los datos de este dispositivo.</p><button type="button" class="btn alt" id="acDel">Borrar mis datos de la nube</button></details>'
+      '<details class="ac-danger"><summary>Más opciones</summary>' +
+      '<p class="ac-note">Borra de la nube los datos sincronizados. No borra tu cuenta ni los datos de este dispositivo.</p><button type="button" class="btn alt" id="acDel">Borrar mis datos de la nube</button>' +
+      '<p class="ac-note">Elimina tu cuenta y todo lo que está guardado en ella, de forma permanente. Los datos de este dispositivo no se borran.</p><button type="button" class="btn alt ac-kill" id="acKill">Eliminar mi cuenta</button></details>'
     );
     document.getElementById('acWho').textContent = meta || 'Mi cuenta';
     document.getElementById('acMail').textContent = u.email || '';
@@ -162,6 +165,23 @@
       say('Datos de la nube borrados.');
       paintSync();
     };
+    document.getElementById('acKill').onclick = deleteAccount;
+  }
+
+  async function deleteAccount() {
+    var typed = prompt('Esto elimina tu cuenta y tus datos guardados en ella de forma PERMANENTE.\n\nEscribe ELIMINAR para confirmar:');
+    if (typed === null) return;
+    if (String(typed).trim().toUpperCase() !== 'ELIMINAR') return say('No se eliminó nada: la confirmación no coincide.', true);
+    say('Eliminando cuenta…');
+    var r = await cloud.client.rpc('delete_my_account');
+    if (r.error) {
+      var missing = /could not find the function|schema cache|does not exist/i.test(r.error.message || '');
+      return say(missing ? 'La eliminación de cuentas aún no está instalada en la base de datos (ejecuta supabase/schema.sql).' : friendly(r.error), true);
+    }
+    try { await cloud.client.auth.signOut({ scope: 'local' }); } catch (e) { /* la cuenta ya no existe */ }
+    localStorage.removeItem('mz_sync_at');
+    say('Tu cuenta fue eliminada.');
+    setTimeout(function () { location.href = appLink('/'); }, 1200);
   }
 
   function render() { if (cloud.user) renderLoggedIn(); else renderLoggedOut(); }

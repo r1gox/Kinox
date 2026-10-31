@@ -42,3 +42,21 @@ create policy "user_data_delete_own" on public.user_data
 -- Sin acceso para usuarios anónimos.
 revoke all on public.user_data from anon;
 grant select, insert, update, delete on public.user_data to authenticated;
+
+-- Eliminar la propia cuenta desde la app (borra auth.users y, en cascada, user_data).
+-- Se ejecuta con permisos del dueño de la función, pero SOLO puede borrar al usuario que la llama.
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if (select auth.uid()) is null then
+    raise exception 'not authenticated';
+  end if;
+  delete from auth.users where id = (select auth.uid());
+end $$;
+
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;

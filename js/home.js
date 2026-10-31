@@ -157,10 +157,6 @@
     var pMoreP = workerGet("/" + SID + "/peliculas?page=2").catch(function () { return null; });
     var pMoreS = workerGet("/" + SID + "/series?page=2").catch(function () { return null; });
     var settled = await Promise.allSettled([pPelis, pSeries, pAnime]);
-    try {
-      console.log("[Kinox home] worker", WORKER, "ok", settled.map(function (x, i) { return i + ":" + x.status; }).join(" "));
-    } catch (_) {}
-
     function ok(i) {
       return settled[i].status === "fulfilled" ? settled[i].value : null;
     }
