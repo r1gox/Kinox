@@ -575,7 +575,7 @@ async function loadDetailFromWorker(type, params) {
   var titleHint = params.title || slug.replace(/-/g, ' ');
   var portadaHint = params.portada || '';
 
-  $('#view').innerHTML = '<div class="load is-loading" role="status" aria-live="polite">Cargando detalle…</div>';
+  $('#view').innerHTML = mzSkeleton('detail', 'Cargando detalle…');
   try {
     if (typeof ensureTmdbReady === 'function') await ensureTmdbReady();
   } catch (_) {}
@@ -1026,32 +1026,7 @@ async function loadDetailFromWorker(type, params) {
     source_id: hit.source_id || sourceId,
     year: year || ''
   };
-  var favBtnEl = document.getElementById('favBtn');
-  if (favBtnEl && typeof favs === 'function') {
-    var favOn = favs().some(function (f) {
-      return f && (f.id === favItem.id || (f.slug && f.slug === favItem.slug && String(f.source_id) === String(favItem.source_id)));
-    });
-    favBtnEl.textContent = favOn ? '✓ En mi lista' : '+ Mi lista';
-    favBtnEl.classList.toggle('on', favOn);
-    favBtnEl.onclick = function () {
-      var a = favs();
-      var has = a.some(function (f) {
-        return f && (f.id === favItem.id || (f.slug && f.slug === favItem.slug && String(f.source_id) === String(favItem.source_id)));
-      });
-      a = has
-        ? a.filter(function (f) {
-            return !(
-              f &&
-              (f.id === favItem.id ||
-                (f.slug && f.slug === favItem.slug && String(f.source_id) === String(favItem.source_id)))
-            );
-          })
-        : [favItem].concat(a);
-      store.set(pk('favs'), a);
-      favBtnEl.textContent = has ? '+ Mi lista' : '✓ En mi lista';
-      favBtnEl.classList.toggle('on', !has);
-    };
-  }
+  mzWireListMenu(document.getElementById('favBtn'), favItem);
 
   // Similares desde la misma fuente del worker
   try {
@@ -1157,7 +1132,7 @@ async function loadDetailFromWorker(type, params) {
       });
       var cnt = (seasonMeta && parseInt(seasonMeta.episode_count, 10)) || 0;
 
-      epsBox.innerHTML = '<div class="load is-loading" role="status" aria-live="polite">Cargando episodios…</div>';
+      epsBox.innerHTML = mzSkeleton('episodes', 'Cargando episodios…');
       var byNum = await loadSeasonEps(sn);
       var nums = Object.keys(byNum)
         .map(function (k) {
@@ -1651,14 +1626,7 @@ async function loadDetail(type) {
         : '') +
       mzCastRow(x);
 
-    $('#favBtn').onclick = function () {
-      var a = favs();
-      var has = a.some(function (f) { return f.id === it.id && f.type === type; });
-      a = has ? a.filter(function (f) { return !(f.id === it.id && f.type === type); }) : [it].concat(a);
-      store.set(pk('favs'), a);
-      $('#favBtn').textContent = has ? '+ Mi lista' : '✓ En mi lista';
-      $('#favBtn').classList.toggle('on', !has);
-    };
+    mzWireListMenu($('#favBtn'), it);
 
     // Recomendaciones: solo títulos del catálogo (no de TMDB)
     (async function () {

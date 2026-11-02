@@ -155,11 +155,16 @@ function tipoFromIt(it){
 function card(it){
   var tipo=tipoFromIt(it);
   var rating=it.rating?`<span class="badge badge-rating">★ ${Number(it.rating).toFixed(1)}</span>`:'';
-  var img='';
+  var img='',srcset='';
   if(it.poster && /^https?:\/\//i.test(String(it.poster))) img=String(it.poster);
   else if(it.portada && /^https?:\/\//i.test(String(it.portada))) img=String(it.portada);
-  else if(it.poster) img=(typeof IMG!=='undefined'?IMG:'https://image.tmdb.org/t/p/')+'w342'+it.poster;
-  return `<a class="card" href="${detailLink(it)}"><div class="im">${img?`<img loading="lazy" src="${esc(img)}" alt="">`:''}<span class="badge badge-type">${esc(tipo)}</span>${rating}</div><b>${esc(it.title)}</b><small>${esc(tipo)}${it.year?' · '+esc(it.year):''}</small></a>`;
+  else if(it.poster){
+    var base=(typeof IMG!=='undefined'?IMG:'https://image.tmdb.org/t/p/');
+    img=base+'w342'+it.poster;
+    // Tamaño según pantalla (solo pósters de TMDB, que tienen varias resoluciones)
+    if(/^\/[A-Za-z0-9_.-]+$/.test(String(it.poster))) srcset=base+'w185'+it.poster+' 185w, '+img+' 342w, '+base+'w500'+it.poster+' 500w';
+  }
+  return `<a class="card" href="${detailLink(it)}"><div class="im">${img?`<img loading="lazy" decoding="async" src="${esc(img)}"${srcset?` srcset="${esc(srcset)}" sizes="(max-width:640px) 34vw, 190px"`:''} alt="">`:''}<span class="badge badge-type">${esc(tipo)}</span>${rating}</div><b>${esc(it.title)}</b><small>${esc(tipo)}${it.year?' · '+esc(it.year):''}</small></a>`;
 }
 
 /** Ventanita modal con tráiler de YouTube */
@@ -186,8 +191,11 @@ function openTrailerModal(youtubeKey) {
     '</div>' +
     '<a class="kx-trailer-yt" href="https://www.youtube.com/watch?v=' + key + '" target="_blank" rel="noopener">Abrir en YouTube</a>' +
     '</div>';
+  var opener = document.activeElement;
   document.body.appendChild(overlay);
   document.body.classList.add('kx-trailer-open');
+  var closeBtn = overlay.querySelector('.kx-trailer-close');
+  if (closeBtn && closeBtn.focus) closeBtn.focus();
 
   function close() {
     try {
@@ -197,9 +205,17 @@ function openTrailerModal(youtubeKey) {
     overlay.remove();
     document.body.classList.remove('kx-trailer-open');
     document.removeEventListener('keydown', onKey);
+    if (opener && opener.focus) { try { opener.focus(); } catch (_) {} }
   }
   function onKey(e) {
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape') return close();
+    if (e.key !== 'Tab') return;
+    // El foco se queda entre "Cerrar" y "Abrir en YouTube" mientras el diálogo está abierto.
+    var first = overlay.querySelector('.kx-trailer-close'), last = overlay.querySelector('.kx-trailer-yt');
+    if (!first || !last) return;
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    else if (!overlay.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
   }
   overlay.addEventListener('click', function (e) {
     if (e.target === overlay) close();
@@ -350,10 +366,10 @@ function workerCard(it){
   return `<a class="card" href="${href}"><div class="im">${img?`<img loading="lazy" src="${esc(img)}" alt="">`:''}<span class="badge badge-type">${esc(tipoLabel)}</span>${ratingBadge}</div><b>${esc(title)}</b><small>${esc(tipoLabel)}${year?' · '+esc(year):''}</small></a>`;
 }
 
-function rowHtml(t,items){return items?.length?`<section class="row"><h2>${esc(t)}</h2><div class="track">${items.map(card).join('')}</div></section>`:''}
+function rowHtml(t,items){return items?.length?`<section class="row"><h2>${esc(t)}</h2><div class="track" tabindex="0" role="region" aria-label="${esc(t)}">${items.map(card).join('')}</div></section>`:''}
 function list(res,type){return (res.results||[]).filter(x=>x.poster_path&&x.media_type!=='person').map(x=>norm(x,type))}
 function nav(){
-  $('#top').innerHTML=`<a class="logo" href="${appLink('/')}" >Movie<span>Zone</span></a><nav><a data-section="inicio" href="${appLink('/')}" >Inicio</a><a data-section="peliculas" href="${appLink('/peliculas')}">Películas</a><a data-section="series" href="${appLink('/series')}">Series</a><a data-section="anime" href="${appLink('/anime')}">Anime</a><a data-section="jk" href="${appLink('/jk')}">JK</a><a data-section="favoritos" href="${appLink('/favoritos')}">Favoritos</a><a data-section="historial" href="${appLink('/historial')}">Historial</a></nav><form id="sf"><input id="q" type="search" placeholder="Buscar…" aria-label="Buscar"></form><a id="prof" href="${appLink('/perfil')}" aria-label="Perfil">${mzAvatarHtml(profiles.find(p=>p.id===pid)||profiles[0])}</a>`;
+  $('#top').innerHTML=`<a class="logo" href="${appLink('/')}" >Movie<span>Zone</span></a><nav aria-label="Principal"><a data-section="inicio" href="${appLink('/')}" >Inicio</a><a data-section="peliculas" href="${appLink('/peliculas')}">Películas</a><a data-section="series" href="${appLink('/series')}">Series</a><a data-section="anime" href="${appLink('/anime')}">Anime</a><a data-section="jk" href="${appLink('/jk')}">JK</a><a data-section="favoritos" href="${appLink('/favoritos')}">Favoritos</a><a data-section="historial" href="${appLink('/historial')}">Historial</a></nav><form id="sf" role="search"><input id="q" type="search" placeholder="Buscar…" aria-label="Buscar"></form><a id="prof" href="${appLink('/perfil')}" aria-label="Perfil">${mzAvatarHtml(profiles.find(p=>p.id===pid)||profiles[0])}</a>`;
   const path=location.pathname.toLowerCase();
   let active='';
   if(path.includes('peliculas')||path.includes('detalle-pelicula')) active='peliculas';
@@ -365,7 +381,7 @@ function nav(){
   else if(path.includes('perfil')||path.includes('buscar')||path.includes('trailer')||path.includes('reproductor')) active='';
   else active='inicio';
   const current=document.querySelector(`nav a[data-section="${active}"]`);
-  if(current) current.classList.add('on');
+  if(current){ current.classList.add('on'); current.setAttribute('aria-current','page'); }
   $('#sf').onsubmit=e=>{e.preventDefault();const q=$('#q').value.trim();if(q)location.href=pageHref('buscar.html',{q})};
   window.addEventListener('scroll',()=>$('#top').classList.toggle('solid',scrollY>30),{passive:true});
   // Barra de secciones ABAJO solo móvil (no depende de mobile-ui.js)
@@ -714,3 +730,146 @@ function mzTimeAgo(iso, now) {
   if (s < 86400 * 7) return 'hace ' + Math.round(s / 86400) + ' d';
   return new Date(t).toLocaleDateString('es');
 }
+
+
+/* ---------------------------------------------------------------------
+   Esqueletos de carga (en lugar de "Cargando…")
+   --------------------------------------------------------------------- */
+function mzSkeleton(kind, label) {
+  var lab = '<span class="sr-only">' + esc(label || 'Cargando…') + '</span>';
+  var card = '<div class="sk-card"><div class="sk sk-im"></div><div class="sk sk-line"></div><div class="sk sk-line short"></div></div>';
+  var wrap = function (inner, cls) { return '<div class="sk-wrap ' + (cls || '') + '" role="status" aria-live="polite" aria-busy="true">' + lab + inner + '</div>'; };
+  if (kind === 'detail') {
+    return wrap('<div class="sk-hero"><div class="sk sk-poster"></div><div class="sk-info"><div class="sk sk-title"></div><div class="sk sk-line"></div><div class="sk sk-line"></div><div class="sk sk-line short"></div><div class="sk-btns"><div class="sk sk-btn"></div><div class="sk sk-btn"></div></div></div></div>');
+  }
+  if (kind === 'episodes') {
+    var ep = '<div class="sk-ep"><div class="sk sk-thumb"></div><div class="sk-ep-text"><div class="sk sk-line"></div><div class="sk sk-line short"></div></div></div>';
+    return wrap(ep.repeat(4), 'sk-eps');
+  }
+  if (kind === 'grid') return wrap('<div class="sk-grid">' + card.repeat(12) + '</div>');
+  if (kind === 'row') return wrap('<div class="sk-track">' + card.repeat(8) + '</div>');
+  // portada
+  return wrap('<div class="sk sk-banner"></div>' + ('<div class="sk sk-row-title"></div><div class="sk-track">' + card.repeat(8) + '</div>').repeat(2), 'sk-home');
+}
+
+
+/* ---------------------------------------------------------------------
+   Mi lista con etiquetas: Favorita · Ver después · Vista
+   (se guarda en la misma lista de favoritos; sin etiqueta = Favorita)
+   --------------------------------------------------------------------- */
+function mzTags() { return [{ id: 'fav', label: 'Favorita' }, { id: 'later', label: 'Ver después' }, { id: 'seen', label: 'Vista' }]; }
+function mzTagValid(t) { return t === 'fav' || t === 'later' || t === 'seen' ? t : ''; }
+function mzTagLabel(t) { var l = mzTags(); for (var i = 0; i < l.length; i++) if (l[i].id === t) return l[i].label; return ''; }
+function mzListMatch(f, item) {
+  if (!f || !item) return false;
+  if (item.id != null && String(f.id) === String(item.id) && (!f.type || !item.type || String(f.type) === String(item.type))) return true;
+  return !!(item.slug && f.slug === item.slug && String(f.source_id) === String(item.source_id));
+}
+function mzListTag(item) {
+  var a = favs();
+  for (var i = 0; i < a.length; i++) if (mzListMatch(a[i], item)) return mzTagValid(a[i].tag) || 'fav';
+  return '';
+}
+// tag '' = quitar de la lista. Si ya estaba, conserva su lugar.
+function mzListSet(item, tag) {
+  tag = mzTagValid(tag);
+  var a = favs(), found = false, out = [];
+  a.forEach(function (f) {
+    if (!mzListMatch(f, item)) return out.push(f);
+    found = true;
+    if (tag) out.push(Object.assign({}, f, { tag: tag }));
+  });
+  if (!found && tag) out.unshift(Object.assign({}, item, { tag: tag }));
+  store.set(pk('favs'), out);
+  return tag;
+}
+
+// Botón "Mi lista" con menú de etiquetas (teclado: ↑↓, Esc, Tab).
+function mzWireListMenu(btn, item) {
+  if (!btn) return;
+  var menu = null;
+  function paint() {
+    var t = mzListTag(item);
+    btn.textContent = t ? '✓ ' + mzTagLabel(t) + ' ▾' : '+ Mi lista';
+    btn.classList.toggle('on', !!t);
+    btn.setAttribute('aria-haspopup', 'menu');
+    btn.setAttribute('aria-expanded', menu ? 'true' : 'false');
+  }
+  function close(refocus) {
+    if (menu) {
+      menu.remove();
+      menu = null;
+      document.removeEventListener('click', outside, true);
+      document.removeEventListener('keydown', onKey, true);
+    }
+    paint();
+    if (refocus) btn.focus();
+  }
+  function outside(e) { if (menu && !menu.contains(e.target) && e.target !== btn) close(false); }
+  function onKey(e) {
+    if (!menu) return;
+    if (e.key === 'Escape') { e.preventDefault(); close(true); }
+    else if (e.key === 'Tab') close(false);
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      var items = Array.prototype.slice.call(menu.querySelectorAll('button'));
+      var i = items.indexOf(document.activeElement);
+      i = e.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
+      items[i].focus();
+    }
+  }
+  function open() {
+    var cur = mzListTag(item);
+    menu = document.createElement('div');
+    menu.className = 'list-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', 'Guardar en mi lista');
+    menu.innerHTML =
+      mzTags().map(function (t) {
+        return '<button type="button" role="menuitemradio" aria-checked="' + (cur === t.id) + '" data-tag="' + t.id + '">' + (cur === t.id ? '✓ ' : '') + esc(t.label) + '</button>';
+      }).join('') +
+      (cur ? '<button type="button" role="menuitem" class="lm-remove" data-tag="">Quitar de mi lista</button>' : '');
+    menu.onclick = function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-tag]') : null;
+      if (!b) return;
+      mzListSet(item, b.getAttribute('data-tag'));
+      close(true);
+    };
+    btn.insertAdjacentElement('afterend', menu);
+    document.addEventListener('click', outside, true);
+    document.addEventListener('keydown', onKey, true);
+    paint();
+    var first = menu.querySelector('[aria-checked="true"]') || menu.querySelector('button');
+    if (first) first.focus();
+  }
+  btn.onclick = function () { if (menu) close(true); else open(); };
+  paint();
+}
+
+
+/* ---------------------------------------------------------------------
+   Accesibilidad general: enlace "Saltar al contenido"
+   --------------------------------------------------------------------- */
+(function () {
+  try {
+    if (!document.body || !document.body.insertAdjacentHTML) return;
+    document.body.insertAdjacentHTML('afterbegin', '<a class="skip-link" href="#view">Saltar al contenido</a>');
+    var v = document.getElementById('view');
+    if (v && v.setAttribute) v.setAttribute('tabindex', '-1');
+  } catch (e) { /* sin DOM */ }
+})();
+
+
+/* ---------------------------------------------------------------------
+   Modo instalable (PWA): service worker
+   --------------------------------------------------------------------- */
+(function () {
+  try {
+    var ok = typeof navigator !== 'undefined' && 'serviceWorker' in navigator &&
+      (location.protocol === 'https:' || location.hostname === 'localhost');
+    if (!ok) return;
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function () { /* sin SW: el sitio funciona igual */ });
+    });
+  } catch (e) { /* ignorar */ }
+})();

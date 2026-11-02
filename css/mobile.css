@@ -294,15 +294,10 @@
     text-align: left !important;
   }
   .det .btns {
-    display: flex !important;
-    flex-wrap: wrap !important;
     justify-content: center !important;
-    gap: 10px !important;
     margin-top: 22px !important;
   }
   .det .btns .btn {
-    flex: 1 1 40% !important;
-    min-height: 46px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -351,7 +346,6 @@
     padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
   }
   .kx-topbar {
-    padding-top: 6px !important;
     padding-bottom: 10px !important;
     margin-top: 0 !important;
   }

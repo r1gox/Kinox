@@ -32,6 +32,11 @@ module.exports = [
     rules: shared,
   },
   {
+    files: ['sw.js'],
+    languageOptions: { ecmaVersion: 2022, sourceType: 'script', globals: globals.serviceworker },
+    rules: shared,
+  },
+  {
     files: ['tests/**/*.js', 'eslint.config.js'],
     languageOptions: { ecmaVersion: 2022, sourceType: 'commonjs', globals: globals.node },
     rules: shared,

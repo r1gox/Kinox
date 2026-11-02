@@ -6,7 +6,7 @@
   try {
     // Pantalla de carga inmediata (antes quedaba en negro hasta que terminaba todo).
     var viewEl = document.getElementById("view");
-    if (viewEl) viewEl.innerHTML = '<div class="load is-loading" role="status" aria-live="polite">Cargando catálogo…</div>';
+    if (viewEl) viewEl.innerHTML = mzSkeleton("home", "Cargando catálogo…");
     // TMDB se prepara en segundo plano: ya no bloquea el primer pintado.
     var tmdbReady = typeof ensureTmdbReady === "function"
       ? Promise.resolve().then(ensureTmdbReady).catch(function () {})
