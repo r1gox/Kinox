@@ -24,7 +24,8 @@
   }
 
   function loggedIn(user) {
-    var name = (user.user_metadata && user.user_metadata.display_name) || '';
+    var md = user.user_metadata || {};
+    var name = md.display_name || md.full_name || md.name || '';
     return (
       '<section class="sync-card ok" aria-labelledby="scTitle"><div class="sc-icon">' + ICON.cloud + '</div><div class="sc-body">' +
       '<h2 id="scTitle">Cuenta conectada</h2>' +

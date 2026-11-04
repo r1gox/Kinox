@@ -5,6 +5,9 @@
   var cloud = null;
   // El enlace del correo llega con #...type=recovery; supabase-js limpia el hash al leerlo.
   var isRecovery = /type=recovery/.test(location.hash);
+  // Al volver de Google llegan los datos de sesión (o un error) en la dirección; se guardan antes de que se limpien.
+  var urlState = location.hash + location.search;
+  var isOAuth = /access_token=|refresh_token=/.test(location.hash);
 
   function el(html) { var d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild; }
   function say(text, bad) {
@@ -38,6 +41,51 @@
     return '<label for="' + id + '">' + label + '</label><input id="' + id + '" type="' + type + '" ' + (extra || '') + '>';
   }
 
+  function googleButton() {
+    return (
+      '<button type="button" class="g-btn" id="acGoogle">' +
+      '<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>' +
+      '<span>Continuar con Google</span></button><p class="ac-or"><span>o con tu correo</span></p>'
+    );
+  }
+
+  async function googleSignIn() {
+    var b = document.getElementById('acGoogle');
+    if (b) b.disabled = true;
+    say('Abriendo Google…');
+    try {
+      // Vuelve a esta misma página; Supabase devuelve la sesión en la dirección.
+      var r = await cloud.client.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } },
+      });
+      if (r.error) throw r.error;
+    } catch (e) {
+      if (b) b.disabled = false;
+      say(friendly(e), true);
+    }
+  }
+
+  // Después de iniciar sesión (correo o Google): sincroniza solo y lleva a elegir perfil.
+  async function syncAndGo() {
+    say('Sincronizando tus datos…');
+    try {
+      await cloud.pull({ reload: false });
+    } catch (e) {
+      render();
+      return say('Iniciaste sesión, pero no se pudo sincronizar: ' + friendly(e), true);
+    }
+    // Cuenta nueva con perfil de fábrica ("Invitado"): usa tu primer nombre.
+    var md = (cloud.user && cloud.user.user_metadata) || {};
+    var nm = String(md.display_name || md.full_name || md.name || '').trim().split(/\s+/)[0].slice(0, 16);
+    if (nm) {
+      var ps = store.get('mz_profiles', []);
+      if (ps.length === 1 && ps[0].name === 'Invitado') { ps[0].name = nm; store.set('mz_profiles', ps); }
+    }
+    say('¡Listo! Ahora elige tu perfil…');
+    setTimeout(function () { location.href = pageHref('perfil.html'); }, 800);
+  }
+
   function renderLoggedOut() {
     var titles = { login: 'Iniciar sesión', register: 'Crear cuenta', recover: 'Recuperar contraseña', reset: 'Nueva contraseña' };
     var body = '';
@@ -49,6 +97,7 @@
       (mode === 'login' || mode === 'register'
         ? '<div class="ac-tabs" role="tablist"><button type="button" role="tab" data-mode="login" aria-selected="' + (mode === 'login') + '">Iniciar sesión</button><button type="button" role="tab" data-mode="register" aria-selected="' + (mode === 'register') + '">Crear cuenta</button></div>'
         : '<h2>' + titles[mode] + '</h2>') +
+      (mode === 'login' || mode === 'register' ? googleButton() : '') +
       '<div class="ac-form">' + body + '<button type="button" class="btn" id="acGo">' + titles[mode] + '</button></div>' +
       (mode === 'login' ? '<p class="ac-links"><a href="#" data-mode="recover">¿Olvidaste tu contraseña?</a></p>' : '') +
       (mode === 'recover' ? '<p class="ac-links"><a href="#" data-mode="login">← Volver</a></p>' : '') +
@@ -58,6 +107,8 @@
     Array.prototype.forEach.call(view.querySelectorAll('[data-mode]'), function (b) {
       b.onclick = function (e) { e.preventDefault(); mode = b.getAttribute('data-mode'); renderLoggedOut(); };
     });
+    var gb = document.getElementById('acGoogle');
+    if (gb) gb.onclick = googleSignIn;
     var go = document.getElementById('acGo');
     go.onclick = submit;
     Array.prototype.forEach.call(view.querySelectorAll('input'), function (i) {
@@ -105,17 +156,7 @@
         mode = 'login';
       }
       cloud.user = (await auth.getSession()).data.session?.user || null;
-      if (cloud.user) {
-        say('Sincronizando tus datos…');
-        try {
-          await cloud.pull({ reload: false });
-        } catch (e) {
-          render();
-          return say('Iniciaste sesión, pero no se pudo sincronizar: ' + friendly(e), true);
-        }
-        say('¡Listo! Ahora elige tu perfil…');
-        setTimeout(function () { location.href = pageHref('perfil.html'); }, 800);
-      }
+      if (cloud.user) await syncAndGo();
     } catch (e) {
       go.disabled = false;
       say(friendly(e), true);
@@ -124,7 +165,8 @@
 
   function renderLoggedIn() {
     var u = cloud.user;
-    var meta = (u.user_metadata && u.user_metadata.display_name) || '';
+    var md = u.user_metadata || {};
+    var meta = md.display_name || md.full_name || md.name || '';
     var at = localStorage.getItem('mz_sync_at');
     frame(
       '<div class="ac-card"><div class="ac-avatar" aria-hidden="true"></div><div><strong id="acWho"></strong><small id="acMail"></small></div></div>' +
@@ -194,7 +236,15 @@
     document.addEventListener('mz:auth', function (ev) {
       if (ev.detail && ev.detail.event === 'PASSWORD_RECOVERY') { mode = 'reset'; renderLoggedOut(); }
     });
-    if (isRecovery) { mode = 'reset'; renderLoggedOut(); } else render();
+    var oauthError = typeof mzOAuthError === 'function' ? mzOAuthError(urlState) : '';
+    if (oauthError) {
+      history.replaceState(null, '', location.pathname);
+      renderLoggedOut();
+      return say(oauthError, true);
+    }
+    if (isRecovery) { mode = 'reset'; renderLoggedOut(); }
+    else if (isOAuth && cloud.user) { frame('<p class="ac-note">Entrando con tu cuenta de Google…</p>'); await syncAndGo(); }
+    else render();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

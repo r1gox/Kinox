@@ -13,6 +13,22 @@ function mzCloudConfigured(cfg) {
   );
 }
 
+// Traduce el error que Supabase deja en la dirección al volver de Google ('' si no hay error).
+function mzOAuthError(raw) {
+  var m = String(raw || '');
+  var d = /[?&#]error_description=([^&#]+)/.exec(m);
+  var e = /[?&#]error=([^&#]+)/.exec(m);
+  if (!d && !e) return '';
+  var desc = '', code = '';
+  try { desc = d ? decodeURIComponent(d[1].replace(/\+/g, ' ')) : ''; } catch (x) { desc = d ? d[1] : ''; }
+  try { code = e ? decodeURIComponent(e[1]) : ''; } catch (x) { code = e ? e[1] : ''; }
+  var all = code + ' ' + desc;
+  if (/access_denied/i.test(all)) return 'Cancelaste el inicio de sesión con Google.';
+  if (/provider is not enabled|unsupported provider/i.test(all)) return 'El inicio de sesión con Google aún no está activado en Supabase.';
+  if (/redirect/i.test(all)) return 'Esta dirección no está permitida como retorno en Supabase (Authentication → URL Configuration).';
+  return 'No se pudo iniciar sesión con Google' + (desc ? ': ' + desc.slice(0, 120) : '.');
+}
+
 (function () {
   var base = (document.currentScript && document.currentScript.src) || '';
   var api = (window.mzCloud = { configured: false, client: null, user: null, ready: Promise.resolve(null) });

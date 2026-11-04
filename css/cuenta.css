@@ -1,0 +1,13 @@
+/* Botón "Continuar con Google" y separador (página de cuenta) */
+.g-btn{
+  display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:48px;padding:10px 16px;
+  background:#fff;color:#1f1f1f;border:1px solid #dadce0;border-radius:12px;
+  font:inherit;font-weight:600;font-size:1rem;cursor:pointer;
+  transition:box-shadow .15s,background .15s;
+}
+.g-btn:hover{background:#f8f9fa;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+.g-btn:focus-visible{outline:3px solid var(--ac);outline-offset:2px}
+.g-btn:disabled{opacity:.7;cursor:progress}
+.g-btn svg{flex:none}
+.ac-or{display:flex;align-items:center;gap:12px;margin:18px 0 6px;color:var(--mute);font-size:.85rem}
+.ac-or:before,.ac-or:after{content:"";flex:1;height:1px;background:var(--line)}
