@@ -41,11 +41,50 @@
   }
 
   function langLabel(p) {
-    var l = String((p && (p.idioma || p.language || p.lang)) || "").trim();
-    if (!l) return "";
-    if (/lat|dub|español|espanol|latino/i.test(l)) return "Latino";
-    if (/sub/i.test(l)) return "Subtitulado";
-    return l;
+    var only = String((p && (p.idioma || p.language || p.lang)) || "").trim();
+    var blob = [
+      only,
+      p && p.name,
+      p && p.provider,
+      p && p.servidor,
+      p && p.server
+    ]
+      .filter(Boolean)
+      .join(" ");
+    var l = String(blob || "").toLowerCase();
+    if (/castellano|castella|\bespaña\b|\bspain\b/.test(l)) return "Castellano";
+    if (/(^|\b)(sub|subs|subtitul|vose|vos)(\b|$)/i.test(l) && !/latino|\blat\b/.test(l))
+      return "Subtitulado";
+    if (/\blat\b|latino|latam|es-?mx|es_la|doblaj/.test(l)) return "Latino";
+    if (/sub|subtitul/i.test(l)) return "Subtitulado";
+    if (!only) return "";
+    if (/lat|dub|español|espanol|latino/i.test(only)) return "Latino";
+    if (/sub/i.test(only)) return "Subtitulado";
+    if (/castellano|castella/i.test(only)) return "Castellano";
+    return only;
+  }
+
+  function langKey(p) {
+    var L = langLabel(p);
+    if (/latino/i.test(L)) return "latino";
+    if (/castellano/i.test(L)) return "castellano";
+    if (/sub/i.test(L)) return "subtitulado";
+    return "otros";
+  }
+
+  function langShort(key) {
+    if (key === "latino") return "LAT";
+    if (key === "castellano") return "ESP";
+    if (key === "subtitulado") return "SUB";
+    if (key === "otros") return "OTROS";
+    return "TODOS";
+  }
+
+  function langFlag(key) {
+    if (key === "latino") return "🇲🇽";
+    if (key === "castellano") return "🇪🇸";
+    if (key === "subtitulado") return "🇺🇸";
+    return "🌐";
   }
 
   function extractVideoUrl(payload) {
@@ -806,11 +845,14 @@
       function chipHtml(p, i, mode) {
         var label = serverLabel(p);
         var lang = langLabel(p);
+        var lk = langKey(p);
         return (
           '<button type="button" class="kx-chip" data-i="' +
           i +
           '" data-mode="' +
           mode +
+          '" data-lang="' +
+          lk +
           '">' +
           '<span class="kx-chip-name">' +
           esc(label) +
@@ -845,6 +887,345 @@
         dirEl.innerHTML =
           dHtml || '<span class="kx-muted">Sin directos</span>';
       }
+
+      var preferredLangForAuto = "all";
+      /* HUD sobre el reproductor: idioma (izq) + lista de servidores */
+      (function setupPlayerHud() {
+        var box = $("#playerBox");
+        if (!box) return;
+
+        var style = document.getElementById("kx-lang-style");
+        if (!style) {
+          style = document.createElement("style");
+          style.id = "kx-lang-style";
+          style.textContent =
+            ".kx-player-wrap{position:relative;width:100%;isolation:isolate}" +
+            ".kx-player-wrap .kx-player,.kx-player-wrap .mz-player{width:100%}" +
+            ".kx-player-hud{position:absolute;top:10px;left:10px;z-index:6;" +
+            "display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;" +
+            "pointer-events:none;max-width:calc(100% - 20px)}" +
+            ".kx-player-hud *{pointer-events:auto}" +
+            ".kx-dd{position:relative;display:inline-flex;z-index:8}" +
+            ".kx-dd-btn .kx-dd-icon{font-size:1.05rem;line-height:1;display:inline-flex;align-items:center}" +".kx-dd-btn{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;" +
+            "border:1px solid rgba(255,255,255,.22);background:rgba(8,12,22,.88);color:#e2e8f0;" +
+            "font:inherit;font-weight:700;font-size:.82rem;cursor:pointer;backdrop-filter:blur(10px);" +
+            "-webkit-backdrop-filter:blur(10px);box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:220px}" +
+            ".kx-dd-btn:hover,.kx-dd.open .kx-dd-btn{border-color:rgba(139,92,246,.65)}" +
+            ".kx-dd-btn .kx-dd-label{opacity:.75;font-size:.72rem;font-weight:800;letter-spacing:.04em}" +".kx-dd-btn.kx-dd-value-only .kx-dd-label{display:none}" +".kx-dd-btn.kx-dd-value-only .kx-dd-value{max-width:160px;font-weight:800}" +
+            ".kx-dd-btn .kx-dd-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}" +
+            ".kx-dd-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:200px;max-width:min(280px,80vw);" +
+            "max-height:240px;overflow-y:auto;padding:6px;border-radius:12px;" +
+            "border:1px solid rgba(56,189,248,.4);background:rgba(11,28,36,.97);" +
+            "box-shadow:0 12px 40px rgba(0,0,0,.55);display:none;z-index:9;" +
+            "scrollbar-width:thin}" +
+            ".kx-dd.open .kx-dd-menu{display:block}" +
+            ".kx-dd-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;" +
+            "text-align:left;padding:10px 12px;border:0;border-radius:8px;background:transparent;" +
+            "color:#e2e8f0;font:inherit;font-weight:700;font-size:.86rem;cursor:pointer}" +
+            ".kx-dd-menu button:hover,.kx-dd-menu button.active{background:rgba(15,23,42,.95)}" +
+            ".kx-dd-menu button .kx-dd-meta{font-size:.72rem;opacity:.7;font-weight:600}" +
+            ".kx-dd-menu button.kx-lang-hide{display:none!important}" +
+            ".kx-dd-empty{padding:10px 12px;color:#64748b;font-size:.82rem}" +
+            ".kx-block--servers-hidden{display:none!important}" +
+            "@media(max-width:600px){.kx-player-hud{top:6px;left:6px;gap:6px}" +
+            ".kx-dd-btn{padding:6px 10px;font-size:.78rem}}";
+          document.head.appendChild(style);
+        }
+
+        // Envolver el player
+        var wrap = box.parentElement;
+        if (!wrap || !wrap.classList.contains("kx-player-wrap")) {
+          wrap = document.createElement("div");
+          wrap.className = "kx-player-wrap";
+          box.parentNode.insertBefore(wrap, box);
+          wrap.appendChild(box);
+        }
+
+        var hud = wrap.querySelector(".kx-player-hud");
+        if (!hud) {
+          hud = document.createElement("div");
+          hud.className = "kx-player-hud";
+          wrap.appendChild(hud);
+        }
+        hud.innerHTML = "";
+
+        // Opciones de idioma presentes
+        var keysPresent = {};
+        players.forEach(function (p) {
+          keysPresent[langKey(p)] = true;
+        });
+        var options = [];
+        if (keysPresent.latino) options.push("latino");
+        if (keysPresent.castellano) options.push("castellano");
+        if (keysPresent.subtitulado) options.push("subtitulado");
+        if (keysPresent.otros) options.push("otros");
+
+        var preferred = keysPresent.latino
+          ? "latino"
+          : keysPresent.castellano
+            ? "castellano"
+            : keysPresent.subtitulado
+              ? "subtitulado"
+              : "all";
+        preferredLangForAuto = preferred;
+
+        function closeAllDd(except) {
+          $all(".kx-dd.open").forEach(function (el) {
+            if (except && el === except) return;
+            el.classList.remove("open");
+            var b = el.querySelector(".kx-dd-btn");
+            if (b) b.setAttribute("aria-expanded", "false");
+          });
+        }
+
+        function makeDropdown(cfg) {
+          var root = document.createElement("div");
+          root.className = "kx-dd";
+          root.id = cfg.id;
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "kx-dd-btn";
+          btn.setAttribute("aria-haspopup", "listbox");
+          btn.setAttribute("aria-expanded", "false");
+          btn.innerHTML =
+            (cfg.icon
+              ? '<span class="kx-dd-icon">' + cfg.icon + "</span>"
+              : "") +
+            '<span class="kx-dd-label">' +
+            esc(cfg.label) +
+            "</span>" +
+            '<span class="kx-dd-value">' +
+            esc(cfg.valueText || "—") +
+            "</span>" +
+            "<span>▾</span>";
+          var menu = document.createElement("div");
+          menu.className = "kx-dd-menu";
+          menu.setAttribute("role", "listbox");
+          menu.innerHTML = cfg.menuHtml || "";
+          root.appendChild(btn);
+          root.appendChild(menu);
+          btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            var willOpen = !root.classList.contains("open");
+            closeAllDd(root);
+            if (willOpen) {
+              root.classList.add("open");
+              btn.setAttribute("aria-expanded", "true");
+            } else {
+              root.classList.remove("open");
+              btn.setAttribute("aria-expanded", "false");
+            }
+          });
+          menu.addEventListener("click", function (e) {
+            e.stopPropagation();
+          });
+          hud.appendChild(root);
+          return { root: root, btn: btn, menu: menu };
+        }
+
+        function setDdValue(dd, text, opts) {
+          if (!dd || !dd.btn) return;
+          opts = opts || {};
+          var v = dd.btn.querySelector(".kx-dd-value");
+          if (v) v.textContent = text || "—";
+          if (opts.valueOnly) {
+            dd.btn.classList.add("kx-dd-value-only");
+          }
+          if (opts.icon != null) {
+            var ic = dd.btn.querySelector(".kx-dd-icon");
+            if (ic) ic.textContent = opts.icon;
+          }
+        }
+
+        // —— Idioma ——
+        var langMenuHtml =
+          '<button type="button" data-lang="all">' +
+          langFlag("all") +
+          " TODOS</button>" +
+          options
+            .map(function (k) {
+              var label =
+                k === "latino"
+                  ? "LATINO"
+                  : k === "castellano"
+                    ? "CASTELLANO"
+                    : k === "subtitulado"
+                      ? "SUBTITULADO"
+                      : "OTROS";
+              return (
+                '<button type="button" data-lang="' +
+                k +
+                '">' +
+                langFlag(k) +
+                " " +
+                label +
+                "</button>"
+              );
+            })
+            .join("");
+
+        var langDd =
+          options.length > 0
+            ? makeDropdown({
+                id: "kxLangDd",
+                label: "IDIOMA",
+                icon: langFlag(preferred),
+                valueText: langShort(preferred),
+                menuHtml: langMenuHtml
+              })
+            : null;
+
+        // —— Servidores ——
+        var srvMenuHtml = normals.length
+          ? normals
+              .map(function (p) {
+                var idx = players.indexOf(p);
+                var lk = langKey(p);
+                var lang = langLabel(p);
+                return (
+                  '<button type="button" class="kx-chip-proxy" data-i="' +
+                  idx +
+                  '" data-mode="iframe" data-lang="' +
+                  lk +
+                  '"><span>' +
+                  esc(serverLabel(p)) +
+                  "</span>" +
+                  (lang
+                    ? '<span class="kx-dd-meta">' + esc(lang) + "</span>"
+                    : "") +
+                  "</button>"
+                );
+              })
+              .join("")
+          : '<div class="kx-dd-empty">Ninguno</div>';
+
+        function firstLabel(list, key) {
+          if (!list || !list.length) return "—";
+          for (var i = 0; i < list.length; i++) {
+            if (!key || key === "all" || langKey(list[i]) === key) {
+              return serverLabel(list[i]);
+            }
+          }
+          return serverLabel(list[0]);
+        }
+        var srvInit = firstLabel(normals, preferred);
+        var srvDd = makeDropdown({
+          id: "kxSrvDd",
+          label: "SERVIDOR",
+          icon: "▶",
+          valueText: srvInit,
+          menuHtml: srvMenuHtml
+        });
+        if (srvInit && srvInit !== "—") {
+          srvDd.btn.classList.add("kx-dd-value-only");
+        }
+
+        // —— Directos ——
+        var dirMenuHtml = directs.length
+          ? directs
+              .map(function (p) {
+                var idx = players.indexOf(p);
+                var lk = langKey(p);
+                var lang = langLabel(p);
+                return (
+                  '<button type="button" class="kx-chip-proxy" data-i="' +
+                  idx +
+                  '" data-mode="direct" data-lang="' +
+                  lk +
+                  '"><span>' +
+                  esc(serverLabel(p)) +
+                  "</span>" +
+                  (lang
+                    ? '<span class="kx-dd-meta">' + esc(lang) + "</span>"
+                    : "") +
+                  "</button>"
+                );
+              })
+              .join("")
+          : '<div class="kx-dd-empty">Ninguno</div>';
+
+        var dirInit = firstLabel(directs, preferred);
+        var dirDd = makeDropdown({
+          id: "kxDirDd",
+          label: "DIRECTO",
+          icon: "⚡",
+          valueText: dirInit,
+          menuHtml: dirMenuHtml
+        });
+        if (dirInit && dirInit !== "—") {
+          dirDd.btn.classList.add("kx-dd-value-only");
+        }
+
+        // Ocultar bloques inferiores
+        if (srvEl) {
+          var b1 = srvEl.closest(".kx-block");
+          if (b1) b1.classList.add("kx-block--servers-hidden");
+        }
+        if (dirEl) {
+          var b2 = dirEl.closest(".kx-block");
+          if (b2) b2.classList.add("kx-block--servers-hidden");
+        }
+
+        function applyLang(key) {
+          $all("#kxSrvDd .kx-chip-proxy[data-lang], #kxDirDd .kx-chip-proxy[data-lang]").forEach(
+            function (btn) {
+              var lk = btn.getAttribute("data-lang") || "otros";
+              var show = key === "all" || lk === key;
+              if (show) btn.classList.remove("kx-lang-hide");
+              else btn.classList.add("kx-lang-hide");
+            }
+          );
+          if (langDd) {
+            var k = key === "all" ? "all" : key;
+            setDdValue(langDd, langShort(k), { icon: langFlag(k) });
+            $all("#kxLangDd .kx-dd-menu button").forEach(function (b) {
+              if (b.getAttribute("data-lang") === key) b.classList.add("active");
+              else b.classList.remove("active");
+            });
+          }
+          var sLab = firstLabel(normals, key);
+          var dLab = firstLabel(directs, key);
+          setDdValue(srvDd, sLab, { valueOnly: sLab && sLab !== "—" });
+          setDdValue(dirDd, dLab, { valueOnly: dLab && dLab !== "—" });
+        }
+
+        if (langDd) {
+          langDd.menu.addEventListener("click", function (e) {
+            var t = e.target.closest("button[data-lang]");
+            if (!t) return;
+            applyLang(t.getAttribute("data-lang") || "all");
+            closeAllDd();
+          });
+        }
+
+        function bindPick(dd) {
+          if (!dd) return;
+          dd.menu.addEventListener("click", function (e) {
+            var t = e.target.closest("button.kx-chip-proxy");
+            if (!t || t.classList.contains("kx-lang-hide")) return;
+            e.preventDefault();
+            e.stopPropagation();
+            var i = Number(t.getAttribute("data-i"));
+            var mode = t.getAttribute("data-mode") || "iframe";
+            setDdValue(dd, serverLabel(players[i]), { valueOnly: true });
+            closeAllDd();
+            if (typeof window.__kxPlayServer === "function") {
+              window.__kxPlayServer(i, mode, t);
+            } else {
+              window.__kxPick = { i: i, mode: mode, btn: t };
+            }
+          });
+        }
+        bindPick(srvDd);
+        bindPick(dirDd);
+
+        document.addEventListener("click", function () {
+          closeAllDd();
+        });
+
+        if (options.length > 0) applyLang(preferred);
+        else applyLang("all");
+      })();
 
       /* Episodios sidebar + mobile */
       if (type === "tv") {
@@ -1071,7 +1452,7 @@
       }
 
       async function play(p, mode, btn) {
-        $all(".kx-chip").forEach(function (x) {
+        $all(".kx-chip, .kx-chip-proxy").forEach(function (x) {
           x.classList.remove("active");
         });
         if (btn) btn.classList.add("active");
@@ -1121,13 +1502,35 @@
           '<div class="player-empty"><span class="kx-empty-ico">!</span><span class="kx-load-text">No se pudo iniciar este servidor.<br>Prueba otro.</span></div>';
       }
 
-      $all(".kx-chip").forEach(function (btn) {
-        btn.onclick = function () {
+      function onServerPick(i, mode, btn) {
+        if (i == null || isNaN(i) || !players[i]) return;
+        mode = mode || "iframe";
+        var dd = btn && btn.closest ? btn.closest(".kx-dd") : null;
+        if (dd) {
+          var val = dd.querySelector(".kx-dd-value");
+          if (val) val.textContent = serverLabel(players[i]);
+          var b = dd.querySelector(".kx-dd-btn");
+          if (b) b.classList.add("kx-dd-value-only");
+        }
+        play(players[i], mode, btn);
+      }
+      window.__kxPlayServer = onServerPick;
+
+      $all(".kx-chip, .kx-chip-proxy").forEach(function (btn) {
+        btn.onclick = function (e) {
+          if (btn.classList.contains("kx-lang-hide")) return;
+          if (e) e.stopPropagation();
           var i = Number(btn.dataset.i);
           var mode = btn.dataset.mode || "iframe";
-          play(players[i], mode, btn);
+          onServerPick(i, mode, btn);
         };
       });
+
+      if (window.__kxPick) {
+        var pk = window.__kxPick;
+        window.__kxPick = null;
+        onServerPick(pk.i, pk.mode, pk.btn);
+      }
 
       // Auto: preferido → primer normal → primer directo
       function pickUpnShare(list) {
@@ -1177,18 +1580,45 @@
                 : "iframe";
         }
       }
-      // Otras fuentes: primer servidor de la lista (NO recordar el de otra peli/serie)
+      // Primer servidor del idioma (sin pisar preferencia anime/UPN si ya hay auto)
+      function firstOfLang(list, key) {
+        if (!list || !list.length) return null;
+        if (!key || key === "all") return list[0];
+        for (var fi = 0; fi < list.length; fi++) {
+          if (langKey(list[fi]) === key) return list[fi];
+        }
+        return null;
+      }
+      // Solo si aún no hay auto (UPN anime se respeta)
       if (!auto) {
-        auto = normals[0] || directs[0] || players[0];
-        autoMode =
-          isDirectPlayer(auto) && !isNormalPlayer(auto) ? "direct" : "iframe";
-        if (normals.indexOf(auto) >= 0) autoMode = "iframe";
-        else if (directs.indexOf(auto) >= 0) autoMode = "direct";
+        auto =
+          firstOfLang(normals, preferredLangForAuto) ||
+          firstOfLang(directs, preferredLangForAuto) ||
+          normals[0] ||
+          directs[0] ||
+          players[0];
+        if (auto) {
+          autoMode =
+            isDirectPlayer(auto) && !isNormalPlayer(auto) ? "direct" : "iframe";
+          if (normals.indexOf(auto) >= 0) autoMode = "iframe";
+          else if (directs.indexOf(auto) >= 0) autoMode = "direct";
+        }
       }
       var autoIdx = players.indexOf(auto);
       var autoBtn = $(
+        '.kx-chip-proxy[data-i="' + autoIdx + '"][data-mode="' + autoMode + '"]'
+      ) || $(
         '.kx-chip[data-i="' + autoIdx + '"][data-mode="' + autoMode + '"]'
-      ) || $('.kx-chip[data-i="' + autoIdx + '"]');
+      ) || $('.kx-chip-proxy[data-i="' + autoIdx + '"]') || $('.kx-chip[data-i="' + autoIdx + '"]');
+      if (autoBtn) {
+        var dd = autoBtn.closest(".kx-dd");
+        if (dd) {
+          var val = dd.querySelector(".kx-dd-value");
+          if (val && auto) val.textContent = serverLabel(auto);
+          var b = dd.querySelector(".kx-dd-btn");
+          if (b) b.classList.add("kx-dd-value-only");
+        }
+      }
       if (auto) play(auto, autoMode, autoBtn);
       else box.innerHTML = '<div class="player-empty"><span class="kx-empty-ico">▶</span><span class="kx-load-text">Selecciona un servidor.</span></div>';
     } catch (e) {
