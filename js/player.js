@@ -41,27 +41,42 @@
   }
 
   function langLabel(p) {
-    var only = String((p && (p.idioma || p.language || p.lang)) || "").trim();
-    var blob = [
-      only,
-      p && p.name,
-      p && p.provider,
-      p && p.servidor,
-      p && p.server
-    ]
-      .filter(Boolean)
-      .join(" ");
-    var l = String(blob || "").toLowerCase();
-    if (/castellano|castella|\bespaña\b|\bspain\b/.test(l)) return "Castellano";
-    if (/(^|\b)(sub|subs|subtitul|vose|vos)(\b|$)/i.test(l) && !/latino|\blat\b/.test(l))
+    // Solo campos de idioma (no mezclar con nombre del servidor)
+    var only = String(
+      (p && (p.idioma || p.language || p.lang || p.lang_code)) || ""
+    ).trim();
+    var l = only.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    // Orden importa: Latino explícito ANTES que "español" genérico
+    if (
+      /latino|latam|es-?mx|es_la|\blat\b|espanol\s*latino|español\s*latino|audio\s*lat/i.test(
+        l
+      )
+    ) {
+      return "Latino";
+    }
+    if (/(^|\b)(sub|subs|subtitul|vose|vos)(\b|$)/i.test(l)) {
       return "Subtitulado";
-    if (/\blat\b|latino|latam|es-?mx|es_la|doblaj/.test(l)) return "Latino";
-    if (/sub|subtitul/i.test(l)) return "Subtitulado";
-    if (!only) return "";
-    if (/lat|dub|español|espanol|latino/i.test(only)) return "Latino";
-    if (/sub/i.test(only)) return "Subtitulado";
-    if (/castellano|castella/i.test(only)) return "Castellano";
-    return only;
+    }
+    // "Español", "ESPAÑOL", "Castellano", España → Castellano (NO Latino)
+    if (
+      /castellano|castella|\bespana\b|\bspain\b|^es$|^esp$|\bespanol\b|\bespañol\b/i.test(
+        l
+      )
+    ) {
+      return "Castellano";
+    }
+    if (/eng|ingl|english/i.test(l)) return "English";
+
+    // Fallback: mirar nombre del servidor solo por marcas claras
+    var name = String(
+      (p && (p.name || p.servidor || p.server || p.provider)) || ""
+    ).toLowerCase();
+    if (/latino|\blat\b|latam/.test(name)) return "Latino";
+    if (/castellano|\bcast\b/.test(name)) return "Castellano";
+    if (/\bsub\b|subtit/.test(name)) return "Subtitulado";
+
+    return only || "";
   }
 
   function langKey(p) {
