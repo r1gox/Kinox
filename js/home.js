@@ -17,7 +17,7 @@
       (typeof MZ_SEARCH !== "undefined" && MZ_SEARCH) ||
       "https://moviezone.tvjz.workers.dev";
     // Catálogo inicio: siempre 9 (pelis/series). No usar mz_source=5 (JK) aquí.
-    var SID = "3"; //9
+    var SID = "9"; //9
     var SID_FALLBACK = "3";
 
     function workerGet(path, tries) {
