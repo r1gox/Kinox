@@ -3,7 +3,7 @@ const TMDB_KEY='';const API='https://api.themoviedb.org/3',IMG='https://image.tm
 const MZ_SEARCH='https://moviezone.tvjz.workers.dev';
 // Base del worker (detalle/buscador; worker.js puede sobrescribir)
 var MZ_WORKER = (typeof MZ_WORKER !== 'undefined' && MZ_WORKER) || MZ_SEARCH;
-var MZ_SOURCE = (typeof MZ_SOURCE !== 'undefined' && MZ_SOURCE) || '1'; //9
+var MZ_SOURCE = (typeof MZ_SOURCE !== 'undefined' && MZ_SOURCE) || '2'; //9
 const $=(s,r=document)=>r.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
 let KEY=TMDB_KEY||store.get('mz_key','');
