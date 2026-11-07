@@ -9,12 +9,33 @@
   var urlState = location.hash + location.search;
   var isOAuth = /access_token=|refresh_token=/.test(location.hash);
 
-  function el(html) { var d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild; }
+  var COPY = {
+    login: { title: 'Bienvenido de nuevo', sub: 'Inicia sesión para sincronizar tu lista, tu historial y tus perfiles.', cta: 'Iniciar sesión' },
+    register: { title: 'Crea tu cuenta', sub: 'Es gratis y toma menos de un minuto.', cta: 'Crear cuenta' },
+    recover: { title: 'Recupera tu contraseña', sub: 'Escribe el correo de tu cuenta y te enviamos un enlace para elegir una nueva.', cta: 'Enviar enlace' },
+    reset: { title: 'Elige una nueva contraseña', sub: 'Usa al menos 8 caracteres.', cta: 'Guardar contraseña' },
+  };
+
+  var S = 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
+  var ICON = {
+    mail: '<svg viewBox="0 0 24 24" ' + S + ' aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M4 7l8 6 8-6"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" ' + S + ' aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M8 10V8a4 4 0 0 1 8 0v2"/></svg>',
+    user: '<svg viewBox="0 0 24 24" ' + S + ' aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 19c.8-3.4 3.6-5 7-5s6.2 1.6 7 5"/></svg>',
+    eye: '<svg viewBox="0 0 24 24" ' + S + ' aria-hidden="true"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    eyeOff: '<svg viewBox="0 0 24 24" ' + S + ' aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 6.2A10 10 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.2 3.9M6.6 7.6C3.9 9.3 2 12 2 12s3.5 6 10 6c1.5 0 2.8-.3 4-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+    cloud: '<svg viewBox="0 0 24 24" ' + S + ' aria-hidden="true"><path d="M7 18a4 4 0 0 1-.6-7.96A5.5 5.5 0 0 1 17 8.5a4.75 4.75 0 0 1 .5 9.5z"/><path d="M9 13l2 2 4-4"/></svg>',
+    users: '<svg viewBox="0 0 24 24" ' + S + ' aria-hidden="true"><circle cx="9" cy="8.5" r="3"/><path d="M3 19c.7-3 3-4.5 6-4.5s5.3 1.5 6 4.5"/><path d="M16 5.8a3 3 0 0 1 0 5.4M17.5 14.6c2 .5 3.1 2 3.5 4.4"/></svg>',
+    heart: '<svg viewBox="0 0 24 24" ' + S + ' aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>',
+    play: '<svg viewBox="0 0 24 24" ' + S + ' aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M10 8.8l5 3.2-5 3.2z"/></svg>',
+    logo: '<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b4ff0"/><stop offset="1" stop-color="#d6347f"/></linearGradient></defs><rect width="64" height="64" rx="16" fill="url(#lg)"/><path d="M25 19l22 13-22 13z" fill="#fff"/></svg>',
+  };
+
   function say(text, bad) {
     var m = document.getElementById('acMsg');
     if (!m) return;
     m.textContent = text || '';
-    m.className = 'ac-msg ' + (bad ? 'bad' : 'ok');
+    m.className = 'ac-msg' + (text ? (bad ? ' bad' : ' ok') : '');
+    m.setAttribute('role', bad ? 'alert' : 'status');
   }
   function friendly(err) {
     var m = String((err && err.message) || err || '');
@@ -26,19 +47,56 @@
     if (/failed to fetch|network/i.test(m)) return 'Sin conexión con el servidor. Inténtalo de nuevo.';
     return m || 'Ocurrió un error inesperado.';
   }
-  function frame(inner) {
-    view.innerHTML = '<section class="page account" style="max-width:520px"><h1>Cuenta</h1>' + inner + '<p id="acMsg" class="ac-msg" role="status" aria-live="polite"></p></section>';
+
+  // ---------- Estructura general: panel de marca + tarjeta ----------
+  function brandPanel() {
+    return (
+      '<aside class="auth-brand"><div class="ab-logo"><span class="ab-mark">' + ICON.logo + '</span><span>MovieZone</span></div>' +
+      '<h2>Tu cine, en todos tus dispositivos</h2>' +
+      '<p>Guarda tu lista y sigue donde lo dejaste, en el teléfono, la computadora o la tele.</p>' +
+      '<ul class="ab-list">' +
+      '<li><span>' + ICON.users + '</span>Perfiles con avatar o tu propia foto</li>' +
+      '<li><span>' + ICON.heart + '</span>Favoritos, “Ver después” y “Vistas”</li>' +
+      '<li><span>' + ICON.play + '</span>Episodios y progreso sincronizados</li>' +
+      '<li><span>' + ICON.cloud + '</span>Copia automática de tus datos</li>' +
+      '</ul><p class="ab-foot">Gratis y sin anuncios</p></aside>'
+    );
+  }
+  function frame(inner, solo) {
+    view.innerHTML =
+      '<div class="auth' + (solo ? ' auth-solo' : '') + '">' + (solo ? '' : brandPanel()) +
+      '<section class="auth-card" aria-labelledby="authTitle">' + inner + '<div id="acMsg" class="ac-msg" role="status" aria-live="polite"></div></section></div>';
+  }
+  function waiting(text) {
+    frame('<div class="auth-wait" role="status"><span class="spin" aria-hidden="true"></span><p id="authTitle">' + esc(text) + '</p></div>', true);
   }
 
   function renderNotConfigured() {
     frame(
-      '<p class="ac-note">La cuenta todavía no está configurada en este sitio. Quien administra el sitio debe rellenar <code>js/config.js</code> con la URL y la <em>anon key</em> de Supabase (pasos en el README).</p>' +
-      '<p class="ac-note">Mientras tanto, tus perfiles, favoritos e historial se guardan en este navegador. Puedes descargarlos desde <a href="' + esc(pageHref('perfil.html')) + '">Perfil</a>.</p>'
+      '<h1 id="authTitle">Cuenta no disponible</h1>' +
+      '<p class="auth-sub">La cuenta todavía no está configurada en este sitio. Quien lo administra debe rellenar <code>js/config.js</code> con la URL y la <em>anon key</em> de Supabase (los pasos están en el README).</p>' +
+      '<p class="auth-sub">Mientras tanto, tus perfiles, favoritos e historial se guardan en este navegador. Puedes verlos desde <a href="' + esc(pageHref('perfil.html')) + '">Perfil</a>.</p>',
+      true
     );
   }
 
-  function field(id, label, type, extra) {
-    return '<label for="' + id + '">' + label + '</label><input id="' + id + '" type="' + type + '" ' + (extra || '') + '>';
+  // ---------- Campos ----------
+  function field(o) {
+    var pw = o.type === 'password';
+    return (
+      '<div class="fld"><label for="' + o.id + '">' + o.label + '</label><div class="fld-box"><span class="fld-ic">' + ICON[o.icon] + '</span>' +
+      '<input id="' + o.id + '" type="' + o.type + '" autocomplete="' + o.auto + '" placeholder="' + o.ph + '" aria-describedby="' + o.id + 'Err" ' + (o.extra || '') + '>' +
+      (pw ? '<button type="button" class="fld-eye" data-eye="' + o.id + '" aria-label="Mostrar contraseña" aria-pressed="false">' + ICON.eye + '</button>' : '') +
+      '</div><p class="fld-err" id="' + o.id + 'Err" role="alert"></p></div>'
+    );
+  }
+  function setErr(id, msg) {
+    var input = document.getElementById(id), p = document.getElementById(id + 'Err');
+    if (!input || !p) return;
+    p.textContent = msg || '';
+    input.setAttribute('aria-invalid', msg ? 'true' : 'false');
+    var box = input.closest ? input.closest('.fld') : null;
+    if (box) box.classList.toggle('bad', !!msg);
   }
 
   function googleButton() {
@@ -86,47 +144,107 @@
     setTimeout(function () { location.href = pageHref('perfil.html'); }, 800);
   }
 
+  // ---------- Pantalla de acceso ----------
   function renderLoggedOut() {
-    var titles = { login: 'Iniciar sesión', register: 'Crear cuenta', recover: 'Recuperar contraseña', reset: 'Nueva contraseña' };
-    var body = '';
-    if (mode === 'login') body = field('acEmail', 'Correo', 'email', 'autocomplete="email" required') + field('acPass', 'Contraseña', 'password', 'autocomplete="current-password" required');
-    if (mode === 'register') body = field('acName', 'Nombre (opcional)', 'text', 'maxlength="16" autocomplete="nickname"') + field('acEmail', 'Correo', 'email', 'autocomplete="email" required') + field('acPass', 'Contraseña (mínimo 8)', 'password', 'autocomplete="new-password" minlength="8" required');
-    if (mode === 'recover') body = field('acEmail', 'Correo de tu cuenta', 'email', 'autocomplete="email" required');
-    if (mode === 'reset') body = field('acPass', 'Nueva contraseña (mínimo 8)', 'password', 'autocomplete="new-password" minlength="8" required');
+    var c = COPY[mode];
+    var fields = '';
+    if (mode === 'login') {
+      fields =
+        field({ id: 'acEmail', label: 'Correo electrónico', type: 'email', icon: 'mail', auto: 'email', ph: 'nombre@correo.com', extra: 'inputmode="email" autocapitalize="off" spellcheck="false"' }) +
+        field({ id: 'acPass', label: 'Contraseña', type: 'password', icon: 'lock', auto: 'current-password', ph: 'Tu contraseña' });
+    }
+    if (mode === 'register') {
+      fields =
+        field({ id: 'acName', label: 'Nombre <span class="opt">(opcional)</span>', type: 'text', icon: 'user', auto: 'nickname', ph: 'Cómo quieres que te llamemos', extra: 'maxlength="16"' }) +
+        field({ id: 'acEmail', label: 'Correo electrónico', type: 'email', icon: 'mail', auto: 'email', ph: 'nombre@correo.com', extra: 'inputmode="email" autocapitalize="off" spellcheck="false"' }) +
+        field({ id: 'acPass', label: 'Contraseña', type: 'password', icon: 'lock', auto: 'new-password', ph: 'Mínimo 8 caracteres', extra: 'minlength="8"' }) +
+        '<div class="pw-meter" id="pwMeter" data-level="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div><p class="pw-text" id="pwText" aria-live="polite"></p>';
+    }
+    if (mode === 'recover') {
+      fields = field({ id: 'acEmail', label: 'Correo de tu cuenta', type: 'email', icon: 'mail', auto: 'email', ph: 'nombre@correo.com', extra: 'inputmode="email" autocapitalize="off" spellcheck="false"' });
+    }
+    if (mode === 'reset') {
+      fields = field({ id: 'acPass', label: 'Nueva contraseña', type: 'password', icon: 'lock', auto: 'new-password', ph: 'Mínimo 8 caracteres', extra: 'minlength="8"' }) +
+        '<div class="pw-meter" id="pwMeter" data-level="0" aria-hidden="true"><i></i><i></i><i></i><i></i></div><p class="pw-text" id="pwText" aria-live="polite"></p>';
+    }
+    var tabs = mode === 'login' || mode === 'register'
+      ? '<div class="auth-tabs" role="tablist" aria-label="Acceso"><button type="button" role="tab" data-mode="login" aria-selected="' + (mode === 'login') + '">Iniciar sesión</button><button type="button" role="tab" data-mode="register" aria-selected="' + (mode === 'register') + '">Crear cuenta</button></div>'
+      : '';
+    var foot =
+      mode === 'login' ? '<p class="auth-links"><a href="#" data-mode="recover">¿Olvidaste tu contraseña?</a></p>'
+      : mode === 'register' ? '<p class="auth-links">¿Ya tienes cuenta? <a href="#" data-mode="login">Inicia sesión</a></p>'
+      : mode === 'recover' ? '<p class="auth-links"><a href="#" data-mode="login">← Volver a iniciar sesión</a></p>'
+      : '';
     frame(
-      (mode === 'login' || mode === 'register'
-        ? '<div class="ac-tabs" role="tablist"><button type="button" role="tab" data-mode="login" aria-selected="' + (mode === 'login') + '">Iniciar sesión</button><button type="button" role="tab" data-mode="register" aria-selected="' + (mode === 'register') + '">Crear cuenta</button></div>'
-        : '<h2>' + titles[mode] + '</h2>') +
+      '<div class="auth-logo-m"><span class="ab-mark">' + ICON.logo + '</span><span>MovieZone</span></div>' +
+      tabs +
+      '<h1 id="authTitle">' + c.title + '</h1><p class="auth-sub">' + c.sub + '</p>' +
       (mode === 'login' || mode === 'register' ? googleButton() : '') +
-      '<div class="ac-form">' + body + '<button type="button" class="btn" id="acGo">' + titles[mode] + '</button></div>' +
-      (mode === 'login' ? '<p class="ac-links"><a href="#" data-mode="recover">¿Olvidaste tu contraseña?</a></p>' : '') +
-      (mode === 'recover' ? '<p class="ac-links"><a href="#" data-mode="login">← Volver</a></p>' : '') +
-      '<p class="ac-note">Con una cuenta tus perfiles, favoritos, historial y episodios vistos se sincronizan entre dispositivos. No es obligatoria. ' +
-      (mode === 'register' ? 'Al crearla aceptas nuestra ' : 'Consulta nuestra ') + '<a href="/privacidad">política de privacidad</a>.</p>'
+      '<div class="ac-form">' + fields +
+      '<button type="button" class="btn-primary" id="acGo"><span class="btn-spin" aria-hidden="true"></span><span class="btn-label">' + c.cta + '</span></button></div>' +
+      foot +
+      '<p class="auth-note">' + (mode === 'register' ? 'Al crear tu cuenta aceptas nuestra ' : 'Consulta nuestra ') + '<a href="/privacidad">política de privacidad</a>. La cuenta es opcional: sin ella tus datos se guardan solo en este navegador.</p>'
     );
+
     Array.prototype.forEach.call(view.querySelectorAll('[data-mode]'), function (b) {
       b.onclick = function (e) { e.preventDefault(); mode = b.getAttribute('data-mode'); renderLoggedOut(); };
     });
     var gb = document.getElementById('acGoogle');
     if (gb) gb.onclick = googleSignIn;
-    var go = document.getElementById('acGo');
-    go.onclick = submit;
+    Array.prototype.forEach.call(view.querySelectorAll('[data-eye]'), function (b) {
+      b.onclick = function () {
+        var inp = document.getElementById(b.getAttribute('data-eye'));
+        var show = inp.type === 'password';
+        inp.type = show ? 'text' : 'password';
+        b.innerHTML = show ? ICON.eyeOff : ICON.eye;
+        b.setAttribute('aria-pressed', show ? 'true' : 'false');
+        b.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+      };
+    });
+    var em = document.getElementById('acEmail');
+    if (em) {
+      em.oninput = function () { setErr('acEmail', ''); };
+      em.onblur = function () { if (em.value.trim() && !mzEmailValid(em.value)) setErr('acEmail', 'Escribe un correo válido, por ejemplo nombre@correo.com.'); };
+    }
+    var pw = document.getElementById('acPass');
+    if (pw) {
+      pw.oninput = function () {
+        setErr('acPass', '');
+        var meter = document.getElementById('pwMeter');
+        if (!meter) return;
+        var s = mzPasswordStrength(pw.value);
+        meter.setAttribute('data-level', String(s.level));
+        document.getElementById('pwText').textContent = s.label ? 'Seguridad: ' + s.label : '';
+      };
+    }
+    document.getElementById('acGo').onclick = submit;
     Array.prototype.forEach.call(view.querySelectorAll('input'), function (i) {
       i.onkeydown = function (e) { if (e.key === 'Enter') submit(); };
     });
   }
 
-  async function submit() {
+  function busy(on) {
     var go = document.getElementById('acGo');
-    var email = (document.getElementById('acEmail') || {}).value;
-    var pass = (document.getElementById('acPass') || {}).value;
+    if (!go) return;
+    go.disabled = !!on;
+    go.classList.toggle('is-busy', !!on);
+    var l = go.querySelector('.btn-label');
+    if (l) l.textContent = on ? 'Un momento…' : COPY[mode].cta;
+  }
+
+  async function submit() {
+    var email = ((document.getElementById('acEmail') || {}).value || '').trim();
+    var pass = (document.getElementById('acPass') || {}).value || '';
     var name = ((document.getElementById('acName') || {}).value || '').trim();
-    email = (email || '').trim();
-    if (mode !== 'reset' && !/^\S+@\S+\.\S+$/.test(email)) return say('Escribe un correo válido.', true);
-    if ((mode === 'register' || mode === 'reset') && (pass || '').length < 8) return say('La contraseña debe tener al menos 8 caracteres.', true);
-    if (mode === 'login' && !pass) return say('Escribe tu contraseña.', true);
-    go.disabled = true;
-    say('Un momento…');
+    say('');
+    setErr('acEmail', '');
+    setErr('acPass', '');
+    var first = '';
+    if (mode !== 'reset' && !mzEmailValid(email)) { setErr('acEmail', 'Escribe un correo válido, por ejemplo nombre@correo.com.'); first = first || 'acEmail'; }
+    if (mode === 'login' && !pass) { setErr('acPass', 'Escribe tu contraseña.'); first = first || 'acPass'; }
+    if ((mode === 'register' || mode === 'reset') && pass.length < 8) { setErr('acPass', 'Usa al menos 8 caracteres.'); first = first || 'acPass'; }
+    if (first) { var f = document.getElementById(first); if (f && f.focus) f.focus(); return; }
+    busy(true);
     try {
       var auth = cloud.client.auth;
       if (mode === 'login') {
@@ -148,8 +266,8 @@
       } else if (mode === 'recover') {
         var r3 = await auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
         if (r3.error) throw r3.error;
-        go.disabled = false;
-        return say('Si el correo existe, te enviamos un enlace para cambiar la contraseña.');
+        busy(false);
+        return say('Si el correo existe, te enviamos un enlace para cambiar la contraseña. Revisa también spam.');
       } else if (mode === 'reset') {
         var r4 = await auth.updateUser({ password: pass });
         if (r4.error) throw r4.error;
@@ -158,30 +276,38 @@
       cloud.user = (await auth.getSession()).data.session?.user || null;
       if (cloud.user) await syncAndGo();
     } catch (e) {
-      go.disabled = false;
+      busy(false);
       say(friendly(e), true);
     }
   }
 
+  // ---------- Con sesión iniciada ----------
   function renderLoggedIn() {
     var u = cloud.user;
     var md = u.user_metadata || {};
     var meta = md.display_name || md.full_name || md.name || '';
-    var at = localStorage.getItem('mz_sync_at');
+    var provs = ((u.app_metadata && u.app_metadata.providers) || []).filter(function (p) { return p === 'email' || p === 'google'; });
     frame(
-      '<div class="ac-card"><div class="ac-avatar" aria-hidden="true"></div><div><strong id="acWho"></strong><small id="acMail"></small></div></div>' +
-      '<p class="ac-note" id="acSync"></p>' +
-      '<div class="ac-actions"><button type="button" class="btn" id="acSyncNow">Sincronizar ahora</button><button type="button" class="btn alt" id="acOut">Cerrar sesión</button></div>' +
+      '<div class="acct-head"><div class="ac-avatar" aria-hidden="true"></div><div class="acct-id">' +
+      '<h1 id="authTitle"></h1><p class="acct-mail" id="acMail"></p>' +
+      '<div class="acct-badges">' + provs.map(function (p) { return '<span class="acct-badge">' + (p === 'google' ? 'Google' : 'Correo') + '</span>'; }).join('') + '</div></div></div>' +
+      '<div class="acct-sync"><span class="sc-dot" aria-hidden="true"></span><span id="acSync"></span></div>' +
+      '<div class="acct-actions"><button type="button" class="btn-primary" id="acSyncNow"><span class="btn-label">Sincronizar ahora</span></button>' +
+      '<a class="btn-ghost" href="' + esc(pageHref('perfil.html')) + '">Elegir perfil</a>' +
+      '<button type="button" class="btn-ghost" id="acOut">Cerrar sesión</button></div>' +
       '<details class="ac-danger"><summary>Más opciones</summary>' +
-      '<p class="ac-note">Borra de la nube los datos sincronizados. No borra tu cuenta ni los datos de este dispositivo.</p><button type="button" class="btn alt" id="acDel">Borrar mis datos de la nube</button>' +
-      '<p class="ac-note">Elimina tu cuenta y todo lo que está guardado en ella, de forma permanente. Los datos de este dispositivo no se borran.</p><button type="button" class="btn alt ac-kill" id="acKill">Eliminar mi cuenta</button></details>'
+      '<div class="ac-danger-row"><div><b>Borrar mis datos de la nube</b><p>Elimina lo sincronizado. No borra tu cuenta ni los datos de este dispositivo.</p></div><button type="button" class="btn-ghost" id="acDel">Borrar datos</button></div>' +
+      '<div class="ac-danger-row"><div><b>Eliminar mi cuenta</b><p>Borra tu cuenta y todo lo guardado en ella, de forma permanente. Los datos de este dispositivo no se borran.</p></div><button type="button" class="btn-ghost ac-kill" id="acKill">Eliminar cuenta</button></div></details>',
+      true
     );
-    document.getElementById('acWho').textContent = meta || 'Mi cuenta';
+    document.getElementById('authTitle').textContent = meta ? 'Hola, ' + meta : 'Mi cuenta';
     document.getElementById('acMail').textContent = u.email || '';
     document.querySelector('.ac-avatar').textContent = String(meta || u.email || '?').charAt(0).toUpperCase();
     function paintSync() {
       var t = localStorage.getItem('mz_sync_at');
-      document.getElementById('acSync').textContent = t ? 'Última sincronización: ' + new Date(t).toLocaleString('es') : 'Aún no se ha sincronizado.';
+      var txt = 'Aún no se ha sincronizado.';
+      if (t) txt = 'Sincronizado ' + (typeof mzTimeAgo === 'function' ? mzTimeAgo(t) : new Date(t).toLocaleString('es'));
+      document.getElementById('acSync').textContent = txt;
     }
     paintSync();
     document.getElementById('acSyncNow').onclick = async function () {
@@ -229,10 +355,13 @@
   function render() { if (cloud.user) renderLoggedIn(); else renderLoggedOut(); }
 
   async function start() {
-    view.innerHTML = '<div class="load is-loading" role="status">Cargando cuenta…</div>';
+    waiting('Cargando cuenta…');
     cloud = await mzCloudLoaded();
     if (!cloud || !cloud.configured) return renderNotConfigured();
-    try { await cloud.ready; } catch (e) { return frame('<p class="ac-note">' + esc(friendly(e)) + '</p>'); }
+    try { await cloud.ready; } catch (e) {
+      frame('<h1 id="authTitle">No se pudo cargar</h1><p class="auth-sub">' + esc(friendly(e)) + '</p>', true);
+      return;
+    }
     document.addEventListener('mz:auth', function (ev) {
       if (ev.detail && ev.detail.event === 'PASSWORD_RECOVERY') { mode = 'reset'; renderLoggedOut(); }
     });
@@ -243,7 +372,7 @@
       return say(oauthError, true);
     }
     if (isRecovery) { mode = 'reset'; renderLoggedOut(); }
-    else if (isOAuth && cloud.user) { frame('<p class="ac-note">Entrando con tu cuenta de Google…</p>'); await syncAndGo(); }
+    else if (isOAuth && cloud.user) { waiting('Entrando con tu cuenta de Google…'); await syncAndGo(); }
     else render();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
