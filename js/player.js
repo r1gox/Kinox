@@ -1293,6 +1293,7 @@
           "</div>" +
           castHtml +
           '<div class="kx-info kx-playback-controls">' +
+          '<div class="kx-ep-mobile" id="kxEpMobile"></div>' +
           '<div class="kx-block">' +
           '<h3 class="kx-block-title">Reproductores</h3>' +
           '<div class="kx-chips" id="kxServers"></div>' +
@@ -1301,7 +1302,9 @@
           '<h3 class="kx-block-title">Directos</h3>' +
           '<div class="kx-chips" id="kxDirects"></div>' +
           "</div>" +
-          '<div class="kx-ep-mobile" id="kxEpMobile"></div>' +
+          "</div>" +
+          '<div class="kx-info kx-episode-synopsis-mobile">' +
+          (epOverview ? '<p class="kx-synopsis">' + esc(epOverview) + "</p>" : "") +
           "</div>" +
           "</section>";
       } else {
@@ -1325,6 +1328,17 @@
           '</div>' +
           castHtml +
           "</section>";
+      }
+
+      // En móvil, dejar la cabecera de serie solo con su título y poner
+      // el selector de temporada junto a la lista de episodios.
+      if (type === "tv" && window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
+        var mobileSeasonControl = $(".kx-season-control");
+        var mobilePlaybackControls = $(".kx-playback-controls");
+        var mobileEpisodesList = $("#kxEpMobile");
+        if (mobileSeasonControl && mobilePlaybackControls && mobileEpisodesList) {
+          mobilePlaybackControls.insertBefore(mobileSeasonControl, mobileEpisodesList);
+        }
       }
 
       var box = $("#playerBox");

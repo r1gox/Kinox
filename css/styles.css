@@ -2043,3 +2043,195 @@ footer a:hover{color:#fff}
     -webkit-line-clamp: unset;
   }
 }
+
+/* KINOX móvil — jerarquía final de series/anime y ficha compacta de películas. */
+.kx-ep-view .kx-episode-synopsis-mobile { display: none; }
+
+@media (max-width: 900px) {
+  /* SERIES / ANIME: nombre principal antes del player. */
+  .kx-ep-view {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .kx-ep-view > .kx-topbar { order: 0 !important; }
+  .kx-ep-view > .kx-cinema-hero {
+    order: 1 !important;
+    width: calc(100% - 20px) !important;
+    margin: 4px auto 9px !important;
+    padding: 8px 2px 3px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .kx-ep-view > .kx-stage { order: 2 !important; }
+  .kx-ep-view > .kx-episode-summary { order: 3 !important; }
+  .kx-ep-view > .kx-playback-controls { order: 4 !important; }
+  .kx-ep-view > .kx-episode-synopsis-mobile { order: 5 !important; }
+  .kx-ep-view > .kx-cast-section { order: 6 !important; }
+
+  .kx-ep-view .kx-cinema-main {
+    display: block !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .kx-ep-view .kx-cinema-poster,
+  .kx-ep-view .kx-cinema-backdrop,
+  .kx-ep-view .kx-cinema-scrim,
+  .kx-ep-view .kx-cinema-facts,
+  .kx-ep-view .kx-genre-list,
+  .kx-ep-view .kx-overview-wrap,
+  .kx-ep-view .kx-cinema-credit,
+  .kx-ep-view .kx-season-single {
+    display: none !important;
+  }
+  .kx-ep-view .kx-cinema-copy {
+    width: 100% !important;
+    max-width: none !important;
+  }
+  .kx-ep-view .kx-cinema-kicker {
+    display: block !important;
+    margin: 0 0 4px !important;
+    font-size: .57rem !important;
+    letter-spacing: .15em !important;
+  }
+  .kx-ep-view .kx-cinema-copy h1 {
+    margin: 0 !important;
+    font-size: clamp(1.3rem, 5.2vw, 1.7rem) !important;
+    line-height: 1.15 !important;
+  }
+  /* Mantener el selector de temporada/arco para que los animes sigan navegables. */
+  .kx-ep-view .kx-season-control {
+    display: inline-flex !important;
+    margin-top: 8px !important;
+    font-size: .67rem !important;
+  }
+  .kx-ep-view .kx-season-control select {
+    width: auto !important;
+    max-width: min(250px, 72vw) !important;
+    min-height: 34px !important;
+  }
+
+  /* Debajo del player: solo T/E + nombre; sin duración ni sinopsis general. */
+  .kx-ep-view .kx-stage {
+    width: 100%;
+    padding: 0 10px !important;
+    margin: 0 !important;
+  }
+  .kx-ep-view .kx-episode-summary {
+    width: calc(100% - 20px) !important;
+    margin: 9px auto 4px !important;
+    padding: 0 !important;
+  }
+  .kx-ep-view .kx-episode-summary .kx-ep-heading {
+    margin: 0 !important;
+    font-size: clamp(1rem, 4.4vw, 1.23rem) !important;
+    line-height: 1.3 !important;
+  }
+  .kx-ep-view .kx-episode-summary .kx-ep-meta,
+  .kx-ep-view .kx-episode-summary .kx-synopsis {
+    display: none !important;
+  }
+
+  /* Primero la lista de episodios; los servidores siguen disponibles debajo. */
+  .kx-ep-view .kx-playback-controls {
+    display: flex !important;
+    flex-direction: column !important;
+    width: calc(100% - 20px) !important;
+    margin: 4px auto 0 !important;
+    padding: 0 !important;
+  }
+  .kx-ep-view .kx-playback-controls .kx-ep-mobile {
+    display: block !important;
+    order: 0 !important;
+    margin: 0 0 10px !important;
+  }
+  .kx-ep-view .kx-playback-controls .kx-block {
+    order: 1 !important;
+    margin: 0 0 9px !important;
+  }
+  .kx-ep-view .kx-episode-synopsis-mobile {
+    display: block !important;
+    width: calc(100% - 20px) !important;
+    margin: 7px auto 0 !important;
+    padding: 0 !important;
+  }
+  .kx-ep-view .kx-episode-synopsis-mobile .kx-synopsis {
+    max-width: none !important;
+    margin: 0 !important;
+    font-size: .82rem !important;
+    line-height: 1.6 !important;
+  }
+  .kx-ep-view > .kx-cast-section {
+    order: 6 !important;
+    width: calc(100% - 20px) !important;
+    margin: 15px auto 16px !important;
+  }
+
+  /* PELÍCULAS: ficha mínima bajo el player; kicker sobre el título. */
+  .kx-movie-view .kx-movie-player-area .kx-player-section-head {
+    display: none !important;
+  }
+  .kx-movie-info-column .kx-cinema-hero {
+    padding: 12px 2px 4px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  .kx-movie-info-column .kx-cinema-main {
+    display: block !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .kx-movie-info-column .kx-cinema-poster,
+  .kx-movie-info-column .kx-cinema-backdrop,
+  .kx-movie-info-column .kx-cinema-scrim,
+  .kx-movie-info-column .kx-cinema-facts,
+  .kx-movie-info-column .kx-genre-list {
+    display: none !important;
+  }
+  .kx-movie-info-column .kx-cinema-copy {
+    width: 100% !important;
+    max-width: none !important;
+  }
+  .kx-movie-info-column .kx-cinema-kicker {
+    display: block !important;
+    margin: 0 0 5px !important;
+    font-size: .57rem !important;
+    letter-spacing: .15em !important;
+  }
+  .kx-movie-info-column .kx-cinema-copy h1 {
+    margin: 0 0 8px !important;
+    font-size: clamp(1.25rem, 5vw, 1.65rem) !important;
+    line-height: 1.18 !important;
+  }
+  .kx-movie-info-column .kx-overview-wrap {
+    display: block !important;
+    margin: 0 !important;
+  }
+  .kx-movie-info-column .kx-cinema-overview {
+    display: block !important;
+    max-width: none !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    font-size: .82rem !important;
+    line-height: 1.6 !important;
+    -webkit-line-clamp: unset !important;
+  }
+  .kx-movie-info-column .kx-cinema-credit {
+    display: flex !important;
+    margin-top: 10px !important;
+  }
+  .kx-movie-view > .kx-cast-section {
+    margin-top: 14px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .kx-ep-view .kx-playback-controls .kx-season-control {
+    order: 0 !important;
+    align-self: flex-start;
+    margin: 0 0 8px !important;
+  }
+  .kx-ep-view .kx-playback-controls .kx-ep-mobile { order: 1 !important; }
+  .kx-ep-view .kx-playback-controls .kx-block { order: 2 !important; }
+}
