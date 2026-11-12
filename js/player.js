@@ -665,6 +665,92 @@
     return eps;
   }
 
+  /**
+   * One Piece y otros animes de numeración absoluta: convierte una temporada
+   * TMDB (1..N dentro del arco o numeración absoluta) a episodios E1..E1180.
+   * El reproductor del worker siempre recibe temporada 1 + episodio absoluto.
+   */
+  async function loadFlatAnimeArcEpsFromTmdb(tvId, seasonNum, seasonMeta, offset, totalEpisodes, workerEps) {
+    if (!tvId || !seasonMeta || typeof tmdb !== "function") return [];
+    var sn = parseInt(seasonNum, 10) || 1;
+    var count = parseInt(seasonMeta.episode_count, 10) || 0;
+    var off = parseInt(offset, 10) || 0;
+    var response = null;
+    try {
+      response = await tmdb("/tv/" + tvId + "/season/" + sn);
+    } catch (_) {}
+    var rows = response && Array.isArray(response.episodes) ? response.episodes.slice() : [];
+    if (!rows.length) return [];
+
+    var hasMissingMeta = rows.some(function (row) {
+      var n = parseInt(row && row.episode_number, 10) || 0;
+      return !row || !row.name || isGenericEpisodeName(row.name, n) || !row.overview;
+    });
+    if (hasMissingMeta) {
+      try {
+        var english = await tmdb("/tv/" + tvId + "/season/" + sn, { language: "en-US" });
+        var englishByNumber = Object.create(null);
+        ((english && english.episodes) || []).forEach(function (row) {
+          var n = parseInt(row && row.episode_number, 10);
+          if (n > 0) englishByNumber[n] = row;
+        });
+        rows = rows.map(function (row) {
+          var n = parseInt(row && row.episode_number, 10);
+          var alternate = englishByNumber[n];
+          if (!alternate) return row;
+          var merged = Object.assign({}, row);
+          if ((!merged.name || isGenericEpisodeName(merged.name, n)) && alternate.name && !isGenericEpisodeName(alternate.name, n)) merged.name = alternate.name;
+          if (!merged.overview) merged.overview = alternate.overview || "";
+          if (!merged.still_path) merged.still_path = alternate.still_path || null;
+          if (!merged.runtime) merged.runtime = alternate.runtime || null;
+          return merged;
+        });
+      } catch (_) {}
+    }
+
+    var numbers = rows.map(function (row) { return parseInt(row && row.episode_number, 10) || 0; })
+      .filter(function (n) { return n > 0; })
+      .sort(function (a, b) { return a - b; });
+    if (!numbers.length) return [];
+    // Algunas temporadas de One Piece devuelven E1..E61; otras devuelven
+    // directamente E62..E77. Replica el criterio que ya usa el detalle.
+    var minN = numbers[0];
+    var maxN = numbers[numbers.length - 1];
+    var useAbsolute = minN > 1 || maxN > count + 5 || maxN > off + count + 5;
+    var workerByAbsolute = Object.create(null);
+    (workerEps || []).forEach(function (row) {
+      var n = parseInt(row && row.episode_number, 10);
+      if (n > 0) workerByAbsolute[n] = row;
+    });
+
+    var output = [];
+    rows.forEach(function (row) {
+      var tmdbNumber = parseInt(row && row.episode_number, 10);
+      if (!tmdbNumber || tmdbNumber < 1) return;
+      var absoluteNumber = useAbsolute ? tmdbNumber : off + tmdbNumber;
+      if (absoluteNumber < 1 || (totalEpisodes > 0 && absoluteNumber > totalEpisodes)) return;
+      if (count > 0 && absoluteNumber > off + count && !useAbsolute) return;
+      var ep = normalizeEp(row, sn);
+      if (!ep) return;
+      ep.episode_number = absoluteNumber;
+      ep.season_number = sn;
+      ep.__tmdb_season = sn;
+      ep.__tmdb_episode = tmdbNumber;
+      ep.__playSeason = 1;
+      ep.__animeFlat = true;
+      var worker = workerByAbsolute[absoluteNumber];
+      if (worker) {
+        var workerName = cleanEpisodeName(worker.name || worker.titulo || "", absoluteNumber);
+        if (workerName && isGenericEpisodeName(ep.name, absoluteNumber) && !isGenericEpisodeName(workerName, absoluteNumber)) ep.name = workerName;
+        if (!ep.overview) ep.overview = worker.overview || worker.descripcion || "";
+        if (!ep.still_url && (worker.still_url || worker.back_img || worker.still)) ep.still_url = worker.still_url || worker.back_img || worker.still;
+      }
+      output.push(ep);
+    });
+    output.sort(function (a, b) { return a.episode_number - b.episode_number; });
+    return output;
+  }
+
   async function loadSeasonEps(opts) {
     opts = opts || {};
     var seasonNum = String(opts.season || "1");
@@ -733,9 +819,12 @@
       // En modo local (file://) no existe el proxy /api/tmdb de Vercel.
       // Completar la ficha desde el worker, que ya alimenta los reproductores.
       var workerMeta = null;
-      // Consultar el worker cuando falte algún dato que sí aparece en el
-      // detalle: sinopsis, imágenes, géneros, reparto, año o temporadas.
+      var animePlayerSource = sourceId || (typeof MZ_SOURCE !== "undefined" ? MZ_SOURCE : null);
+      // En anime consultamos también el worker para saber si la fuente usa una
+      // sola lista absoluta (One Piece) o temporadas reales (otros animes).
+      // Consultar el worker cuando falte algún dato del detalle o sea anime.
       var needsWorkerMeta = !meta || !meta.overview || !meta.poster_path || !meta.backdrop_path ||
+        (type === "tv" && isAnimeSourceId(animePlayerSource)) ||
         (type === "tv" && (
           !meta.first_air_date || !Array.isArray(meta.genres) || !meta.genres.length ||
           !meta.credits || !Array.isArray(meta.credits.cast) || !meta.credits.cast.length ||
@@ -747,7 +836,9 @@
         try {
           workerMeta = await Promise.race([
             mzFetchDetail({ slug: slug, type: type, source_id: sourceId }),
-            new Promise(function (resolve) { setTimeout(function () { resolve(null); }, 4000); })
+            new Promise(function (resolve) {
+              setTimeout(function () { resolve(null); }, isAnimeSourceId(animePlayerSource) ? 8000 : 4000);
+            })
           ]);
         } catch (workerMetaError) {
           console.warn("[Kinox player] No se pudo cargar la ficha del catálogo:", workerMetaError);
@@ -889,6 +980,14 @@
         directorLabel = String(directorLabel || "");
       }
       var workerSeasonRows = workerMeta && Array.isArray(workerMeta.temporadas) ? workerMeta.temporadas : [];
+      var workerEpisodeTotal = parseInt(workerMeta && (workerMeta.total_episodios || workerMeta.episodes_count), 10) ||
+        parseInt(meta && meta.number_of_episodes, 10) || 0;
+      var isFlatAnimeCatalog = !!(
+        type === "tv" && isAnimeSourceId(animePlayerSource) && workerEpisodeTotal > 60 &&
+        ((workerMeta && workerSeasonRows.length <= 1) ||
+          (!workerMeta && workerEpisodeTotal > 300 && meta && Array.isArray(meta.seasons) && meta.seasons.length > 1))
+      );
+      var animeArcOffsets = Object.create(null);
       var seasonOptions = type === "tv" && meta && Array.isArray(meta.seasons)
         ? meta.seasons.filter(function (x) { return Number(x.season_number) > 0; })
         : workerSeasonRows.map(function (x, index) {
@@ -900,18 +999,68 @@
               episode_count: Array.isArray(list) ? list.length : (x && (x.episodes_count || x.total_episodios)) || 0
             };
           }).filter(function (x) { return Number(x.season_number) > 0; });
+
+      // Igual que el detalle: para anime largo, cada temporada TMDB representa
+      // un arco y su offset se convierte a numeración absoluta E1..E1180.
+      if (isFlatAnimeCatalog && meta && Array.isArray(meta.seasons)) {
+        var arcTotal = workerEpisodeTotal || parseInt(meta.number_of_episodes, 10) || 0;
+        var arcOffset = 0;
+        var arcOptions = [];
+        meta.seasons.filter(function (x) {
+          return x && Number(x.season_number) > 0 && Number(x.episode_count) > 0;
+        }).forEach(function (x) {
+          if (arcTotal > 0 && arcOffset >= arcTotal) return;
+          var count = parseInt(x.episode_count, 10) || 0;
+          if (arcTotal > 0 && arcOffset + count > arcTotal) count = arcTotal - arcOffset;
+          if (count <= 0) return;
+          var sn = parseInt(x.season_number, 10);
+          animeArcOffsets[sn] = arcOffset;
+          arcOptions.push(Object.assign({}, x, { episode_count: count }));
+          arcOffset += count;
+        });
+        if (arcOptions.length) seasonOptions = arcOptions;
+      }
+      function animeArcSeasonForAbsolute(absoluteEpisode) {
+        var absolute = parseInt(absoluteEpisode, 10) || 1;
+        for (var ai = 0; ai < seasonOptions.length; ai++) {
+          var option = seasonOptions[ai];
+          var sn = parseInt(option.season_number, 10);
+          var offset = animeArcOffsets[sn] || 0;
+          var count = parseInt(option.episode_count, 10) || 0;
+          if (absolute > offset && (!count || absolute <= offset + count)) return sn;
+        }
+        return seasonOptions.length ? parseInt(seasonOptions[seasonOptions.length - 1].season_number, 10) || 1 : 1;
+      }
+
+      // Compatibilidad con enlaces creados por el selector anterior: si llega
+      // season=TMDB y episode=1..N, normalizarlo a season=1 + episodio absoluto.
+      if (isFlatAnimeCatalog) {
+        var requestedArcSeason = parseInt(season, 10) || 1;
+        var requestedArcEpisode = parseInt(episode, 10) || 1;
+        if (requestedArcSeason > 1 && animeArcOffsets[requestedArcSeason] != null) {
+          var requestedArc = seasonOptions.find(function (x) { return Number(x.season_number) === requestedArcSeason; });
+          var requestedArcCount = parseInt(requestedArc && requestedArc.episode_count, 10) || 0;
+          if (requestedArcEpisode <= requestedArcCount) {
+            episode = String(animeArcOffsets[requestedArcSeason] + requestedArcEpisode);
+          }
+        }
+        season = "1";
+        if (urlVidBase) urlVid = urlVidBase.replace(/\/$/, "") + "/1/" + episode;
+      }
+
+      var pickerSeason = isFlatAnimeCatalog ? animeArcSeasonForAbsolute(episode) : (parseInt(season, 10) || 1);
       var seasonPickerHtml = "";
       if (type === "tv") {
         if (seasonOptions.length > 1) {
           seasonPickerHtml = '<label class="kx-season-control"><span>Temporada</span><select id="kxSeasonSelect" aria-label="Seleccionar temporada">' +
             seasonOptions.map(function (x) {
               var n = String(x.season_number);
-              return '<option value="' + esc(n) + '"' + (n === String(season || "1") ? " selected" : "") + '>' +
+              return '<option value="' + esc(n) + '"' + (Number(n) === Number(pickerSeason) ? " selected" : "") + '>' +
                 esc(x.name || ("Temporada " + n)) + (x.episode_count ? " · " + esc(String(x.episode_count)) + " episodios" : "") +
                 '</option>';
             }).join("") + '</select></label>';
         } else {
-          seasonPickerHtml = '<span class="kx-season-single">Temporada ' + esc(String(season || "1")) + '</span>';
+          seasonPickerHtml = '<span class="kx-season-single">Temporada ' + esc(String(pickerSeason || season || "1")) + '</span>';
         }
       }
 
@@ -965,7 +1114,7 @@
         seasonEps = await loadSeasonEps({
           tvId: id,
           slug: slug,
-          season: season,
+          season: isFlatAnimeCatalog ? "1" : season,
           sourceId: sourceId,
           currentEpisode: episode,
           episode: episode
@@ -977,7 +1126,7 @@
       if (type === "tv" && id && typeof tmdb === "function") {
         try {
           var tvMeta = (meta && meta.seasons) ? meta : await tmdb("/tv/" + id);
-          var seasonsMeta = (tvMeta && tvMeta.seasons) || [];
+          var seasonsMeta = isFlatAnimeCatalog && seasonOptions.length ? seasonOptions : ((tvMeta && tvMeta.seasons) || []);
           absSeasonMap = Object.create(null);
           var absN = 1;
           for (var si = 0; si < seasonsMeta.length; si++) {
@@ -1017,10 +1166,26 @@
           var mapRow = absSeasonMap[absEp];
           if (mapRow) {
             rowEp.__tmdb_season = mapRow.season;
+            rowEp.__tmdb_episode = mapRow.episode;
             rowEp.season_number = mapRow.season;
           }
         }
-        seasonEps = await enrichFlatAnimeEpsWithTmdb(seasonEps, id, absSeasonMap);
+        if (isFlatAnimeCatalog) {
+          var activeArcSeason = animeArcSeasonForAbsolute(episode);
+          var activeArcMeta = seasonOptions.find(function (x) { return Number(x.season_number) === Number(activeArcSeason); });
+          var activeArcEpisodes = await loadFlatAnimeArcEpsFromTmdb(
+            id,
+            activeArcSeason,
+            activeArcMeta,
+            animeArcOffsets[activeArcSeason] || 0,
+            workerEpisodeTotal,
+            seasonEps
+          );
+          if (activeArcEpisodes.length) seasonEps = activeArcEpisodes;
+          else seasonEps = await enrichFlatAnimeEpsWithTmdb(seasonEps, id, absSeasonMap);
+        } else {
+          seasonEps = await enrichFlatAnimeEpsWithTmdb(seasonEps, id, absSeasonMap);
+        }
       }
 
       var epMeta = null;
@@ -1035,28 +1200,25 @@
       var epN = parseInt(episode, 10);
       var seaN = parseInt(season, 10) || 1;
       if (type === "tv" && id && episode) {
-        // 1) Temporada de la URL (Wistoria T2 E12)
-        tmdbEp = await loadTmdbEpDirect(id, seaN, epN);
-        if (tmdbEp) {
-          tmdbEp.__tmdb_season = seaN;
-          tmdbEp.__tmdb_episode = epN;
-        }
-        // 2) One Piece-like: episodio absoluto alto
-        if (!tmdbEp && epN > 80) {
-          var mappedSea = tmdbSeasonForAbs(epN);
-          var mappedEpInSea =
-            absSeasonMap && absSeasonMap[epN]
-              ? absSeasonMap[epN].episode
-              : null;
-          if (mappedSea && mappedEpInSea) {
-            tmdbEp = await loadTmdbEpDirect(id, mappedSea, mappedEpInSea);
-            if (tmdbEp) {
-              tmdbEp.__tmdb_season = mappedSea;
-              tmdbEp.__tmdb_episode = mappedEpInSea;
-              tmdbEp.__absolute = epN;
-            }
+        if (isFlatAnimeCatalog && absSeasonMap && absSeasonMap[epN]) {
+          // En One Piece, E62 no significa T1 E62: es T2 E1 de TMDB,
+          // pero la fuente del worker sigue necesitando T1 E62.
+          var mappedCurrent = absSeasonMap[epN];
+          tmdbEp = await loadTmdbEpDirect(id, mappedCurrent.season, mappedCurrent.episode);
+          if (tmdbEp) {
+            tmdbEp.__tmdb_season = mappedCurrent.season;
+            tmdbEp.__tmdb_episode = mappedCurrent.episode;
+            tmdbEp.__absolute = epN;
           }
-          if (!tmdbEp) tmdbEp = await loadTmdbEpByAbsolute(id, epN);
+        } else {
+          // Temporadas reales (Wistoria T2 E12, etc.).
+          tmdbEp = await loadTmdbEpDirect(id, seaN, epN);
+          if (tmdbEp) {
+            tmdbEp.__tmdb_season = seaN;
+            tmdbEp.__tmdb_episode = epN;
+          }
+          // Fallback para animes absolutos cuando la ficha no trae el bloque.
+          if (!tmdbEp && epN > 80) tmdbEp = await loadTmdbEpByAbsolute(id, epN);
         }
       }
       if (tmdbEp) {
@@ -1077,10 +1239,7 @@
       // Formato como en detalle: T23 E1179 — Nombre
       var epTitle =
         type === "tv"
-          ? "T" +
-            labelSea +
-            " E" +
-            episode +
+          ? (isFlatAnimeCatalog ? "E" + episode : "T" + labelSea + " E" + episode) +
             (epMeta && epMeta.name ? " — " + epMeta.name : "")
           : "Película";
       var epRuntime =
@@ -1107,10 +1266,10 @@
           '<div id="playerBox" class="kx-player mz-player"><div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Buscando reproductores…</span></div></div>' +
           "</div>" +
           '<aside class="kx-sidebar" id="kxSidebar">' +
-          '<div class="kx-sidebar-head">Episodios · T' +
-          esc(season || "1") +
-          " E" +
-          esc(episode) +
+          '<div class="kx-sidebar-head">Episodios · ' +
+          (isFlatAnimeCatalog
+            ? esc((seasonOptions.find(function (x) { return Number(x.season_number) === Number(pickerSeason); }) || {}).name || ("E" + episode))
+            : "T" + esc(season || "1") + " E" + esc(episode)) +
           "</div>" +
           '<div class="kx-ep-list" id="kxEpList"></div>' +
           "</aside>" +
@@ -1176,8 +1335,14 @@
       if (seasonSelect) {
         seasonSelect.addEventListener("change", function () {
           var nextSeason = String(seasonSelect.value || "1");
+          var nextEpisode = 1;
+          var nextPlaySeason = nextSeason;
+          if (isFlatAnimeCatalog) {
+            nextEpisode = (animeArcOffsets[parseInt(nextSeason, 10)] || 0) + 1;
+            nextPlaySeason = 1;
+          }
           location.href = buildPlayHref({
-            type: "tv", id: id, season: nextSeason, episode: 1,
+            type: "tv", id: id, season: nextPlaySeason, episode: nextEpisode,
             slug: slug, sourceId: sourceId, urlVidBase: urlVidBase
           });
         });
@@ -1213,8 +1378,11 @@
       window.addEventListener("pagehide", clearPref);
 
       // Anime multi-temp: respetar season de la URL (T2 E12). Flat One Piece: 1.
-      var playSeasonMz = season || 1;
+      var playSeasonMz = isFlatAnimeCatalog ? 1 : (season || 1);
       var playEpisodeMz = episode;
+      if (isFlatAnimeCatalog && urlVidBase) {
+        urlVid = urlVidBase.replace(/\/$/, "") + "/1/" + playEpisodeMz;
+      }
       var data = await mzPlayers({
         type: type,
         slug: slug,
@@ -1692,16 +1860,15 @@
               : "") +
             "</div>" +
             '<div class="kx-ep-info"><div class="kx-ep-name">' +
-            "T" +
-            (e.__tmdb_season ||
-              e.season_number ||
-              (typeof tmdbSeasonForAbs === "function"
-                ? tmdbSeasonForAbs(n)
-                : null) ||
-              season ||
-              "1") +
-            " E" +
-            n +
+            (isFlatAnimeCatalog
+              ? "E" + n
+              : "T" +
+                (e.__tmdb_season ||
+                  e.season_number ||
+                  (typeof tmdbSeasonForAbs === "function" ? tmdbSeasonForAbs(n) : null) ||
+                  season ||
+                  "1") +
+                " E" + n) +
             " — " +
             esc(e.name || "Episodio " + n) +
             "</div>" +
