@@ -1973,3 +1973,73 @@ footer a:hover{color:#fff}
   .kx-ep-view .kx-ep-num { height: 35px; }
   .kx-ep-view .kx-cast-heading h2 { font-size: .95rem; }
 }
+
+/* KINOX móvil: primero el reproductor; ficha debajo, sin portada; episodios antes del elenco. */
+@media (max-width: 900px) {
+  /* Series: reordenar visualmente sin duplicar ni perder los controles de temporada. */
+  .kx-ep-view {
+    display: flex;
+    flex-direction: column;
+  }
+  .kx-ep-view > .kx-topbar { order: 0; }
+  .kx-ep-view > .kx-stage { order: 1; }
+  .kx-ep-view > .kx-cinema-hero { order: 2; margin-top: 12px; margin-bottom: 0; }
+  .kx-ep-view > .kx-episode-summary { order: 3; }
+  .kx-ep-view > .kx-playback-controls { order: 4; }
+  .kx-ep-view > .kx-cast-section { order: 5; }
+
+  /* La ficha conserva título, año, calificación, géneros, sinopsis, creador y temporadas. */
+  .kx-ep-view .kx-cinema-main,
+  .kx-movie-info-column .kx-cinema-main {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start;
+  }
+  .kx-ep-view .kx-cinema-poster,
+  .kx-movie-info-column .kx-cinema-poster {
+    display: none !important;
+  }
+  .kx-ep-view .kx-genre-list,
+  .kx-ep-view .kx-overview-wrap,
+  .kx-ep-view .kx-cinema-credit {
+    display: block !important;
+  }
+  .kx-ep-view .kx-genre-list { display: flex !important; flex-wrap: wrap; }
+  .kx-ep-view .kx-overview-wrap { margin-top: 9px; }
+  .kx-ep-view .kx-cinema-overview {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    max-width: none;
+    font-size: .8rem;
+    line-height: 1.55;
+  }
+  .kx-ep-view .kx-cinema-overview.is-expanded {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+  .kx-ep-view .kx-cinema-copy { min-width: 0; width: 100%; }
+  .kx-ep-view .kx-cinema-copy h1 { font-size: clamp(1.2rem, 5vw, 1.55rem); }
+  .kx-ep-view .kx-cinema-credit { display: flex !important; flex-wrap: wrap; }
+
+  /* Películas: el player queda arriba y toda la ficha debajo; se elimina solo el póster. */
+  .kx-movie-info-column .kx-cinema-hero {
+    min-height: 0;
+    padding: 14px 12px;
+  }
+  .kx-movie-info-column .kx-cinema-copy { width: 100%; }
+  .kx-movie-info-column .kx-overview-wrap { display: block; margin-top: 9px; }
+  .kx-movie-info-column .kx-cinema-overview {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+    max-width: none;
+  }
+  .kx-movie-info-column .kx-cinema-overview.is-expanded {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+  }
+}
