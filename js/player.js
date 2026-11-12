@@ -242,6 +242,25 @@
     return "reproductor.html?" + sp.toString();
   }
 
+  /** Limpia nombres de episodios que el worker puede devolver como enlaces Markdown. */
+  function cleanEpisodeName(value, episodeNumber) {
+    var name = String(value == null ? "" : value).trim();
+    name = name.replace(/^\*\*([\s\S]+)\*\*$/, "$1").trim();
+    var markdownLink = name.match(/^\s*\[([\s\S]*?)\]\((?:https?:\/\/|\/)[^)]+\)\s*$/i);
+    if (markdownLink) name = markdownLink[1].trim();
+    name = name.replace(/<[^>]*>/g, "").trim();
+    // La numeración T/E se dibuja por separado en las tarjetas del reproductor.
+    name = name.replace(/^T\s*\d+\s*E\s*\d+\s*[—–-]\s*/i, "").trim();
+    return name || "Episodio " + episodeNumber;
+  }
+
+  function isGenericEpisodeName(value, episodeNumber) {
+    var name = String(value || "").trim();
+    if (!name) return true;
+    var number = episodeNumber == null ? "\\d+" : String(episodeNumber);
+    return new RegExp("^(?:episodio|episode|cap[ií]tulo|chapter)\\s*#?\\s*" + number + "$", "i").test(name);
+  }
+
   /** Normaliza un episodio de TMDB o del worker a un shape común */
   function normalizeEp(e, seasonNum) {
     if (!e) return null;
@@ -256,7 +275,7 @@
     if (n == null) return null;
     n = parseInt(n, 10);
     if (!n || n < 1) return null;
-    var name = e.name || e.titulo || e.title || ("Episodio " + n);
+    var name = cleanEpisodeName(e.name || e.titulo || e.title || "", n);
     var still =
       e.still_path ||
       e.back_img ||
@@ -364,7 +383,7 @@
           outFlat.push({
             episode_number: n,
             season_number: 1,
-            name: (src && (src.titulo || src.name)) || "Episodio " + n,
+            name: cleanEpisodeName(src && (src.titulo || src.name), n),
             still_url: stillForEp(n, src),
             still_path: null,
             __animeFlat: true,
@@ -521,7 +540,6 @@
   /** Rellena nombre/sinopsis/still desde TMDB sin cambiar la lista del worker */
   async function enrichEpsWithTmdb(eps, tvId, seasonNum) {
     if (!eps || !eps.length || !tvId || typeof tmdb !== "function") return eps;
-    if (typeof KEY === "undefined" || !KEY) return eps;
     try {
       var tmdbList = await loadSeasonEpsFromTmdb(tvId, seasonNum);
       if (!tmdbList.length) {
@@ -557,6 +575,96 @@
     return eps;
   }
 
+  /**
+   * Anime de numeración continua (p. ej. One Piece): el worker usa E1166,
+   * mientras TMDB guarda ese capítulo dentro de una temporada y episodio.
+   * Descarga cada temporada TMDB una sola vez y enriquece toda la ventana.
+   */
+  async function enrichFlatAnimeEpsWithTmdb(eps, tvId, absoluteMap) {
+    if (!eps || !eps.length || !tvId || !absoluteMap || typeof tmdb !== "function") return eps;
+    var neededSeasons = Object.create(null);
+    for (var i = 0; i < eps.length; i++) {
+      var abs = parseInt(eps[i] && eps[i].episode_number, 10);
+      var mapped = absoluteMap[abs];
+      if (mapped && mapped.season && mapped.episode) neededSeasons[mapped.season] = true;
+    }
+    var seasonNumbers = Object.keys(neededSeasons);
+    var bySeason = Object.create(null);
+    await Promise.all(seasonNumbers.map(async function (seasonNumber) {
+      var response = null;
+      try {
+        response = await tmdb("/tv/" + tvId + "/season/" + seasonNumber);
+      } catch (_) {}
+      var rows = response && Array.isArray(response.episodes) ? response.episodes : [];
+      // Revisar los episodios solicitados, no solo si la temporada tiene algún título.
+      var requestedNumbers = eps.map(function (ep) {
+        var mapped = absoluteMap[parseInt(ep && ep.episode_number, 10)];
+        return mapped && String(mapped.season) === String(seasonNumber) ? parseInt(mapped.episode, 10) : null;
+      }).filter(Boolean);
+      var spanishByNumber = Object.create(null);
+      rows.forEach(function (row) {
+        var n = parseInt(row && row.episode_number, 10);
+        if (n > 0) spanishByNumber[n] = row;
+      });
+      var needsEnglish = requestedNumbers.some(function (n) {
+        var row = spanishByNumber[n];
+        return !row || !row.name || isGenericEpisodeName(row.name, n);
+      });
+      if (needsEnglish) {
+        try {
+          var english = await tmdb("/tv/" + tvId + "/season/" + seasonNumber, { language: "en-US" });
+          if (english && Array.isArray(english.episodes) && english.episodes.length) {
+            var englishByNumber = Object.create(null);
+            english.episodes.forEach(function (row) {
+              var n = parseInt(row && row.episode_number, 10);
+              if (n > 0) englishByNumber[n] = row;
+            });
+            requestedNumbers.forEach(function (n) {
+              var current = spanishByNumber[n];
+              var alternate = englishByNumber[n];
+              if ((!current || !current.name || isGenericEpisodeName(current.name, n)) && alternate && alternate.name && !isGenericEpisodeName(alternate.name, n)) {
+                spanishByNumber[n] = alternate;
+              }
+            });
+            rows = rows.filter(function (row) {
+              var n = parseInt(row && row.episode_number, 10);
+              return !requestedNumbers.includes(n) || !spanishByNumber[n] || spanishByNumber[n] === row;
+            });
+            requestedNumbers.forEach(function (n) {
+              var alternate = spanishByNumber[n];
+              if (alternate && rows.indexOf(alternate) < 0) rows.push(alternate);
+            });
+          }
+        } catch (_) {}
+      }
+      var index = Object.create(null);
+      rows.forEach(function (row) {
+        var episodeNumber = parseInt(row && row.episode_number, 10);
+        if (episodeNumber > 0) index[episodeNumber] = row;
+      });
+      bySeason[seasonNumber] = index;
+    }));
+
+    for (var j = 0; j < eps.length; j++) {
+      var ep = eps[j];
+      var absoluteNumber = parseInt(ep && ep.episode_number, 10);
+      var mapRow = absoluteMap[absoluteNumber];
+      if (!mapRow) continue;
+      var details = bySeason[mapRow.season] && bySeason[mapRow.season][mapRow.episode];
+      if (!details) continue;
+      ep.__tmdb_season = mapRow.season;
+      ep.__tmdb_episode = mapRow.episode;
+      ep.season_number = mapRow.season;
+      if (details.name && isGenericEpisodeName(ep.name, absoluteNumber) && !isGenericEpisodeName(details.name, mapRow.episode)) {
+        ep.name = details.name;
+      }
+      if (details.overview && (!ep.overview || !String(ep.overview).trim())) ep.overview = details.overview;
+      if (details.still_path && !ep.still_path) ep.still_path = details.still_path;
+      if (details.runtime && !ep.runtime) ep.runtime = details.runtime;
+    }
+    return eps;
+  }
+
   async function loadSeasonEps(opts) {
     opts = opts || {};
     var seasonNum = String(opts.season || "1");
@@ -571,7 +679,7 @@
     );
     if (fromWorker.length) {
       // Solo la temporada pedida; rellenar meta TMDB (nombres / sinopsis)
-      if (opts.tvId) {
+      if (opts.tvId && !(fromWorker[0] && fromWorker[0].__animeFlat === true)) {
         fromWorker = await enrichEpsWithTmdb(fromWorker, opts.tvId, seasonNum);
       }
       return fromWorker;
@@ -857,7 +965,10 @@
         seasonEps[0] &&
         seasonEps[0].__playSeason != null &&
         seasonEps[0].__animeFlat === false;
-      if (seasonEps.length && absSeasonMap && !workerMulti) {
+      var hasFlatAnimeEpisodes = seasonEps.some(function (row) {
+        return row && row.__animeFlat === true;
+      });
+      if (seasonEps.length && absSeasonMap && !workerMulti && hasFlatAnimeEpisodes) {
         for (var se = 0; se < seasonEps.length; se++) {
           var rowEp = seasonEps[se];
           if (rowEp.__animeFlat === false && rowEp.__playSeason != null) continue;
@@ -868,6 +979,7 @@
             rowEp.season_number = mapRow.season;
           }
         }
+        seasonEps = await enrichFlatAnimeEpsWithTmdb(seasonEps, id, absSeasonMap);
       }
 
       var epMeta = null;
@@ -1132,8 +1244,18 @@
         var box = $("#playerBox");
         if (!box) return;
 
+        // Crear siempre el marco exterior: los embeds externos también deben llenar
+        // el mismo rectángulo 16:9 y no quedar dentro de un segundo cuadro limitado.
+        var wrap = box.parentElement;
+        if (!wrap || !wrap.classList.contains("kx-player-wrap")) {
+          wrap = document.createElement("div");
+          wrap.className = "kx-player-wrap";
+          box.parentNode.insertBefore(wrap, box);
+          wrap.appendChild(box);
+        }
+
         // Los embeds externos ya incluyen sus propios controles de idioma/servidor.
-        // Si todos los reproductores son embeds, no mostrar el HUD ni los selectores inferiores.
+        // Si todos son embeds, ocultar selectores extra pero conservar el marco común.
         if (players.length && players.every(isProviderEmbed)) {
           [$("#kxServers"), $("#kxDirects")].forEach(function (el) {
             var block = el && el.closest(".kx-block");
@@ -1178,15 +1300,6 @@
             "@media(max-width:600px){.kx-player-hud{top:6px;left:6px;gap:6px}" +
             ".kx-dd-btn{padding:6px 10px;font-size:.78rem}}";
           document.head.appendChild(style);
-        }
-
-        // Envolver el player
-        var wrap = box.parentElement;
-        if (!wrap || !wrap.classList.contains("kx-player-wrap")) {
-          wrap = document.createElement("div");
-          wrap.className = "kx-player-wrap";
-          box.parentNode.insertBefore(wrap, box);
-          wrap.appendChild(box);
         }
 
         var hud = wrap.querySelector(".kx-player-hud");
