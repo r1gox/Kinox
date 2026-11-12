@@ -1699,3 +1699,135 @@ footer a:hover{color:#fff}
 @media (max-width: 520px) {
   .kx-movie-player-area .kx-player-wrap { border-radius: 9px; }
 }
+
+/* KINOX — películas a todo el ancho: reproductor a la izquierda, ficha vertical a la derecha. */
+.kx-movie-view {
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0 0 42px;
+  box-sizing: border-box;
+}
+.kx-movie-view > .kx-topbar {
+  width: min(1840px, calc(100% - 64px));
+  max-width: none;
+  margin: 0 auto 14px;
+  padding: 14px 0 !important;
+}
+.kx-movie-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  align-items: start;
+  gap: clamp(18px, 2vw, 30px);
+  width: min(1840px, calc(100% - 64px));
+  margin: 0 auto;
+}
+.kx-movie-player-column { min-width: 0; }
+.kx-movie-player-area {
+  width: 100%;
+  margin: 0 0 16px;
+}
+.kx-movie-player-area .kx-player-section-head { margin-bottom: 10px; }
+.kx-movie-player-area .kx-player-wrap {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+}
+.kx-movie-servers {
+  width: 100%;
+  margin: 0 0 18px;
+}
+.kx-movie-info-column { min-width: 0; }
+.kx-movie-info-column .kx-cinema-hero {
+  width: 100%;
+  margin: 0;
+  padding: 20px 18px;
+  border-radius: 18px;
+  box-sizing: border-box;
+  min-height: 100%;
+}
+.kx-movie-info-column .kx-cinema-backdrop {
+  width: 100%;
+  opacity: .22;
+  mask-image: linear-gradient(180deg, #000 0%, transparent 82%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 82%);
+}
+.kx-movie-info-column .kx-cinema-scrim {
+  background: linear-gradient(180deg, rgba(12,11,22,.68), rgba(12,11,22,.97) 48%, #0b0c15 100%);
+}
+.kx-movie-info-column .kx-cinema-main {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.kx-movie-info-column .kx-cinema-poster {
+  width: min(154px, 62%);
+  aspect-ratio: 2 / 3;
+  border-radius: 12px;
+}
+.kx-movie-info-column .kx-cinema-copy { max-width: none; }
+.kx-movie-info-column .kx-cinema-copy h1 {
+  margin: 3px 0 10px;
+  font-size: clamp(1.35rem, 2vw, 2rem);
+  line-height: 1.12;
+}
+.kx-movie-info-column .kx-cinema-facts { gap: 7px; font-size: .78rem; }
+.kx-movie-info-column .kx-genre-list { margin-top: 10px; }
+.kx-movie-info-column .kx-cinema-overview {
+  max-width: none;
+  margin-top: 12px;
+  font-size: .8rem;
+  line-height: 1.6;
+  -webkit-line-clamp: 7;
+}
+.kx-movie-info-column .kx-cinema-credit { margin-top: 12px; }
+.kx-movie-view > .kx-cast-section {
+  width: min(1840px, calc(100% - 64px));
+  margin: 24px auto 0;
+}
+
+/* En series, completar la ficha del reproductor con los mismos datos del detalle. */
+.kx-ep-view .kx-cinema-hero {
+  width: min(1700px, 94%);
+  margin-bottom: 20px;
+}
+.kx-ep-view .kx-cinema-facts { row-gap: 8px; }
+.kx-ep-view .kx-cinema-overview { max-width: 920px; }
+
+@media (max-width: 980px) {
+  .kx-movie-view > .kx-topbar,
+  .kx-movie-layout,
+  .kx-movie-view > .kx-cast-section {
+    width: calc(100% - 28px);
+  }
+  .kx-movie-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .kx-movie-player-column { order: 1; }
+  .kx-movie-info-column { order: 2; }
+  .kx-movie-info-column .kx-cinema-hero { padding: 18px; }
+  .kx-movie-info-column .kx-cinema-main {
+    grid-template-columns: 104px minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+  }
+  .kx-movie-info-column .kx-cinema-poster { width: 104px; }
+  .kx-movie-info-column .kx-cinema-copy h1 { font-size: clamp(1.25rem, 4vw, 1.8rem); }
+}
+@media (max-width: 600px) {
+  .kx-movie-view { padding-bottom: 28px; }
+  .kx-movie-view > .kx-topbar,
+  .kx-movie-layout,
+  .kx-movie-view > .kx-cast-section { width: calc(100% - 20px); }
+  .kx-movie-view > .kx-topbar { margin-bottom: 8px; }
+  .kx-movie-player-area .kx-player-section-head small { width: 100%; }
+  .kx-movie-info-column .kx-cinema-hero { padding: 14px 12px; border-radius: 13px; }
+  .kx-movie-info-column .kx-cinema-main { grid-template-columns: 78px minmax(0, 1fr); gap: 11px; }
+  .kx-movie-info-column .kx-cinema-poster { width: 78px; border-radius: 8px; }
+  .kx-movie-info-column .kx-cinema-copy h1 { font-size: 1.15rem; }
+  .kx-movie-info-column .kx-cinema-kicker { font-size: .53rem; }
+  .kx-movie-info-column .kx-cinema-facts { font-size: .66rem; gap: 5px; }
+  .kx-movie-info-column .kx-cinema-overview { font-size: .72rem; -webkit-line-clamp: 5; }
+  .kx-movie-view > .kx-cast-section { margin-top: 18px; }
+}

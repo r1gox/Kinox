@@ -733,7 +733,16 @@
       // En modo local (file://) no existe el proxy /api/tmdb de Vercel.
       // Completar la ficha desde el worker, que ya alimenta los reproductores.
       var workerMeta = null;
-      var needsWorkerMeta = !meta || !meta.overview || !meta.poster_path || !meta.backdrop_path;
+      // Consultar el worker cuando falte algún dato que sí aparece en el
+      // detalle: sinopsis, imágenes, géneros, reparto, año o temporadas.
+      var needsWorkerMeta = !meta || !meta.overview || !meta.poster_path || !meta.backdrop_path ||
+        (type === "tv" && (
+          !meta.first_air_date || !Array.isArray(meta.genres) || !meta.genres.length ||
+          !meta.credits || !Array.isArray(meta.credits.cast) || !meta.credits.cast.length ||
+          !Array.isArray(meta.created_by) || !meta.created_by.length ||
+          !Array.isArray(meta.seasons) || !meta.seasons.length ||
+          !Array.isArray(meta.episode_run_time) || !meta.episode_run_time.length
+        ));
       if (slug && needsWorkerMeta && typeof mzFetchDetail === "function") {
         try {
           workerMeta = await Promise.race([
@@ -747,6 +756,32 @@
       if (!slug && !urlVid) {
         $("#view").innerHTML = '<div class="load">Falta el slug del título.</div>';
         return;
+      }
+      // Si la serie llega desde una ficha del worker sin ID TMDB, resolver
+      // su serie principal igual que detail.js para recuperar año, géneros,
+      // reparto, temporadas, sinopsis y créditos dentro del reproductor.
+      if (!meta && type === "tv" && slug && typeof resolveTmdbIdForTitle === "function") {
+        var workerTitleForTmdb = String((workerMeta && (workerMeta.titulo || workerMeta.title || workerMeta.nombre)) || String(slug || "").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim());
+        var baseTitleForTmdb = workerTitleForTmdb
+          .replace(/\s*[：:]\s*.*$/, "")
+          .replace(/\s*(2nd|3rd|4th)\s*season.*$/i, "")
+          .replace(/\s*season\s*\d+.*$/i, "")
+          .replace(/\s*temporada\s*\d+.*$/i, "")
+          .replace(/\s+\b(II|III|IV|2|3|4)\b\s*$/i, "")
+          .trim();
+        try {
+          if (typeof ensureTmdbReady === "function") await ensureTmdbReady();
+          var resolvedSeriesId = await resolveTmdbIdForTitle(baseTitleForTmdb || workerTitleForTmdb, "tv", null);
+          if (resolvedSeriesId) {
+            var resolvedMeta = await tmdb("/tv/" + resolvedSeriesId, { append_to_response: "credits,content_ratings" });
+            if (resolvedMeta) {
+              meta = resolvedMeta;
+              id = String(resolvedSeriesId);
+            }
+          }
+        } catch (resolveMetaError) {
+          console.warn("[Kinox player] No se pudo resolver la ficha TMDB de la serie:", resolveMetaError);
+        }
       }
       if (type === "tv") {
         season = String(season || "1");
@@ -889,6 +924,12 @@
       }
       if (certification) facts.push('<span class="kx-cert">' + esc(certification) + '</span>');
       if (vote) facts.push('<span class="kx-score">★ ' + esc(vote) + '</span>');
+      if (type === "tv") {
+        var seriesSeasonCount = parseInt((meta && meta.number_of_seasons) || (workerMeta && workerMeta.total_temporadas) || workerSeasonRows.length, 10) || 0;
+        var seriesEpisodeCount = parseInt((meta && meta.number_of_episodes) || (workerMeta && workerMeta.total_episodios), 10) || 0;
+        if (seriesSeasonCount) facts.push('<span><b>' + esc(String(seriesSeasonCount)) + '</b> <i>' + (seriesSeasonCount === 1 ? 'temporada' : 'temporadas') + '</i></span>');
+        if (seriesEpisodeCount) facts.push('<span><b>' + esc(String(seriesEpisodeCount)) + '</b> <i>' + (seriesEpisodeCount === 1 ? 'episodio' : 'episodios') + '</i></span>');
+      }
       var castHtml = cast.length
         ? '<section class="kx-cast-section" aria-label="Reparto"><div class="kx-cast-heading"><div><span class="kx-section-kicker">ELENCO</span><h2>Reparto</h2></div><small>Actores y personajes</small></div><div class="kx-cast-row">' + cast.map(function (person) {
             var rawPhoto = person.profile_path || person.photo || person.foto || person.image || "";
@@ -1105,14 +1146,18 @@
           '<div class="kx-topbar-title">REPRODUCTOR</div>' +
           '<div class="kx-top-actions"><button type="button" class="kx-reload-btn" id="kxReloadPlayer" title="Volver a cargar" aria-label="Volver a cargar reproductor">↻</button><button type="button" class="kx-fullscreen-btn" id="kxFullscreen">⛶ <span>Pantalla completa</span></button></div>' +
           "</div>" +
-          titleHeroHtml +
-          '<div class="kx-movie-player-area">' +
-            '<div class="kx-player-section-head"><span>REPRODUCCIÓN</span><small>Selecciona servidor e idioma en los controles del reproductor</small></div>' +
-            '<div id="playerBox" class="mz-player kx-player"><div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Buscando reproductores…</span></div></div>' +
+          '<div class="kx-movie-layout">' +
+            '<div class="kx-movie-player-column">' +
+              '<div class="kx-movie-player-area">' +
+                '<div class="kx-player-section-head"><span>REPRODUCCIÓN</span><small>Selecciona servidor e idioma en los controles del reproductor</small></div>' +
+                '<div id="playerBox" class="mz-player kx-player"><div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Buscando reproductores…</span></div></div>' +
+              '</div>' +
+              '<div class="kx-block kx-movie-servers"><h3 class="kx-block-title">Reproductores</h3><div class="kx-chips" id="kxServers"></div></div>' +
+              '<div class="kx-block kx-movie-servers"><h3 class="kx-block-title">Directos</h3><div class="kx-chips" id="kxDirects"></div></div>' +
+            '</div>' +
+            '<aside class="kx-movie-info-column">' + titleHeroHtml + '</aside>' +
           '</div>' +
           castHtml +
-          '<div class="kx-block"><h3 class="kx-block-title">Reproductores</h3><div class="kx-chips" id="kxServers"></div></div>' +
-          '<div class="kx-block"><h3 class="kx-block-title">Directos</h3><div class="kx-chips" id="kxDirects"></div></div>' +
           "</section>";
       }
 
