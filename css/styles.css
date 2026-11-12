@@ -1831,3 +1831,145 @@ footer a:hover{color:#fff}
   .kx-movie-info-column .kx-cinema-overview { font-size: .72rem; -webkit-line-clamp: 5; }
   .kx-movie-view > .kx-cast-section { margin-top: 18px; }
 }
+
+/* KINOX — jerarquía del episodio: título, duración, sinopsis y después reparto. */
+.kx-ep-view .kx-episode-summary {
+  width: min(1320px, 92%);
+  margin: 12px auto 0;
+  padding: 12px 0 0;
+}
+.kx-ep-view .kx-episode-summary .kx-ep-heading {
+  margin: 0 0 5px;
+  color: #f8fafc;
+  font-size: clamp(1.15rem, 2.1vw, 1.55rem);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.kx-ep-view .kx-episode-summary .kx-ep-meta {
+  margin: 0 0 9px;
+  color: #c4b5fd;
+  font-size: .82rem;
+  font-weight: 700;
+}
+.kx-ep-view .kx-episode-summary .kx-synopsis {
+  max-width: 100%;
+  margin: 0;
+  color: #aab2c4;
+  font-size: .9rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.kx-ep-view .kx-episode-summary .kx-synopsis:empty { display: none; }
+.kx-ep-view > .kx-cast-section {
+  width: min(1320px, 92%);
+  margin: 18px auto 18px;
+}
+.kx-ep-view .kx-playback-controls {
+  width: min(1320px, 92%);
+  margin: 0 auto 12px;
+  padding: 0;
+}
+.kx-ep-view .kx-playback-controls .kx-block { margin-bottom: 12px; }
+.kx-ep-view .kx-playback-controls .kx-ep-mobile { margin-top: 8px; }
+.kx-ep-view .kx-ep-mobile-title {
+  margin: 0 0 9px;
+  color: #b4a6e8;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 900px) {
+  .kx-ep-view { padding-bottom: 24px; }
+  .kx-ep-view .kx-cinema-hero {
+    width: calc(100% - 20px);
+    margin: 0 auto 10px;
+    padding: 11px 10px;
+    border-radius: 12px;
+    box-shadow: none;
+  }
+  .kx-ep-view .kx-cinema-main {
+    grid-template-columns: 58px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
+  .kx-ep-view .kx-cinema-poster { width: 58px; border-radius: 7px; }
+  .kx-ep-view .kx-cinema-backdrop,
+  .kx-ep-view .kx-cinema-scrim { display: none; }
+  .kx-ep-view .kx-cinema-copy h1 {
+    margin: 1px 0 4px;
+    font-size: clamp(1rem, 3.8vw, 1.2rem);
+    line-height: 1.18;
+  }
+  .kx-ep-view .kx-cinema-kicker { font-size: .5rem; }
+  .kx-ep-view .kx-cinema-facts { gap: 4px; font-size: .64rem; }
+  .kx-ep-view .kx-genre-list,
+  .kx-ep-view .kx-overview-wrap,
+  .kx-ep-view .kx-cinema-credit { display: none !important; }
+  .kx-ep-view .kx-season-control {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 7px;
+    font-size: .65rem;
+  }
+  .kx-ep-view .kx-season-control select {
+    min-width: 0;
+    width: min(250px, 100%);
+    min-height: 34px;
+    font-size: .68rem;
+  }
+  .kx-ep-view .kx-stage { padding: 0 10px; margin-top: 0; }
+  .kx-ep-view .kx-episode-summary,
+  .kx-ep-view > .kx-cast-section,
+  .kx-ep-view .kx-playback-controls {
+    width: calc(100% - 20px);
+  }
+  .kx-ep-view .kx-episode-summary { margin-top: 10px; padding-top: 5px; }
+  .kx-ep-view .kx-episode-summary .kx-ep-heading { font-size: clamp(1rem, 4.5vw, 1.25rem); }
+  .kx-ep-view .kx-episode-summary .kx-ep-meta { margin-bottom: 7px; font-size: .76rem; }
+  .kx-ep-view .kx-episode-summary .kx-synopsis { font-size: .82rem; line-height: 1.55; }
+  .kx-ep-view > .kx-cast-section { margin: 15px auto 16px; padding-top: 11px; }
+  .kx-ep-view .kx-cast-row { gap: 9px; padding: 8px 2px 7px; overflow-x: auto; }
+  .kx-ep-view .kx-cast-card { flex: 0 0 70px; }
+  .kx-ep-view .kx-cast-photo { width: 62px; height: 76px; margin-bottom: 6px; border-radius: 9px; }
+  .kx-ep-view .kx-cast-card b { font-size: .62rem; }
+  .kx-ep-view .kx-cast-card small { font-size: .56rem; }
+  .kx-ep-view .kx-playback-controls { padding: 0; }
+  .kx-ep-view .kx-ep-mobile {
+    max-height: 250px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 10px;
+    border-radius: 12px;
+  }
+  .kx-ep-view .kx-ep-num-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+  .kx-ep-view .kx-ep-num { height: 36px; border-radius: 9px; font-size: .76rem; }
+  .kx-ep-view .kx-playback-controls .kx-block { margin-bottom: 10px; }
+  .kx-ep-view .kx-playback-controls .kx-block-title { margin-bottom: 6px; font-size: .65rem; }
+  .kx-ep-view .kx-playback-controls .kx-chips { gap: 6px; padding-bottom: 3px; }
+  .kx-ep-view .kx-playback-controls .kx-chip { min-height: 33px; padding: 6px 9px; font-size: .73rem; }
+}
+
+@media (max-width: 520px) {
+  .kx-ep-view .kx-topbar {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 4px;
+    padding: 8px 10px !important;
+  }
+  .kx-ep-view .kx-back { font-size: .76rem; }
+  .kx-ep-view .kx-topbar-title { font-size: .56rem; }
+  .kx-ep-view .kx-top-actions { gap: 5px; }
+  .kx-ep-view .kx-fullscreen-btn { min-height: 35px; width: 36px; padding: 0; }
+  .kx-ep-view .kx-fullscreen-btn span { display: none; }
+  .kx-ep-view .kx-cinema-main { grid-template-columns: 50px minmax(0, 1fr); gap: 8px; }
+  .kx-ep-view .kx-cinema-poster { width: 50px; }
+  .kx-ep-view .kx-cinema-copy h1 { font-size: 1rem; }
+  .kx-ep-view .kx-cinema-facts { font-size: .59rem; }
+  .kx-ep-view .kx-season-control select { width: 100%; max-width: 220px; }
+  .kx-ep-view .kx-ep-num-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+  .kx-ep-view .kx-ep-num { height: 35px; }
+  .kx-ep-view .kx-cast-heading h2 { font-size: .95rem; }
+}

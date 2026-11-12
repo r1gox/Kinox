@@ -1246,6 +1246,12 @@
         (epMeta && epMeta.runtime) ||
         (meta && meta.runtime) ||
         null;
+      var epRuntimeLabel = "";
+      if (epRuntime != null && String(epRuntime).trim()) {
+        epRuntimeLabel = String(epRuntime).trim();
+        if (/^\d+(?:\.\d+)?$/.test(epRuntimeLabel)) epRuntimeLabel += " min";
+        else if (!/\bmin(?:uto)?s?\b/i.test(epRuntimeLabel)) epRuntimeLabel += " min";
+      }
       var epOverview =
         (epMeta && epMeta.overview && String(epMeta.overview).trim()) ||
         (tmdbEp && tmdbEp.overview && String(tmdbEp.overview).trim()) ||
@@ -1274,15 +1280,19 @@
           '<div class="kx-ep-list" id="kxEpList"></div>' +
           "</aside>" +
           "</div>" +
-          castHtml +
-          '<div class="kx-info">' +
+          '<div class="kx-info kx-episode-summary">' +
           '<h1 class="kx-ep-heading" id="kxEpHeading">' +
           esc(epTitle) +
           "</h1>" +
           '<div class="kx-ep-meta" id="kxEpMeta">' +
-          (epRuntime ? esc(String(epRuntime) + " min") : "") +
+          esc(epRuntimeLabel) +
           "</div>" +
-          '<div class="kx-nav" id="kxNav"></div>' +
+          (epOverview
+            ? '<p class="kx-synopsis" id="kxSynopsis">' + esc(epOverview) + "</p>"
+            : '<p class="kx-synopsis" id="kxSynopsis"></p>') +
+          "</div>" +
+          castHtml +
+          '<div class="kx-info kx-playback-controls">' +
           '<div class="kx-block">' +
           '<h3 class="kx-block-title">Reproductores</h3>' +
           '<div class="kx-chips" id="kxServers"></div>' +
@@ -1292,9 +1302,6 @@
           '<div class="kx-chips" id="kxDirects"></div>' +
           "</div>" +
           '<div class="kx-ep-mobile" id="kxEpMobile"></div>' +
-          (epOverview
-            ? '<p class="kx-synopsis" id="kxSynopsis">' + esc(epOverview) + "</p>"
-            : '<p class="kx-synopsis" id="kxSynopsis"></p>') +
           "</div>" +
           "</section>";
       } else {
@@ -1911,6 +1918,7 @@
         }
         if (mob) {
           mob.innerHTML =
+            '<div class="kx-ep-mobile-title">Episodios</div>' +
             '<div class="kx-ep-num-grid">' +
             seasonEps
               .map(function (e) {
@@ -1920,44 +1928,6 @@
             "</div>";
         }
 
-        /* Prev / Next */
-        var nav = $("#kxNav");
-        var epNum = parseInt(episode, 10) || 1;
-        var prevEp = seasonEps.find(function (e) {
-          return e.episode_number === epNum - 1;
-        });
-        var nextEp = seasonEps.find(function (e) {
-          return e.episode_number === epNum + 1;
-        });
-        if (nav) {
-          nav.innerHTML =
-            (prevEp
-              ? '<a class="kx-nav-btn" href="' +
-                buildPlayHref({
-                  type: "tv",
-                  id: id,
-                  season: season,
-                  episode: prevEp.episode_number,
-                  slug: slug,
-                  sourceId: sourceId,
-                  urlVidBase: urlVidBase
-                }) +
-                '">← Anterior</a>'
-              : '<span class="kx-nav-btn disabled">← Anterior</span>') +
-            (nextEp
-              ? '<a class="kx-nav-btn" href="' +
-                buildPlayHref({
-                  type: "tv",
-                  id: id,
-                  season: season,
-                  episode: nextEp.episode_number,
-                  slug: slug,
-                  sourceId: sourceId,
-                  urlVidBase: urlVidBase
-                }) +
-                '">Siguiente →</a>'
-              : '<span class="kx-nav-btn disabled">Siguiente →</span>');
-        }
       }
 
       function renderVideo(src) {
