@@ -1255,3 +1255,380 @@ footer a:hover{color:#fff}
 @media (prefers-reduced-motion:reduce){
   *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+
+
+/* ==========================================================
+   KINOX PREMIUM PLAYER — cinematic metadata + responsive UI
+   ========================================================== */
+.kx-ep-view,
+.kx-movie-view {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 15% 0%, rgba(93, 48, 150, .18), transparent 42%),
+    linear-gradient(180deg, #090812 0%, #080a12 55%, #07080d 100%);
+}
+.kx-ep-view::before,
+.kx-movie-view::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 620px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 80% 12%, rgba(36, 115, 130, .12), transparent 48%);
+}
+.kx-topbar {
+  position: relative;
+  z-index: 12;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 18px 4% !important;
+}
+.kx-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px;
+  background: rgba(255,255,255,.055);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: background .2s ease, border-color .2s ease, transform .2s ease;
+}
+.kx-back:hover { background: rgba(255,255,255,.11); border-color: rgba(255,255,255,.25); transform: translateY(-1px); }
+.kx-topbar-title { color: rgba(226,232,240,.58); font-size: .68rem; letter-spacing: .22em; font-weight: 900; }
+.kx-fullscreen-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  color: #f8fafc;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 999px;
+  background: rgba(255,255,255,.07);
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: .2s ease;
+}
+.kx-fullscreen-btn:hover { background: rgba(139,92,246,.2); border-color: rgba(167,139,250,.55); }
+.kx-cinema-hero {
+  position: relative;
+  isolation: isolate;
+  width: min(1400px, 92%);
+  margin: 0 auto 28px;
+  padding: 34px clamp(16px, 3vw, 42px) 28px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: 24px;
+  background: linear-gradient(120deg, rgba(20,19,34,.96), rgba(11,13,23,.88));
+  box-shadow: 0 24px 80px rgba(0,0,0,.28), inset 0 1px rgba(255,255,255,.055);
+}
+.kx-cinema-backdrop {
+  position: absolute;
+  inset: 0 0 auto auto;
+  width: 78%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 28%;
+  z-index: -2;
+  opacity: .34;
+  filter: saturate(.78) blur(.2px);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 48%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 48%);
+}
+.kx-cinema-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(12,11,22,.99) 0%, rgba(12,11,22,.91) 42%, rgba(12,11,22,.58) 100%), linear-gradient(0deg, #0b0c15 0%, transparent 42%);
+}
+.kx-cinema-main { display: grid; grid-template-columns: 164px minmax(0,1fr); align-items: center; gap: clamp(22px,3vw,42px); }
+.kx-cinema-poster {
+  width: 164px;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 15px;
+  background: linear-gradient(145deg,#29243d,#111827);
+  box-shadow: 0 18px 48px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.16);
+}
+.kx-cinema-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.kx-poster-fallback { display:grid; place-items:center; height:100%; color:#c4b5fd; font-size:4rem; font-weight:900; }
+.kx-cinema-copy { min-width: 0; max-width: 900px; }
+.kx-cinema-kicker, .kx-section-kicker { display:block; color:#b8a6ff; font-size:.68rem; letter-spacing:.2em; font-weight:900; }
+.kx-cinema-copy h1 { margin: 9px 0 12px; color:#fff; font-size:clamp(1.8rem,3.5vw,3.15rem); line-height:1.08; letter-spacing:-.045em; font-weight:900; text-wrap:balance; }
+.kx-cinema-facts { display:flex; flex-wrap:wrap; align-items:center; gap:9px; color:#cbd5e1; font-size:.88rem; }
+.kx-cinema-facts b { color:#f8fafc; font-weight:800; }
+.kx-cinema-facts i { color:#94a3b8; font-size:.78rem; font-style:normal; }
+.kx-fact-dot { color:#64748b; font-size:.8rem; }
+.kx-cert { padding:3px 8px; border:1px solid rgba(255,255,255,.25); border-radius:5px; color:#e2e8f0; font-size:.74rem; font-weight:900; }
+.kx-score { color:#fbbf24; font-weight:900; }
+.kx-genre-list { display:flex; flex-wrap:wrap; gap:7px; margin-top:13px; }
+.kx-genre-list span { padding:5px 10px; border:1px solid rgba(196,181,253,.2); border-radius:999px; background:rgba(139,92,246,.1); color:#d9d1ff; font-size:.72rem; font-weight:700; }
+.kx-cinema-overview { max-width:780px; margin:14px 0 0; color:#c0c5d3; font-size:.9rem; line-height:1.7; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+.kx-cinema-credit { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px; margin-top:13px; }
+.kx-cinema-credit span { color:#8e91a6; font-size:.64rem; font-weight:900; letter-spacing:.13em; }
+.kx-cinema-credit b { color:#f1f5f9; font-size:.82rem; }
+.kx-season-control { display:inline-flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:17px; color:#a5acc0; font-size:.75rem; font-weight:800; }
+.kx-season-control select { min-width:190px; max-width:min(360px,70vw); min-height:39px; padding:0 34px 0 12px; color:#f8fafc; border:1px solid rgba(255,255,255,.16); border-radius:10px; outline:none; background:rgba(12,13,25,.82); font:inherit; font-size:.78rem; cursor:pointer; }
+.kx-season-control select:focus { border-color:#a78bfa; box-shadow:0 0 0 3px rgba(139,92,246,.17); }
+.kx-season-control option { color:#f8fafc; background:#111827; }
+.kx-season-single { display:inline-flex; margin-top:17px; padding:7px 11px; color:#d6ccff; border:1px solid rgba(196,181,253,.18); border-radius:9px; background:rgba(139,92,246,.1); font-size:.76rem; font-weight:800; }
+.kx-cast-section { margin-top:25px; padding-top:19px; border-top:1px solid rgba(255,255,255,.1); }
+.kx-cast-row { display:flex; gap:14px; overflow-x:auto; padding:12px 2px 4px; scrollbar-width:thin; scrollbar-color:rgba(167,139,250,.35) transparent; }
+.kx-cast-card { flex:0 0 88px; min-width:0; text-align:center; }
+.kx-cast-photo { width:66px; height:66px; margin:0 auto 8px; overflow:hidden; display:grid; place-items:center; border-radius:50%; background:linear-gradient(145deg,#38304e,#171b2b); border:1px solid rgba(255,255,255,.17); color:#ddd6fe; font-size:1.25rem; font-weight:900; }
+.kx-cast-photo img { width:100%; height:100%; object-fit:cover; }
+.kx-cast-photo.is-empty { background:linear-gradient(145deg,#38304e,#171b2b); }
+.kx-cast-card b { display:block; color:#e7e9f2; font-size:.7rem; line-height:1.25; font-weight:800; }
+.kx-cast-card small { display:block; margin-top:3px; color:#8e96a9; font-size:.64rem; line-height:1.25; }
+.kx-stage { position:relative; z-index:1; margin-top:0; }
+.kx-player, .kx-ep-view .mz-player, .kx-movie-view .mz-player { border:1px solid rgba(255,255,255,.13); border-radius:18px; box-shadow:0 24px 70px rgba(0,0,0,.52), 0 0 0 1px rgba(255,255,255,.025); }
+.kx-player-wrap { border-radius:18px; overflow:visible; }
+.kx-player-hud { top:14px !important; left:14px !important; }
+.kx-dd-btn { border-color:rgba(255,255,255,.18) !important; background:rgba(9,12,23,.82) !important; box-shadow:0 8px 24px rgba(0,0,0,.34) !important; }
+.kx-dd-menu { background:rgba(12,14,27,.97) !important; border-color:rgba(167,139,250,.38) !important; backdrop-filter:blur(18px); }
+.kx-sidebar { border-color:rgba(255,255,255,.1); border-radius:18px; background:linear-gradient(160deg,rgba(23,25,42,.88),rgba(12,14,24,.92)); box-shadow:0 18px 48px rgba(0,0,0,.2); }
+.kx-sidebar-head { color:#c4b5fd; letter-spacing:.12em; }
+.kx-ep-card { border-radius:12px; }
+.kx-ep-card.playing,.kx-ep-card.active { border-color:rgba(167,139,250,.65); background:linear-gradient(100deg,rgba(139,92,246,.2),rgba(139,92,246,.07)); box-shadow:inset 3px 0 #a78bfa; }
+.kx-ep-name { color:#f1f5f9; font-size:.8rem; }
+.kx-ep-desc { margin-top:5px; color:#8e9aaf; font-size:.68rem; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.kx-ep-info { display:block; align-self:center; }
+.kx-info { max-width:1400px; margin:0 auto; }
+.kx-ep-heading { font-size:clamp(1.15rem,2vw,1.55rem); letter-spacing:-.025em; }
+.kx-ep-meta { color:#a5acc0; }
+.kx-nav-btn { border-radius:999px; background:rgba(255,255,255,.055); transition:.2s ease; }
+.kx-nav-btn:hover { transform:translateY(-1px); }
+.kx-block-title { color:#b4a6e8; letter-spacing:.14em; }
+.kx-chip { border-radius:999px; background:rgba(255,255,255,.055); border-color:rgba(255,255,255,.13); }
+.kx-chip.active { box-shadow:0 5px 18px rgba(139,92,246,.18); }
+.kx-synopsis { color:#aab2c4; line-height:1.75; }
+.kx-movie-player-area { width:min(1400px,92%); margin:0 auto 24px; }
+.kx-player-section-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; margin:0 0 10px; }
+.kx-player-section-head span { color:#c4b5fd; font-size:.68rem; font-weight:900; letter-spacing:.18em; }
+.kx-player-section-head small { color:#778198; font-size:.72rem; }
+.kx-movie-view > .kx-block { width:min(1400px,92%); margin:0 auto 15px; }
+.kx-movie-view .kx-player { aspect-ratio:16/9; }
+.kx-player .player-loading, .kx-player .player-empty { min-height:260px; background:radial-gradient(ellipse at center,rgba(35,30,61,.55),rgba(0,0,0,.96) 70%); }
+.kx-player .player-empty { color:#dce2ef; }
+.kx-player .kx-retry-btn { border-radius:999px; padding:10px 20px; }
+.kx-ep-mobile { padding:14px; border:1px solid rgba(255,255,255,.08); border-radius:16px; background:rgba(17,20,34,.7); }
+.kx-ep-num { border-radius:12px; transition:.2s ease; }
+.kx-ep-num.active { box-shadow:0 6px 18px rgba(139,92,246,.2); }
+
+@media (max-width: 900px) {
+  .kx-cinema-hero { width:calc(100% - 24px); margin:0 auto 18px; padding:22px 17px 18px; border-radius:19px; }
+  .kx-cinema-main { grid-template-columns:96px minmax(0,1fr); gap:15px; align-items:start; }
+  .kx-cinema-poster { width:96px; border-radius:11px; }
+  .kx-cinema-copy h1 { margin:5px 0 9px; font-size:clamp(1.35rem,5.8vw,2rem); }
+  .kx-cinema-kicker { font-size:.58rem; letter-spacing:.16em; }
+  .kx-cinema-facts { gap:6px; font-size:.75rem; }
+  .kx-genre-list { gap:5px; margin-top:9px; }
+  .kx-genre-list span { padding:4px 8px; font-size:.65rem; }
+  .kx-cinema-overview { grid-column:1/-1; font-size:.8rem; line-height:1.55; -webkit-line-clamp:4; }
+  .kx-cinema-credit { gap:7px; margin-top:9px; }
+  .kx-cinema-credit span { font-size:.57rem; }
+  .kx-cinema-credit b { font-size:.72rem; }
+  .kx-season-control { margin-top:11px; gap:7px; font-size:.68rem; }
+  .kx-season-control select { min-width:0; width:min(230px,100%); min-height:38px; font-size:.72rem; }
+  .kx-season-single { margin-top:11px; }
+  .kx-cast-section { margin-top:17px; padding-top:14px; }
+  .kx-cast-card { flex-basis:78px; }
+  .kx-cast-photo { width:56px; height:56px; }
+  .kx-topbar { padding:10px 12px !important; }
+  .kx-topbar-title { font-size:.58rem; }
+  .kx-fullscreen-btn { min-height:37px; padding:0 11px; font-size:.7rem; }
+  .kx-player-hud { top:8px !important; left:8px !important; }
+  .kx-movie-player-area { width:calc(100% - 24px); }
+  .kx-movie-view > .kx-block { width:calc(100% - 24px); }
+}
+@media (max-width: 520px) {
+  .kx-cinema-main { grid-template-columns:78px minmax(0,1fr); gap:12px; }
+  .kx-cinema-poster { width:78px; }
+  .kx-cinema-copy h1 { font-size:1.28rem; }
+  .kx-cinema-facts { font-size:.68rem; gap:5px; }
+  .kx-cinema-overview { font-size:.76rem; }
+  .kx-cinema-backdrop { width:100%; opacity:.25; mask-image:linear-gradient(90deg,transparent,#000 100%); -webkit-mask-image:linear-gradient(90deg,transparent,#000 100%); }
+  .kx-cinema-scrim { background:linear-gradient(90deg,rgba(12,11,22,.94),rgba(12,11,22,.76)),linear-gradient(0deg,#0b0c15,transparent 65%); }
+  .kx-top-actions { min-width:0; }
+  .kx-fullscreen-btn span { display:none; }
+  .kx-fullscreen-btn { width:39px; padding:0; font-size:1rem; }
+  .kx-player-section-head small { display:none; }
+  .kx-cast-card { flex-basis:72px; }
+  .kx-cast-photo { width:52px; height:52px; }
+}
+
+.kx-player-wrap:fullscreen,
+.kx-player-wrap:-webkit-full-screen,
+.kx-player:fullscreen,
+.kx-player:-webkit-full-screen {
+  width:100vw !important;
+  height:100vh !important;
+  max-width:none !important;
+  max-height:none !important;
+  aspect-ratio:auto !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:#000 !important;
+  box-shadow:none !important;
+}
+.kx-player-wrap:fullscreen .kx-player,
+.kx-player-wrap:-webkit-full-screen .kx-player,
+.kx-player:fullscreen,
+.kx-player:-webkit-full-screen { width:100% !important; height:100% !important; aspect-ratio:auto !important; border:0 !important; border-radius:0 !important; }
+
+/* KINOX PLAYER — ficha compacta y reproducción prioritaria */
+.kx-cinema-hero {
+  width: min(1360px, 92%);
+  margin: 0 auto 16px;
+  padding: 18px clamp(14px, 2.2vw, 28px) 16px;
+  border-radius: 18px;
+  box-shadow: 0 16px 48px rgba(0,0,0,.24), inset 0 1px rgba(255,255,255,.055);
+}
+.kx-cinema-main {
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: clamp(14px, 2vw, 24px);
+}
+.kx-cinema-poster {
+  width: 116px;
+  border-radius: 11px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.13);
+}
+.kx-cinema-copy h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(1.35rem, 2.35vw, 2.15rem);
+  line-height: 1.12;
+  letter-spacing: -.035em;
+}
+.kx-cinema-facts { gap: 7px; font-size: .78rem; }
+.kx-genre-list { gap: 6px; margin-top: 8px; }
+.kx-genre-list span { padding: 4px 9px; font-size: .66rem; }
+.kx-cinema-overview {
+  max-width: 850px;
+  margin: 9px 0 0;
+  font-size: .8rem;
+  line-height: 1.55;
+  -webkit-line-clamp: 2;
+}
+.kx-cinema-credit { gap: 8px; margin-top: 8px; }
+.kx-cinema-credit b { font-size: .75rem; }
+.kx-season-control { margin-top: 10px; }
+.kx-season-single { margin-top: 10px; padding: 5px 9px; }
+.kx-cast-section {
+  width: min(1360px, 92%);
+  margin: 0 auto 18px;
+  padding: 13px 0 0;
+}
+.kx-cast-row { gap: 12px; padding: 9px 2px 3px; }
+.kx-cast-card { flex-basis: 78px; }
+.kx-cast-photo { width: 54px; height: 54px; margin-bottom: 6px; }
+.kx-cast-card b { font-size: .66rem; }
+.kx-cast-card small { font-size: .6rem; }
+.kx-movie-player-area { margin-bottom: 20px; }
+.kx-movie-view .kx-player { min-height: 0; }
+
+@media (max-width: 900px) {
+  .kx-cinema-hero {
+    width: calc(100% - 24px);
+    margin-bottom: 13px;
+    padding: 14px 13px 13px;
+    border-radius: 15px;
+  }
+  .kx-cinema-main { grid-template-columns: 84px minmax(0, 1fr); gap: 12px; }
+  .kx-cinema-poster { width: 84px; border-radius: 9px; }
+  .kx-cinema-copy h1 { margin: 3px 0 6px; font-size: clamp(1.18rem, 3.5vw, 1.65rem); }
+  .kx-cinema-facts { gap: 5px; font-size: .7rem; }
+  .kx-genre-list { gap: 4px; margin-top: 6px; }
+  .kx-genre-list span { padding: 3px 7px; font-size: .6rem; }
+  .kx-cinema-overview { margin-top: 7px; font-size: .73rem; line-height: 1.45; -webkit-line-clamp: 2; }
+  .kx-cinema-credit { margin-top: 6px; }
+  .kx-cinema-credit span { font-size: .55rem; }
+  .kx-cinema-credit b { font-size: .68rem; }
+  .kx-season-control { margin-top: 8px; font-size: .64rem; }
+  .kx-season-control select { width: min(210px, 100%); min-height: 34px; font-size: .68rem; }
+  .kx-season-single { margin-top: 8px; font-size: .66rem; }
+  .kx-cast-section { width: calc(100% - 24px); margin-bottom: 14px; padding-top: 10px; }
+  .kx-cast-photo { width: 48px; height: 48px; }
+  .kx-cast-card { flex-basis: 70px; }
+  .kx-movie-player-area { width: calc(100% - 24px); }
+}
+@media (max-width: 520px) {
+  .kx-cinema-hero { padding: 12px 10px 11px; }
+  .kx-cinema-main { grid-template-columns: 68px minmax(0, 1fr); gap: 10px; }
+  .kx-cinema-poster { width: 68px; border-radius: 8px; }
+  .kx-cinema-copy h1 { font-size: 1.08rem; line-height: 1.15; }
+  .kx-cinema-kicker { font-size: .52rem; letter-spacing: .12em; }
+  .kx-cinema-facts { font-size: .64rem; }
+  .kx-cinema-overview { font-size: .68rem; -webkit-line-clamp: 2; }
+  .kx-genre-list span { font-size: .56rem; padding: 3px 6px; }
+  .kx-cinema-credit b { font-size: .62rem; }
+  .kx-cast-card { flex-basis: 64px; }
+  .kx-cast-photo { width: 44px; height: 44px; }
+}
+
+
+/* KINOX PLAYER — reparto visible y reproductor de una sola pieza */
+.kx-cast-section { width:min(1320px,92%); margin:20px auto 28px; padding:18px 0 0; border-top:1px solid rgba(255,255,255,.09); }
+.kx-cast-heading { display:flex; align-items:end; justify-content:space-between; gap:14px; margin-bottom:4px; }
+.kx-cast-heading h2 { margin:5px 0 0; color:#f4f5fb; font-size:1.05rem; letter-spacing:-.02em; }
+.kx-cast-heading > small { color:#8791a6; font-size:.72rem; }
+.kx-cast-row { gap:13px; padding:12px 2px 8px; scroll-snap-type:x proximity; }
+.kx-cast-card { flex:0 0 104px; scroll-snap-align:start; text-align:left; }
+.kx-cast-photo { width:94px; height:116px; margin:0 0 8px; border-radius:12px; background:linear-gradient(145deg,#26283a,#121520); box-shadow:0 8px 22px rgba(0,0,0,.25); }
+.kx-cast-photo img { display:block; transition:transform .35s ease; }
+.kx-cast-card:hover .kx-cast-photo img { transform:scale(1.055); }
+.kx-cast-photo span { font-size:1.6rem; }
+.kx-cast-card b { color:#f0f2f8; font-size:.72rem; line-height:1.3; }
+.kx-cast-card small { color:#8f99ad; font-size:.65rem; line-height:1.3; }
+.kx-overview-wrap { max-width:850px; }
+.kx-cinema-overview { -webkit-line-clamp:2; transition:max-height .25s ease; }
+.kx-cinema-overview.is-expanded { display:block; overflow:visible; -webkit-line-clamp:unset; }
+.kx-overview-toggle { display:inline-flex; align-items:center; gap:7px; margin-top:5px; padding:0; border:0; background:transparent; color:#c4b5fd; font:inherit; font-size:.7rem; font-weight:800; cursor:pointer; }
+.kx-overview-toggle:hover { color:#fff; }
+.kx-top-actions { display:flex; align-items:center; gap:8px; }
+.kx-reload-btn { display:inline-grid; place-items:center; width:40px; height:40px; border:1px solid rgba(255,255,255,.15); border-radius:50%; background:rgba(255,255,255,.07); color:#f8fafc; font-size:1.35rem; line-height:1; cursor:pointer; transition:background .2s ease,border-color .2s ease,transform .2s ease; }
+.kx-reload-btn:hover { border-color:rgba(167,139,250,.55); background:rgba(139,92,246,.18); }
+.kx-reload-btn.is-loading { animation:kxReloadSpin .75s linear infinite; }
+@keyframes kxReloadSpin { to { transform:rotate(360deg); } }
+
+/* El borde/sombra vive en el wrapper. El iframe/video interno no dibuja otro marco. */
+.kx-movie-player-area { width:min(1320px,92%); margin:0 auto 20px; }
+.kx-movie-player-area .kx-player-wrap { position:relative; isolation:isolate; width:100%; aspect-ratio:16/9; overflow:hidden; border:1px solid rgba(255,255,255,.12); border-radius:16px; background:#000; box-shadow:0 18px 52px rgba(0,0,0,.38); }
+.kx-movie-player-area .kx-player-wrap > .kx-player,
+.kx-movie-player-area .kx-player-wrap > .mz-player { position:absolute; inset:0; width:100%; height:100%; min-height:0; aspect-ratio:auto; overflow:hidden; border:0; border-radius:0; box-shadow:none; background:#000; }
+.kx-movie-player-area .kx-player-wrap .kx-player iframe,
+.kx-movie-player-area .kx-player-wrap .kx-player video,
+.kx-movie-player-area .kx-player-wrap .mz-player iframe,
+.kx-movie-player-area .kx-player-wrap .mz-player video { position:absolute; inset:0; display:block; width:100% !important; height:100% !important; max-width:none; max-height:none; border:0; border-radius:0; background:#000; }
+.kx-movie-player-area .kx-player-wrap .kx-player-hud { z-index:8; }
+.kx-movie-player-area .kx-player-section-head { margin-bottom:9px; }
+.kx-movie-player-area .kx-player-section-head span { display:flex; align-items:center; gap:8px; }
+.kx-movie-player-area .kx-player-section-head span::before { content:""; width:7px; height:7px; border-radius:50%; background:#a78bfa; box-shadow:0 0 12px rgba(167,139,250,.65); }
+.kx-movie-view > .kx-block { width:min(1320px,92%); }
+@media (max-width:900px) {
+  .kx-cast-section { width:calc(100% - 24px); margin:16px auto 22px; padding-top:14px; }
+  .kx-cast-card { flex-basis:92px; }
+  .kx-cast-photo { width:82px; height:102px; }
+  .kx-reload-btn { width:37px; height:37px; }
+  .kx-movie-player-area .kx-player-wrap { border-radius:11px; }
+}
+@media (max-width:520px) {
+  .kx-cast-heading > small { display:none; }
+  .kx-cast-card { flex-basis:80px; }
+  .kx-cast-photo { width:72px; height:90px; border-radius:10px; }
+  .kx-cast-card b { font-size:.66rem; }
+  .kx-cast-card small { font-size:.6rem; }
+  .kx-reload-btn { width:35px; height:35px; font-size:1.2rem; }
+  .kx-movie-player-area .kx-player-wrap { border-radius:9px; }
+}

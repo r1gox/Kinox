@@ -12,33 +12,48 @@ export const config = {
 };
 
 export default async function handler(request) {
-  // Solo se usa desde el mismo origen, así que no se habilita CORS.
+  // CORS restringido a pruebas locales: file:// (Origin: null) y localhost.
+  // No se permite que cualquier sitio externo lea este proxy.
+  const origin = request.headers.get('origin') || '';
+  const localOrigin = origin === 'null' || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  const corsHeaders = {};
+  if (localOrigin) {
+    corsHeaders['Access-Control-Allow-Origin'] = origin;
+    corsHeaders['Vary'] = 'Origin';
+    corsHeaders['Access-Control-Allow-Methods'] = 'GET, OPTIONS';
+    corsHeaders['Access-Control-Allow-Headers'] = 'Content-Type';
+  }
+  const json = (body, status = 200, extraHeaders = {}) => new Response(JSON.stringify(body), {
+    status,
+    headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, corsHeaders, extraHeaders),
+  });
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: localOrigin ? 204 : 403, headers: corsHeaders });
+  }
   if (request.method !== 'GET') {
-    return Response.json({ error: 'Method not allowed' }, { status: 405 });
+    return json({ error: 'Method not allowed' }, 405);
   }
 
   const key =
     process.env.TMDB_API_KEY || process.env.TMBD_API_KEY || process.env.TMDB_KEY || '';
   if (!key) {
-    return Response.json(
-      {
-        error:
-          'Falta TMDB_API_KEY en Vercel → Settings → Environment Variables (Production y Preview) y Redeploy',
-      },
-      { status: 503 }
+    return json(
+      { error: 'Falta TMDB_API_KEY en Vercel → Settings → Environment Variables (Production y Preview) y Redeploy' },
+      503
     );
   }
 
   const rl = allowRequest(clientIp(request));
   if (!rl.ok) {
-    return Response.json(
+    return json(
       { error: 'Demasiadas peticiones. Inténtalo de nuevo en unos segundos.' },
-      { status: 429, headers: { 'Retry-After': String(rl.retryAfter) } }
+      429,
+      { 'Retry-After': String(rl.retryAfter) }
     );
   }
 
   const check = validateTmdbRequest(new URL(request.url).searchParams);
-  if (!check.ok) return Response.json({ error: check.error }, { status: check.status });
+  if (!check.ok) return json({ error: check.error }, check.status);
 
   try {
     const target = new URL('https://api.themoviedb.org/3' + check.path);
@@ -55,14 +70,10 @@ export default async function handler(request) {
       body = { error: 'Respuesta no JSON' };
     }
 
-    return new Response(JSON.stringify(body), {
-      status: r.status,
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': r.ok ? 's-maxage=300, stale-while-revalidate=600' : 'no-store',
-      },
+    return json(body, r.status, {
+      'Cache-Control': r.ok ? 's-maxage=300, stale-while-revalidate=600' : 'no-store',
     });
   } catch (e) {
-    return Response.json({ error: String(e && e.message ? e.message : e) }, { status: 502 });
+    return json({ error: String(e && e.message ? e.message : e) }, 502);
   }
 }

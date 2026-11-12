@@ -15,8 +15,15 @@
     return Array.prototype.slice.call((r || document).querySelectorAll(s));
   }
 
+  function isProviderEmbed(p) {
+    if (!p || !p.url || !/^https?:\/\//i.test(String(p.url))) return false;
+    var type = String(p.tipo || p.type || p.name || p.provider || p.servidor || "").toLowerCase();
+    var endpoint = String(p.hls_resolve || p.stream_url || "").toLowerCase();
+    return /reproductor|embed|iframe/.test(type) || /\/streamurl(?:\?|$)/.test(endpoint);
+  }
+
   function isDirectPlayer(p) {
-    if (!p) return false;
+    if (!p || isProviderEmbed(p)) return false;
     if (p.stream_url || p.hls_resolve) return true;
     if (p.noAds || p.__directHls) return true;
     return false;
@@ -603,12 +610,31 @@
       }
 
       var meta = null;
-      if (typeof KEY !== "undefined" && KEY && id) {
+      // La ficha puede venir del proxy TMDB de Vercel aunque el usuario no
+      // tenga una API key guardada localmente. Cargamos créditos y rating.
+      if (id && typeof tmdb === "function") {
         try {
-          meta = await tmdb("/" + type + "/" + id);
+          var appendMeta = type === "tv" ? "credits,content_ratings" : "credits,release_dates";
+          meta = await tmdb("/" + type + "/" + id, { append_to_response: appendMeta });
           if (!slug) slug = mzSlug(meta.title || meta.name);
-          document.title = (meta.title || meta.name || "Reproductor") + " — Kinox";
-        } catch (_) {}
+        } catch (metaError) {
+          console.warn("[Kinox player] No se pudo cargar la ficha TMDB:", metaError);
+        }
+      }
+
+      // En modo local (file://) no existe el proxy /api/tmdb de Vercel.
+      // Completar la ficha desde el worker, que ya alimenta los reproductores.
+      var workerMeta = null;
+      var needsWorkerMeta = !meta || !meta.overview || !meta.poster_path || !meta.backdrop_path;
+      if (slug && needsWorkerMeta && typeof mzFetchDetail === "function") {
+        try {
+          workerMeta = await Promise.race([
+            mzFetchDetail({ slug: slug, type: type, source_id: sourceId }),
+            new Promise(function (resolve) { setTimeout(function () { resolve(null); }, 4000); })
+          ]);
+        } catch (workerMetaError) {
+          console.warn("[Kinox player] No se pudo cargar la ficha del catálogo:", workerMetaError);
+        }
       }
       if (!slug && !urlVid) {
         $("#view").innerHTML = '<div class="load">Falta el slug del título.</div>';
@@ -619,16 +645,171 @@
         episode = String(episode || "1");
       }
 
+      var fallbackTitle = (slug || "Reproducción").replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+      fallbackTitle = fallbackTitle.replace(/(^|\s)([a-záéíóúñ])/gi, function (_, gap, letter) { return gap + letter.toUpperCase(); });
       var title =
         (meta && (meta.title || meta.name)) ||
-        (slug || "Reproducción").replace(/-/g, " ");
-      var overview = (meta && meta.overview) || "";
-      var poster =
-        meta && meta.poster_path
-          ? (typeof IMG !== "undefined" ? IMG : "https://image.tmdb.org/t/p/") +
-            "w780" +
-            meta.poster_path
-          : "";
+        (workerMeta && (workerMeta.titulo || workerMeta.title || workerMeta.nombre)) ||
+        fallbackTitle;
+      document.title = title + " — Kinox";
+      var overview = (meta && meta.overview) ||
+        (workerMeta && (workerMeta.descripcion || workerMeta.overview || workerMeta.sinopsis)) || "";
+      var imageBase = typeof IMG !== "undefined" ? IMG : "https://image.tmdb.org/t/p/";
+      function workerImage(value, size) {
+        var raw = String(value || "").trim();
+        if (!raw) return "";
+        if (/^https?:\/\//i.test(raw)) return raw;
+        if (raw.indexOf("//") === 0) return "https:" + raw;
+        if (raw.charAt(0) === "/") return imageBase + (size || "w500") + raw;
+        return "";
+      }
+      var poster = meta && meta.poster_path
+        ? imageBase + "w500" + meta.poster_path
+        : workerImage(workerMeta && (workerMeta.portada || workerMeta.poster || workerMeta.image), "w500");
+      var backdrop = meta && meta.backdrop_path
+        ? imageBase + "w1280" + meta.backdrop_path
+        : workerImage(workerMeta && (workerMeta.backdrop || workerMeta.back_img || workerMeta.fondo), "w1280") || poster;
+      var credits = (meta && meta.credits) || {};
+      function workerCastRows(source) {
+        if (!source) return [];
+        var rows = source.reparto || source.reparto_principal || source.elenco || source.actores || source.actores_principales || source.actors || source.cast ||
+          (source.credits && source.credits.cast) ||
+          (source.detalle && (source.detalle.reparto || source.detalle.elenco || source.detalle.actores || source.detalle.cast));
+        if (typeof rows === "string") {
+          try { rows = JSON.parse(rows); } catch (_) { rows = rows.split(/[,;|]/); }
+        }
+        if (rows && !Array.isArray(rows) && typeof rows === "object") rows = Object.keys(rows).map(function (k) { return rows[k]; });
+        if (!Array.isArray(rows)) return [];
+        return rows.map(function (person) {
+          if (typeof person === "string") return { name: person.trim(), character: "", profile_path: "" };
+          if (!person || typeof person !== "object") return null;
+          var name = person.name || person.nombre || person.nombre_actor || person.nombre_persona || person.actor_name || person.actor || person.actriz || person.artista || person.titulo || "";
+          var character = person.character || person.character_name || person.personaje || person.personaje_nombre || person.rol || person.role || person.nombre_personaje || "";
+          var image = person.profile_path || person.profile || person.photo || person.foto || person.fotografia || person.image || person.imagen || person.url_foto || person.url_imagen || "";
+          var profilePath = /^https?:\/\//i.test(String(image)) ? String(image) : String(image || "");
+          if (profilePath && profilePath.charAt(0) !== "/" && !/^https?:\/\//i.test(profilePath)) profilePath = "";
+          return { name: String(name || "").trim(), character: String(character || "").trim(), profile_path: profilePath };
+        }).filter(function (person) { return person && person.name; });
+      }
+      var cast = Array.isArray(credits.cast) && credits.cast.length
+        ? credits.cast.slice(0, 12)
+        : workerCastRows(workerMeta).slice(0, 12);
+      var workerGenres = workerMeta && (workerMeta.generos || workerMeta.genres);
+      if (typeof workerGenres === "string") {
+        try { workerGenres = JSON.parse(workerGenres); } catch (_) { workerGenres = workerGenres.split(/[,|]/); }
+      }
+      if (!Array.isArray(workerGenres)) workerGenres = [];
+      var genres = meta && Array.isArray(meta.genres) && meta.genres.length
+        ? meta.genres
+        : workerGenres.map(function (g) {
+            return typeof g === "string" ? { name: g.trim() } : { name: g && (g.name || g.nombre || g.genero) || "" };
+          }).filter(function (g) { return !!g.name; });
+      var releaseDate = (meta && (type === "tv" ? meta.first_air_date : meta.release_date)) ||
+        (workerMeta && (workerMeta.year || workerMeta.ano || workerMeta.fecha || workerMeta.release_date)) || "";
+      var releaseYear = String(releaseDate || "").slice(0, 4);
+      var workerRating = workerMeta && (workerMeta.rating != null ? workerMeta.rating : workerMeta.calificacion);
+      var ratingNumber = parseFloat(String((meta && meta.vote_average) || workerRating || "0").replace(",", ".")) || 0;
+      var vote = ratingNumber > 0 ? ratingNumber.toFixed(1) : "";
+      var runtimeValue = type === "tv"
+        ? ((meta && Array.isArray(meta.episode_run_time) ? meta.episode_run_time[0] : null) ||
+          (workerMeta && (workerMeta.duracion_episodio || workerMeta.runtime_episode)))
+        : ((meta && meta.runtime) || (workerMeta && (workerMeta.duracion || workerMeta.runtime || workerMeta.duracion_texto)));
+      var certification = "";
+      if (meta && type === "tv") {
+        var ratingRows = (meta.content_ratings && meta.content_ratings.results) || [];
+        var ratingRow = ratingRows.find(function (x) { return x.iso_3166_1 === "MX" && x.rating; }) ||
+          ratingRows.find(function (x) { return x.iso_3166_1 === "US" && x.rating; }) ||
+          ratingRows.find(function (x) { return x.rating; });
+        certification = ratingRow ? ratingRow.rating : "";
+      } else if (meta) {
+        var releaseRows = (meta.release_dates && meta.release_dates.results) || [];
+        var releaseRow = releaseRows.find(function (x) { return x.iso_3166_1 === "MX" && x.release_dates && x.release_dates.length; }) ||
+          releaseRows.find(function (x) { return x.iso_3166_1 === "US" && x.release_dates && x.release_dates.length; }) ||
+          releaseRows.find(function (x) { return x.release_dates && x.release_dates.length; });
+        if (releaseRow) {
+          var certItem = releaseRow.release_dates.find(function (x) { return x.certification; });
+          certification = certItem ? certItem.certification : "";
+        }
+      }
+      var directorLabel = "";
+      if (type === "tv") {
+        var creators = Array.isArray(meta && meta.created_by) ? meta.created_by : [];
+        directorLabel = creators.slice(0, 2).map(function (x) { return x.name; }).filter(Boolean).join(", ");
+      } else {
+        var director = (credits.crew || []).find(function (x) { return x.job === "Director" && x.name; });
+        directorLabel = director ? director.name : "";
+      }
+      if (!directorLabel && workerMeta) {
+        directorLabel = workerMeta.director || workerMeta.direccion || workerMeta.creador || workerMeta.created_by || "";
+        if (Array.isArray(directorLabel)) directorLabel = directorLabel.map(function (x) { return typeof x === "string" ? x : (x && (x.name || x.nombre)) || ""; }).filter(Boolean).slice(0, 2).join(", ");
+        else if (directorLabel && typeof directorLabel === "object") directorLabel = directorLabel.name || directorLabel.nombre || "";
+        directorLabel = String(directorLabel || "");
+      }
+      var workerSeasonRows = workerMeta && Array.isArray(workerMeta.temporadas) ? workerMeta.temporadas : [];
+      var seasonOptions = type === "tv" && meta && Array.isArray(meta.seasons)
+        ? meta.seasons.filter(function (x) { return Number(x.season_number) > 0; })
+        : workerSeasonRows.map(function (x, index) {
+            var sn = parseInt(x && (x.temporada != null ? x.temporada : x.season_number != null ? x.season_number : x.season), 10);
+            var list = x && (x.lista || x.episodios || x.episodes);
+            return {
+              season_number: sn || index + 1,
+              name: (x && (x.nombre || x.name || x.titulo)) || ("Temporada " + (sn || index + 1)),
+              episode_count: Array.isArray(list) ? list.length : (x && (x.episodes_count || x.total_episodios)) || 0
+            };
+          }).filter(function (x) { return Number(x.season_number) > 0; });
+      var seasonPickerHtml = "";
+      if (type === "tv") {
+        if (seasonOptions.length > 1) {
+          seasonPickerHtml = '<label class="kx-season-control"><span>Temporada</span><select id="kxSeasonSelect" aria-label="Seleccionar temporada">' +
+            seasonOptions.map(function (x) {
+              var n = String(x.season_number);
+              return '<option value="' + esc(n) + '"' + (n === String(season || "1") ? " selected" : "") + '>' +
+                esc(x.name || ("Temporada " + n)) + (x.episode_count ? " · " + esc(String(x.episode_count)) + " episodios" : "") +
+                '</option>';
+            }).join("") + '</select></label>';
+        } else {
+          seasonPickerHtml = '<span class="kx-season-single">Temporada ' + esc(String(season || "1")) + '</span>';
+        }
+      }
+
+      var facts = [];
+      if (releaseYear) facts.push('<span><b>' + esc(releaseYear) + '</b></span>');
+      if (runtimeValue) {
+        var runtimeText = String(runtimeValue).trim();
+        if (/^\d+(?:\.\d+)?$/.test(runtimeText)) runtimeText += ' min';
+        facts.push('<span><b>' + esc(runtimeText) + '</b>' + (type === "tv" ? ' <i>/ episodio</i>' : '') + '</span>');
+      }
+      if (certification) facts.push('<span class="kx-cert">' + esc(certification) + '</span>');
+      if (vote) facts.push('<span class="kx-score">★ ' + esc(vote) + '</span>');
+      var castHtml = cast.length
+        ? '<section class="kx-cast-section" aria-label="Reparto"><div class="kx-cast-heading"><div><span class="kx-section-kicker">ELENCO</span><h2>Reparto</h2></div><small>Actores y personajes</small></div><div class="kx-cast-row">' + cast.map(function (person) {
+            var rawPhoto = person.profile_path || person.photo || person.foto || person.image || "";
+            var photo = /^https?:\/\//i.test(String(rawPhoto)) ? String(rawPhoto) : (rawPhoto && String(rawPhoto).charAt(0) === "/" ? imageBase + "w185" + rawPhoto : "");
+            var personName = person.name || person.nombre || "Reparto";
+            var characterName = person.character || person.personaje || person.rol || "";
+            return '<article class="kx-cast-card">' +
+              '<div class="kx-cast-photo">' + (photo ? '<img src="' + esc(photo) + '" alt="' + esc(personName) + '" loading="lazy" onerror="this.remove();this.parentNode.classList.add(\'is-empty\')">' : '<span>' + esc(String(personName || "?").slice(0, 1)) + '</span>') + '</div>' +
+              '<b>' + esc(personName) + '</b>' +
+              (characterName ? '<small>' + esc(characterName) + '</small>' : '') +
+            '</article>';
+          }).join("") + '</div></section>'
+        : "";
+      var titleHeroHtml = '<section class="kx-cinema-hero" aria-label="Información del título">' +
+        (backdrop ? '<img class="kx-cinema-backdrop" src="' + esc(backdrop) + '" alt="" aria-hidden="true">' : '') +
+        '<div class="kx-cinema-scrim"></div>' +
+        '<div class="kx-cinema-main">' +
+          '<div class="kx-cinema-poster">' + (poster ? '<img src="' + esc(poster) + '" alt="Portada de ' + esc(title) + '" loading="eager">' : '<div class="kx-poster-fallback">K</div>') + '</div>' +
+          '<div class="kx-cinema-copy">' +
+            '<span class="kx-cinema-kicker">' + (type === "tv" ? 'SERIE' : 'PELÍCULA') + ' · KINOX</span>' +
+            '<h1>' + esc(title) + '</h1>' +
+            (facts.length ? '<div class="kx-cinema-facts">' + facts.join('<span class="kx-fact-dot">•</span>') + '</div>' : '') +
+            (genres.length ? '<div class="kx-genre-list">' + genres.slice(0, 5).map(function (g) { return '<span>' + esc(g.name) + '</span>'; }).join("") + '</div>' : '') +
+            (overview ? '<div class="kx-overview-wrap"><p class="kx-cinema-overview" id="kxOverview">' + esc(overview) + '</p>' + (overview.length > 190 ? '<button type="button" class="kx-overview-toggle" id="kxOverviewToggle" aria-expanded="false">Ver sinopsis completa <span>⌄</span></button>' : '') + '</div>' : '') +
+            (directorLabel ? '<div class="kx-cinema-credit"><span>' + (type === "tv" ? 'CREADA POR' : 'DIRECCIÓN') + '</span><b>' + esc(directorLabel) + '</b></div>' : '') +
+            seasonPickerHtml +
+          '</div>' +
+        '</div>' +
+      '</section>';
 
       var seasonEps = [];
       if (type === "tv") {
@@ -646,7 +827,7 @@
       var absSeasonMap = null; // absEp -> { season, episode, name? }
       if (type === "tv" && id && typeof tmdb === "function") {
         try {
-          var tvMeta = await tmdb("/tv/" + id);
+          var tvMeta = (meta && meta.seasons) ? meta : await tmdb("/tv/" + id);
           var seasonsMeta = (tvMeta && tvMeta.seasons) || [];
           absSeasonMap = Object.create(null);
           var absN = 1;
@@ -764,11 +945,10 @@
           '<section class="kx-ep-view">' +
           '<div class="kx-topbar">' +
           '<a class="kx-back" href="javascript:history.back()">← Volver</a>' +
-          '<div class="kx-topbar-title">' +
-          esc(title) +
+          '<div class="kx-topbar-title">REPRODUCTOR</div>' +
+          '<div class="kx-top-actions"><button type="button" class="kx-reload-btn" id="kxReloadPlayer" title="Volver a cargar" aria-label="Volver a cargar reproductor">↻</button><button type="button" class="kx-fullscreen-btn" id="kxFullscreen">⛶ <span>Pantalla completa</span></button></div>' +
           "</div>" +
-          '<div class="kx-top-actions"></div>' +
-          "</div>" +
+          titleHeroHtml +
           '<div class="kx-stage">' +
           '<div class="kx-hero">' +
           '<div id="playerBox" class="kx-player mz-player"><div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Buscando reproductores…</span></div></div>' +
@@ -782,6 +962,7 @@
           '<div class="kx-ep-list" id="kxEpList"></div>' +
           "</aside>" +
           "</div>" +
+          castHtml +
           '<div class="kx-info">' +
           '<h1 class="kx-ep-heading" id="kxEpHeading">' +
           esc(epTitle) +
@@ -809,21 +990,63 @@
           '<section class="page player-page kx-movie-view">' +
           '<div class="player-head kx-topbar">' +
           '<a class="kx-back" href="javascript:history.back()">← Volver</a>' +
-          '<div class="kx-topbar-title">' +
-          esc(title) +
+          '<div class="kx-topbar-title">REPRODUCTOR</div>' +
+          '<div class="kx-top-actions"><button type="button" class="kx-reload-btn" id="kxReloadPlayer" title="Volver a cargar" aria-label="Volver a cargar reproductor">↻</button><button type="button" class="kx-fullscreen-btn" id="kxFullscreen">⛶ <span>Pantalla completa</span></button></div>' +
           "</div>" +
-          '<div class="kx-top-actions"></div>' +
-          "</div>" +
-          '<div id="playerBox" class="mz-player kx-player"><div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Buscando reproductores…</span></div></div>' +
+          titleHeroHtml +
+          '<div class="kx-movie-player-area">' +
+            '<div class="kx-player-section-head"><span>REPRODUCCIÓN</span><small>Selecciona servidor e idioma en los controles del reproductor</small></div>' +
+            '<div id="playerBox" class="mz-player kx-player"><div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Buscando reproductores…</span></div></div>' +
+          '</div>' +
+          castHtml +
           '<div class="kx-block"><h3 class="kx-block-title">Reproductores</h3><div class="kx-chips" id="kxServers"></div></div>' +
           '<div class="kx-block"><h3 class="kx-block-title">Directos</h3><div class="kx-chips" id="kxDirects"></div></div>' +
-          (overview
-            ? '<p class="kx-synopsis">' + esc(overview) + "</p>"
-            : "") +
           "</section>";
       }
 
       var box = $("#playerBox");
+      var overviewToggle = $("#kxOverviewToggle");
+      if (overviewToggle) {
+        overviewToggle.addEventListener("click", function () {
+          var overviewNode = $("#kxOverview");
+          if (!overviewNode) return;
+          var expanded = overviewNode.classList.toggle("is-expanded");
+          overviewToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+          overviewToggle.innerHTML = expanded ? 'Mostrar menos <span>⌃</span>' : 'Ver sinopsis completa <span>⌄</span>';
+        });
+      }
+      var seasonSelect = $("#kxSeasonSelect");
+      if (seasonSelect) {
+        seasonSelect.addEventListener("change", function () {
+          var nextSeason = String(seasonSelect.value || "1");
+          location.href = buildPlayHref({
+            type: "tv", id: id, season: nextSeason, episode: 1,
+            slug: slug, sourceId: sourceId, urlVidBase: urlVidBase
+          });
+        });
+      }
+      var fullscreenBtn = $("#kxFullscreen");
+      if (fullscreenBtn && box) {
+        fullscreenBtn.addEventListener("click", function () {
+          var target = box.closest(".kx-player-wrap") || box;
+          var request = target.requestFullscreen || target.webkitRequestFullscreen;
+          if (request) {
+            try { request.call(target); } catch (e) { console.warn("Fullscreen:", e); }
+          } else {
+            var video = box.querySelector("video");
+            if (video && video.webkitEnterFullscreen) {
+              try { video.webkitEnterFullscreen(); } catch (_) {}
+            }
+          }
+        });
+        function updateFullscreenLabel() {
+          var active = document.fullscreenElement || document.webkitFullscreenElement;
+          var isActive = !!active && (active === box || (box.closest(".kx-player-wrap") && active === box.closest(".kx-player-wrap")));
+          fullscreenBtn.innerHTML = isActive ? '⛶ <span>Salir de pantalla completa</span>' : '⛶ <span>Pantalla completa</span>';
+        }
+        document.addEventListener("fullscreenchange", updateFullscreenLabel);
+        document.addEventListener("webkitfullscreenchange", updateFullscreenLabel);
+      }
       // Al volver: limpiar preferencia de servidor (no auto-elegir el anterior)
       $all("a.kx-back, a.back").forEach(function (a) {
         a.addEventListener("click", function () {
@@ -908,6 +1131,16 @@
       (function setupPlayerHud() {
         var box = $("#playerBox");
         if (!box) return;
+
+        // Los embeds externos ya incluyen sus propios controles de idioma/servidor.
+        // Si todos los reproductores son embeds, no mostrar el HUD ni los selectores inferiores.
+        if (players.length && players.every(isProviderEmbed)) {
+          [$("#kxServers"), $("#kxDirects")].forEach(function (el) {
+            var block = el && el.closest(".kx-block");
+            if (block) block.style.display = "none";
+          });
+          return;
+        }
 
         var style = document.getElementById("kx-lang-style");
         if (!style) {
@@ -1313,7 +1546,9 @@
             n +
             " — " +
             esc(e.name || "Episodio " + n) +
-            "</div></div></a>"
+            "</div>" +
+            (e.overview ? '<div class="kx-ep-desc">' + esc(e.overview) + '</div>' : '') +
+            "</div></a>"
           );
         }
 
@@ -1530,6 +1765,32 @@
         play(players[i], mode, btn);
       }
       window.__kxPlayServer = onServerPick;
+
+      var reloadPlayerBtn = $("#kxReloadPlayer");
+      if (reloadPlayerBtn) {
+        reloadPlayerBtn.addEventListener("click", function () {
+          reloadPlayerBtn.classList.add("is-loading");
+          var activeVideo = box && box.querySelector("video");
+          var activeFrame = box && box.querySelector("iframe");
+          if (activeVideo) {
+            try {
+              if (activeVideo._hls && typeof activeVideo._hls.startLoad === "function") {
+                activeVideo._hls.stopLoad();
+                activeVideo._hls.startLoad();
+              } else {
+                activeVideo.load();
+              }
+              activeVideo.play().catch(function () {});
+            } catch (_) {}
+          } else if (activeFrame) {
+            try { activeFrame.src = activeFrame.src; } catch (_) {}
+          } else if (players.length) {
+            var first = normals.length ? normals[0] : players[0];
+            play(first, isNormalPlayer(first) ? "iframe" : "direct", null);
+          }
+          window.setTimeout(function () { reloadPlayerBtn.classList.remove("is-loading"); }, 900);
+        });
+      }
 
       $all(".kx-chip, .kx-chip-proxy").forEach(function (btn) {
         btn.onclick = function (e) {

@@ -48,8 +48,11 @@ function go(path){location.href=appLink(path)}
 
 function norm(x,type){type=type||x.media_type||(x.title?'movie':'tv');const it={id:x.id,type,title:x.title||x.name,poster:x.poster_path,backdrop:x.backdrop_path,year:(x.release_date||x.first_air_date||'').slice(0,4),rating:x.vote_average||0,overview:x.overview||''};ITEMS.set(type+x.id,it);return it}
 async function tmdbViaServer(path,params={}){
-  if(LOCAL) return null;
-  const u=new URL('/api/tmdb',location.origin);
+  // En una vista file:// no existe /api/tmdb en el origen local.
+  // Usar el dominio Vercel del proyecto; el proxy solo acepta rutas TMDB
+  // permitidas y habilita CORS únicamente para file:// y localhost.
+  const proxyOrigin = LOCAL ? 'https://moviezone-teal.vercel.app' : location.origin;
+  const u=new URL('/api/tmdb',proxyOrigin);
   u.searchParams.set('path',path.startsWith('/')?path:'/'+path);
   u.searchParams.set('language',params.language||'es-MX');
   for(const k in params){

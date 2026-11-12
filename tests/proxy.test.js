@@ -46,10 +46,13 @@ test('el límite por IP corta al pasar de 150 por minuto y se reinicia después'
   assert.equal(allowRequest('1.2.3.4', t0 + 61_000).ok, true, 'ventana nueva');
 });
 
-test('el endpoint usa el guard, no abre CORS y no devuelve cuerpos crudos de error', () => {
+test('el endpoint usa el guard y limita CORS a vistas locales', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'api', 'tmdb.js'), 'utf8');
   assert.match(src, /validateTmdbRequest/);
   assert.match(src, /allowRequest/);
-  assert.doesNotMatch(src, /Access-Control-Allow-Origin/);
+  assert.match(src, /origin === 'null'/);
+  assert.match(src, /localhost/);
+  assert.match(src, /Access-Control-Allow-Origin/);
+  assert.doesNotMatch(src, /Access-Control-Allow-Origin.*\*/);
   assert.doesNotMatch(src, /raw:/);
 });

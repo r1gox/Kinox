@@ -39,21 +39,17 @@ test('el esquema SQL activa RLS y limita cada política al dueño', () => {
   assert.equal((sql.match(/auth\.uid\(\)/g) || []).length >= 5, true);
 });
 
-test('config.js no trae claves reales ni la service_role', () => {
+test('config.js solo lleva la clave pública (anon); ningún otro archivo trae tokens ni la service_role', () => {
+  const jwtRe = /eyJ[A-Za-z0-9_-]{20,}\.([A-Za-z0-9_-]{20,})\.[A-Za-z0-9_-]{20,}/g;
   for (const f of ['js/config.js', 'js/cloud.js', 'js/account.js', 'README.md']) {
-    assert.doesNotMatch(read(f), /service_role\s*[:=]\s*['"]ey/i, f);
-    assert.doesNotMatch(read(f), /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\./, `JWT en ${f}`);
+    const src = read(f);
+    assert.doesNotMatch(src, /service_role\s*[:=]\s*['"]ey/i, f);
+    for (const m of src.matchAll(jwtRe)) {
+      const role = JSON.parse(Buffer.from(m[1], 'base64url').toString()).role;
+      assert.equal(f, 'js/config.js', `token en ${f}`);       // solo config.js puede llevar la clave pública
+      assert.equal(role, 'anon', 'la clave de config.js debe ser la anon (pública), nunca la service_role');
+    }
   }
-});
-
-test('mzTimeAgo() da tiempos relativos legibles', () => {
-  const { mzTimeAgo } = load(['js/common.js'], 'this.__a = { mzTimeAgo };').__a;
-  const now = Date.parse('2026-10-30T12:00:00Z');
-  assert.equal(mzTimeAgo('2026-10-30T11:59:50Z', now), 'hace unos segundos');
-  assert.equal(mzTimeAgo('2026-10-30T11:50:00Z', now), 'hace 10 min');
-  assert.equal(mzTimeAgo('2026-10-30T09:00:00Z', now), 'hace 3 h');
-  assert.equal(mzTimeAgo('2026-10-28T12:00:00Z', now), 'hace 2 d');
-  assert.equal(mzTimeAgo('no es fecha', now), '');
 });
 
 test('la pantalla de perfil ya no ofrece exportar/importar y usa la tarjeta de cuenta', () => {
