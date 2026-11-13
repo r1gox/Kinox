@@ -22,16 +22,15 @@
     return /reproductor|embed|iframe/.test(type) || /\/streamurl(?:\?|$)/.test(endpoint);
   }
 
-  function isDirectPlayer(p) {
-    if (!p || isProviderEmbed(p)) return false;
-    if (p.stream_url || p.hls_resolve) return true;
-    if (p.noAds || p.__directHls) return true;
-    return false;
-  }
 
-  function isNormalPlayer(p) {
-    if (!p || !p.url) return false;
-    if (!/^https?:\/\//i.test(String(p.url))) return false;
+  function isIframePlayer(p) {
+    if (!p || !p.url || !/^https?:\/\//i.test(String(p.url))) return false;
+    // Un embed externo es válido aunque el proveedor también publique su endpoint interno.
+    if (isProviderEmbed(p)) return true;
+    // Excluir fuentes HLS/MP4 directas y sus endpoints separados.
+    if (p.stream_url || p.hls_resolve || p.noAds || p.__directHls) return false;
+    var url = String(p.url).toLowerCase();
+    if (/\.(m3u8|mp4|m4v|mpd|ts)(?:[?#]|$)/i.test(url) || /master\.txt|\/proxy\?/i.test(url)) return false;
     return true;
   }
 
@@ -109,73 +108,6 @@
     return "🌐";
   }
 
-  function extractVideoUrl(payload) {
-    if (!payload) return null;
-    if (typeof payload === "string") {
-      var t = payload.trim();
-      if (/^https?:\/\//i.test(t)) return t.split(/\s/)[0];
-      try {
-        payload = JSON.parse(t);
-      } catch (e) {
-        return null;
-      }
-    }
-    if (typeof payload !== "object" || !payload) return null;
-
-    function isImageUrl(u) {
-      return /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(String(u || ""));
-    }
-    function isMediaUrl(u) {
-      u = String(u || "");
-      if (!/^https?:\/\//i.test(u)) return false;
-      if (isImageUrl(u)) return false;
-      return true;
-    }
-    function pickStr(v) {
-      if (typeof v === "string" && isMediaUrl(v)) return v;
-      if (Array.isArray(v)) {
-        for (var i = 0; i < v.length; i++) {
-          if (typeof v[i] === "string" && isMediaUrl(v[i])) return v[i];
-          if (v[i] && typeof v[i].url === "string" && isMediaUrl(v[i].url)) return v[i].url;
-        }
-      }
-      if (v && typeof v === "object") {
-        if (Array.isArray(v.hls)) {
-          for (var j = 0; j < v.hls.length; j++) {
-            if (typeof v.hls[j] === "string" && isMediaUrl(v.hls[j])) return v.hls[j];
-          }
-        }
-        if (typeof v.url === "string" && isMediaUrl(v.url)) return v.url;
-      }
-      return null;
-    }
-
-    // Prioridad: streams reales / proxy worker antes que "url" genérica
-    var keys = [
-      "play_direct",
-      "master",
-      "hls",
-      "play_url",
-      "proxy_url",
-      "src",
-      "file",
-      "link",
-      "url"
-    ];
-    for (var i = 0; i < keys.length; i++) {
-      var got = pickStr(payload[keys[i]]);
-      if (got) return got;
-    }
-    if (payload.videos) {
-      var g2 = pickStr(payload.videos);
-      if (g2) return g2;
-      if (payload.videos.hls) {
-        var g3 = pickStr(payload.videos.hls);
-        if (g3) return g3;
-      }
-    }
-    return null;
-  }
 
   function savePref(p, mode) {
     /* Ya no persistimos servidor entre títulos: al volver se limpia */
@@ -188,33 +120,6 @@
     try {
       localStorage.removeItem(PREF_KEY);
     } catch (_) {}
-  }
-
-  function loadPref() {
-    return null;
-  }
-
-  function matchPref(players, pref) {
-    if (!pref || !players || !players.length) return null;
-    var wantName = String(pref.name || "").toLowerCase();
-    var wantDirect = pref.mode === "direct";
-    var best = null;
-    for (var i = 0; i < players.length; i++) {
-      var p = players[i];
-      var n = serverLabel(p).toLowerCase();
-      var isDir = isDirectPlayer(p);
-      if (wantDirect && !isDir) continue;
-      if (!wantDirect && isDir && isNormalPlayer(p)) {
-        /* prefer normal when pref is iframe */
-      }
-      if (wantName && n.indexOf(wantName) === -1 && wantName.indexOf(n) === -1) continue;
-      if (wantDirect === isDir || (!wantDirect && isNormalPlayer(p))) {
-        best = p;
-        break;
-      }
-      if (!best) best = p;
-    }
-    return best;
   }
 
   function buildPlayHref(opts) {
@@ -1294,14 +1199,6 @@
           castHtml +
           '<div class="kx-info kx-playback-controls">' +
           '<div class="kx-ep-mobile" id="kxEpMobile"></div>' +
-          '<div class="kx-block">' +
-          '<h3 class="kx-block-title">Reproductores</h3>' +
-          '<div class="kx-chips" id="kxServers"></div>' +
-          "</div>" +
-          '<div class="kx-block">' +
-          '<h3 class="kx-block-title">Directos</h3>' +
-          '<div class="kx-chips" id="kxDirects"></div>' +
-          "</div>" +
           "</div>" +
           '<div class="kx-info kx-episode-synopsis-mobile">' +
           (epOverview ? '<p class="kx-synopsis">' + esc(epOverview) + "</p>" : "") +
@@ -1321,8 +1218,6 @@
                 '<div class="kx-player-section-head"><span>REPRODUCCIÓN</span><small>Selecciona servidor e idioma en los controles del reproductor</small></div>' +
                 '<div id="playerBox" class="mz-player kx-player"><div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Buscando reproductores…</span></div></div>' +
               '</div>' +
-              '<div class="kx-block kx-movie-servers"><h3 class="kx-block-title">Reproductores</h3><div class="kx-chips" id="kxServers"></div></div>' +
-              '<div class="kx-block kx-movie-servers"><h3 class="kx-block-title">Directos</h3><div class="kx-chips" id="kxDirects"></div></div>' +
             '</div>' +
             '<aside class="kx-movie-info-column">' + titleHeroHtml + '</aside>' +
           '</div>' +
@@ -1412,65 +1307,14 @@
         source_id: sourceId,
         url_vid: urlVid
       });
-      var players = data.reproductores || [];
+      var players = (data.reproductores || []).filter(isIframePlayer);
       if (!players.length) {
         box.innerHTML =
           '<div class="player-empty"><span class="kx-empty-ico">!</span><span class="kx-load-text">No hay reproductores disponibles.</span></div>';
         return;
       }
 
-      var normals = players.filter(isNormalPlayer);
-      var directs = players.filter(isDirectPlayer);
-      // Evitar duplicar el mismo url en ambos si solo tiene url
-      if (!directs.length && normals.length) {
-        /* solo normales */
-      }
-
-      function chipHtml(p, i, mode) {
-        var label = serverLabel(p);
-        var lang = langLabel(p);
-        var lk = langKey(p);
-        return (
-          '<button type="button" class="kx-chip" data-i="' +
-          i +
-          '" data-mode="' +
-          mode +
-          '" data-lang="' +
-          lk +
-          '">' +
-          '<span class="kx-chip-name">' +
-          esc(label) +
-          "</span>" +
-          (lang
-            ? '<span class="kx-chip-lang">' + esc(lang) + "</span>"
-            : "") +
-          "</button>"
-        );
-      }
-
-      var srvEl = $("#kxServers");
-      var dirEl = $("#kxDirects");
-      if (srvEl) {
-        var nHtml = normals
-          .map(function (p) {
-            var idx = players.indexOf(p);
-            return chipHtml(p, idx, "iframe");
-          })
-          .join("");
-        srvEl.innerHTML =
-          nHtml ||
-          '<span class="kx-muted">Sin mirrors clásicos</span>';
-      }
-      if (dirEl) {
-        var dHtml = directs
-          .map(function (p) {
-            var idx = players.indexOf(p);
-            return chipHtml(p, idx, "direct");
-          })
-          .join("");
-        dirEl.innerHTML =
-          dHtml || '<span class="kx-muted">Sin directos</span>';
-      }
+      // Solo reproductores iframe; se excluyen las fuentes directas independientes.
 
       var preferredLangForAuto = "all";
       /* HUD sobre el reproductor: idioma (izq) + lista de servidores */
@@ -1490,61 +1334,62 @@
 
         // Los embeds externos ya incluyen sus propios controles de idioma/servidor.
         // Si todos son embeds, ocultar selectores extra pero conservar el marco común.
-        if (players.length && players.every(isProviderEmbed)) {
-          [$("#kxServers"), $("#kxDirects")].forEach(function (el) {
-            var block = el && el.closest(".kx-block");
-            if (block) block.style.display = "none";
-          });
-          return;
-        }
+        if (players.length && players.every(isProviderEmbed)) return;
 
         var style = document.getElementById("kx-lang-style");
-        if (!style) {
-          style = document.createElement("style");
-          style.id = "kx-lang-style";
-          style.textContent =
+        if (!style) style = document.createElement("style");
+        style.id = "kx-lang-style";
+        // Reescribir también si el estilo quedó en memoria de una vista anterior.
+        style.textContent =
             ".kx-player-wrap{position:relative;width:100%;isolation:isolate}" +
             ".kx-player-wrap .kx-player,.kx-player-wrap .mz-player{width:100%}" +
-            ".kx-player-hud{position:absolute;top:12px;left:12px;z-index:8;" +
-            "display:flex;flex-wrap:wrap;align-items:flex-start;gap:9px;" +
-            "pointer-events:none;max-width:calc(100% - 24px)}" +
+            ".kx-player-hud{position:absolute;top:14px;left:14px;z-index:20;display:flex;" +
+            "flex-wrap:wrap;align-items:flex-start;gap:10px;pointer-events:none;max-width:calc(100% - 28px)}" +
             ".kx-player-hud *{pointer-events:auto}" +
-            ".kx-dd{position:relative;display:inline-flex;z-index:8}" +
-            ".kx-dd-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;" +
-            "min-width:112px;max-width:220px;padding:8px 11px 9px;border-radius:13px;" +
-            "border:1px solid rgba(255,255,255,.17);background:linear-gradient(145deg,rgba(19,22,39,.96),rgba(5,8,18,.9));" +
-            "color:#f8fafc;font:inherit;font-weight:700;cursor:pointer;backdrop-filter:blur(16px);" +
-            "-webkit-backdrop-filter:blur(16px);box-shadow:0 9px 26px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.08);" +
-            "transition:border-color .18s ease,background .18s ease,transform .18s ease}" +
-            ".kx-dd-btn:hover,.kx-dd.open .kx-dd-btn{border-color:rgba(167,139,250,.65);background:linear-gradient(145deg,rgba(35,29,61,.97),rgba(9,12,25,.94));}" +
-            ".kx-dd-btn .kx-dd-label{display:block;opacity:.68;color:#c4b5fd;font-size:.57rem;font-weight:900;letter-spacing:.16em;line-height:1}" +
-            ".kx-dd-btn .kx-dd-main{display:flex;align-items:center;gap:7px;min-width:0;width:100%}" +
-            ".kx-dd-btn .kx-dd-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:1rem;line-height:1}" +
-            ".kx-dd-btn .kx-dd-value{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;color:#fff;font-size:.78rem;font-weight:850;letter-spacing:.015em}" +
-            ".kx-dd-btn .kx-dd-chevron{margin-left:auto;color:#a5acc0;font-size:.82rem;line-height:1;transition:transform .18s ease}" +
+            ".kx-dd{position:relative;display:inline-flex;z-index:20}" +
+            ".kx-dd-btn{display:flex;flex-direction:column;align-items:stretch;gap:7px;" +
+            "min-width:146px;max-width:230px;min-height:58px;padding:9px 12px 10px;border-radius:15px;" +
+            "border:1px solid rgba(203,213,225,.24);background:linear-gradient(145deg,rgba(18,24,42,.96),rgba(5,8,18,.94));" +
+            "color:#f8fafc;font:inherit;font-weight:700;cursor:pointer;backdrop-filter:blur(18px);" +
+            "-webkit-backdrop-filter:blur(18px);box-shadow:0 12px 30px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.11);" +
+            "transition:border-color .2s ease,background .2s ease,transform .2s ease,box-shadow .2s ease}" +
+            ".kx-dd-btn:hover,.kx-dd.open .kx-dd-btn{border-color:rgba(167,139,250,.78);" +
+            "background:linear-gradient(145deg,rgba(35,29,65,.98),rgba(8,12,27,.97));" +
+            "box-shadow:0 14px 34px rgba(0,0,0,.5),0 0 0 1px rgba(139,92,246,.12),inset 0 1px 0 rgba(255,255,255,.13)}" +
+            ".kx-dd-btn:active{transform:translateY(1px)}" +
+            ".kx-dd-btn .kx-dd-label{display:block;color:#c4b5fd;opacity:.9;font-size:.58rem;" +
+            "font-weight:900;letter-spacing:.17em;line-height:1;text-transform:uppercase}" +
+            ".kx-dd-btn .kx-dd-main{display:flex;align-items:center;gap:8px;width:100%;min-width:0}" +
+            ".kx-dd-btn .kx-dd-icon{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;" +
+            "font-size:1rem;line-height:1;filter:drop-shadow(0 1px 5px rgba(167,139,250,.2))}" +
+            ".kx-dd-btn .kx-dd-value{display:block;min-width:0;max-width:155px;overflow:hidden;color:#fff;" +
+            "font-size:.82rem;font-weight:850;letter-spacing:.025em;text-overflow:ellipsis;white-space:nowrap}" +
+            ".kx-dd-btn .kx-dd-chevron{margin-left:auto;color:#b9bfd0;font-size:.9rem;line-height:1;" +
+            "transition:transform .2s ease,color .2s ease}" +
             ".kx-dd.open .kx-dd-chevron{transform:rotate(180deg);color:#c4b5fd}" +
-            ".kx-dd-menu{position:absolute;top:calc(100% + 8px);left:0;min-width:210px;max-width:min(290px,82vw);" +
-            "max-height:260px;overflow-y:auto;padding:6px;border-radius:14px;" +
-            "border:1px solid rgba(167,139,250,.34);background:linear-gradient(150deg,rgba(20,22,40,.99),rgba(8,11,22,.98));" +
-            "box-shadow:0 18px 48px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.06);display:none;z-index:12;" +
-            "scrollbar-width:thin;scrollbar-color:rgba(167,139,250,.4) transparent}" +
+            ".kx-dd-menu{position:absolute;top:calc(100% + 9px);left:0;min-width:220px;max-width:min(310px,84vw);" +
+            "max-height:280px;overflow-y:auto;padding:7px;border:1px solid rgba(167,139,250,.4);border-radius:16px;" +
+            "background:linear-gradient(155deg,rgba(20,24,43,.99),rgba(6,9,20,.99));" +
+            "box-shadow:0 22px 55px rgba(0,0,0,.68),inset 0 1px 0 rgba(255,255,255,.08);" +
+            "backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);display:none;z-index:25;" +
+            "scrollbar-width:thin;scrollbar-color:rgba(167,139,250,.45) transparent}" +
             ".kx-dd.open .kx-dd-menu{display:block}" +
-            ".kx-dd-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;" +
-            "text-align:left;padding:10px 11px;border:0;border-radius:9px;background:transparent;" +
-            "color:#e7eaf3;font:inherit;font-weight:750;font-size:.82rem;cursor:pointer;transition:background .16s ease,color .16s ease}" +
-            ".kx-dd-menu button:hover,.kx-dd-menu button.active{background:linear-gradient(90deg,rgba(139,92,246,.22),rgba(59,130,246,.08));color:#fff}" +
-            ".kx-dd-menu button .kx-dd-meta{font-size:.68rem;opacity:.65;font-weight:650}" +
+            ".kx-dd-menu button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;" +
+            "text-align:left;padding:11px 12px;border:0;border-radius:10px;background:transparent;" +
+            "color:#e7eaf3;font:inherit;font-weight:750;font-size:.84rem;cursor:pointer;" +
+            "transition:background .16s ease,color .16s ease,transform .16s ease}" +
+            ".kx-dd-menu button:hover,.kx-dd-menu button.active{background:linear-gradient(90deg,rgba(139,92,246,.27),rgba(59,130,246,.1));color:#fff}" +
+            ".kx-dd-menu button:active{transform:scale(.985)}" +
+            ".kx-dd-menu button .kx-dd-meta{font-size:.7rem;color:#c4b5fd;opacity:.9;font-weight:700}" +
             ".kx-dd-menu button.kx-lang-hide{display:none!important}" +
-            ".kx-dd-empty{padding:10px 12px;color:#94a3b8;font-size:.8rem}" +
-            ".kx-block--servers-hidden{display:none!important}" +
-            "@media(max-width:600px){.kx-player-hud{top:8px;left:8px;gap:6px;max-width:calc(100% - 16px)}" +
-            ".kx-dd-btn{min-width:98px;padding:7px 9px 8px;border-radius:11px}" +
-            ".kx-dd-btn .kx-dd-label{font-size:.52rem}" +
-            ".kx-dd-btn .kx-dd-icon{font-size:.9rem}" +
-            ".kx-dd-btn .kx-dd-value{max-width:116px;font-size:.72rem}" +
-            ".kx-dd-menu{min-width:190px;max-height:220px}}";
-          document.head.appendChild(style);
-        }
+            ".kx-dd-empty{padding:12px;color:#aab3c5;font-size:.82rem}" +
+            "@media(max-width:600px){.kx-player-hud{top:9px;left:9px;gap:7px;max-width:calc(100% - 18px)}" +
+            ".kx-dd-btn{min-width:120px;max-width:190px;min-height:51px;padding:8px 10px 9px;border-radius:13px;gap:6px}" +
+            ".kx-dd-btn .kx-dd-label{font-size:.53rem}" +
+            ".kx-dd-btn .kx-dd-icon{font-size:.92rem}" +
+            ".kx-dd-btn .kx-dd-value{max-width:120px;font-size:.75rem}" +
+            ".kx-dd-menu{min-width:190px;max-height:230px}}";
+        document.head.appendChild(style);
 
         var hud = wrap.querySelector(".kx-player-hud");
         if (!hud) {
@@ -1682,17 +1527,8 @@
               })
             : null;
 
-        // —— Reproductores: servidores normales + directos en un solo selector ——
-        // Evita mostrar un tercer control "DIRECTO —" vacío y conserva las
-        // fuentes directas disponibles dentro del menú principal.
-        var serverChoices = [];
-        var seenServerIndexes = {};
-        normals.concat(directs).forEach(function (p) {
-          var idx = players.indexOf(p);
-          if (idx < 0 || seenServerIndexes[idx]) return;
-          seenServerIndexes[idx] = true;
-          serverChoices.push(p);
-        });
+        // —— Servidores iframe solamente; las fuentes directas no se ofrecen ——
+        var serverChoices = players.slice();
 
         var srvMenuHtml = serverChoices.length
           ? serverChoices
@@ -1700,12 +1536,9 @@
                 var idx = players.indexOf(p);
                 var lk = langKey(p);
                 var lang = langLabel(p);
-                var mode = isDirectPlayer(p) ? "direct" : "iframe";
                 return (
                   '<button type="button" class="kx-chip-proxy" data-i="' +
                   idx +
-                  '" data-mode="' +
-                  mode +
                   '" data-lang="' +
                   lk +
                   '"><span>' +
@@ -1732,21 +1565,11 @@
         var srvInit = firstLabel(serverChoices, preferred);
         var srvDd = makeDropdown({
           id: "kxSrvDd",
-          label: "SERVIDOR",
+          label: "REPRODUCTOR",
           icon: "▶",
           valueText: srvInit,
           menuHtml: srvMenuHtml
         });
-
-        // Ocultar bloques inferiores
-        if (srvEl) {
-          var b1 = srvEl.closest(".kx-block");
-          if (b1) b1.classList.add("kx-block--servers-hidden");
-        }
-        if (dirEl) {
-          var b2 = dirEl.closest(".kx-block");
-          if (b2) b2.classList.add("kx-block--servers-hidden");
-        }
 
         function applyLang(key) {
           $all("#kxSrvDd .kx-chip-proxy[data-lang]").forEach(
@@ -1786,13 +1609,12 @@
             e.preventDefault();
             e.stopPropagation();
             var i = Number(t.getAttribute("data-i"));
-            var mode = t.getAttribute("data-mode") || "iframe";
             setDdValue(dd, serverLabel(players[i]));
             closeAllDd();
             if (typeof window.__kxPlayServer === "function") {
-              window.__kxPlayServer(i, mode, t);
+              window.__kxPlayServer(i, t);
             } else {
-              window.__kxPick = { i: i, mode: mode, btn: t };
+              window.__kxPick = { i: i, btn: t };
             }
           });
         }
@@ -1928,65 +1750,6 @@
 
       }
 
-      function renderVideo(src) {
-        if (!src || /\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?|$)/i.test(src)) {
-          box.innerHTML =
-            '<div class="player-empty">URL de video inválida (parece una imagen).</div>';
-          return;
-        }
-        if (box.querySelector("video") && box.querySelector("video")._hls) {
-          try {
-            box.querySelector("video")._hls.destroy();
-          } catch (_) {}
-        }
-        // preload auto + sin depender solo del poster (si HLS falla, avisar)
-        box.innerHTML =
-          '<video id="mzVideo" class="kx-video" controls playsinline autoplay preload="auto"></video>';
-        var video = $("#mzVideo");
-        function onFail(msg) {
-          console.warn("[player]", msg, src);
-          box.innerHTML =
-            '<div class="player-empty"><span class="kx-empty-ico">!</span><span class="kx-load-text">' +
-            (msg || "No se pudo reproducir el directo.") +
-            '</span><button type="button" class="btn kx-retry-btn" id="kxRetryDirect">Reintentar</button></div>';
-          var rb = document.getElementById("kxRetryDirect");
-          if (rb) rb.onclick = function () { renderVideo(src); };
-        }
-        video.addEventListener("error", function () {
-          onFail("Error al cargar el video.");
-        });
-        if (/\.m3u8(?:\?|$)/i.test(src) || /m3u8/i.test(src) || /master\.txt/i.test(src) || /\/proxy\?/i.test(src)) {
-          if (video.canPlayType("application/vnd.apple.mpegurl")) {
-            video.src = src;
-          } else if (window.Hls && Hls.isSupported()) {
-            var hls = new Hls({
-              enableWorker: true,
-              xhrSetup: function (xhr) {
-                try { xhr.withCredentials = false; } catch (_) {}
-              }
-            });
-            hls.loadSource(src);
-            hls.attachMedia(video);
-            video._hls = hls;
-            hls.on(Hls.Events.ERROR, function (_e, data) {
-              if (data && data.fatal) {
-                try { hls.destroy(); } catch (_) {}
-                onFail("Stream HLS no disponible (fatal).");
-              }
-            });
-            hls.on(Hls.Events.MANIFEST_PARSED, function () {
-              video.play().catch(function () {});
-            });
-          } else {
-            onFail("Tu navegador no puede reproducir HLS.");
-            return;
-          }
-        } else {
-          video.src = src;
-        }
-        video.play().catch(function () {});
-      }
-
       function renderIframe(url) {
         box.innerHTML =
           '<iframe class="mz-iframe kx-iframe" src="' +
@@ -1994,60 +1757,24 @@
           '" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="no-referrer"></iframe>';
       }
 
-      async function play(p, mode, btn) {
-        $all(".kx-chip, .kx-chip-proxy").forEach(function (x) {
+      function play(p, btn) {
+        $all(".kx-chip-proxy").forEach(function (x) {
           x.classList.remove("active");
         });
         if (btn) btn.classList.add("active");
-        savePref(p, mode);
-        box.innerHTML =
-          '<div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Resolviendo video…</span></div>';
-        var endpoint = p.hls_resolve || p.stream_url;
-        if (mode === "direct" && endpoint) {
-          try {
-            var src = null;
-            if (/\.m3u8(?:\?|$)/i.test(endpoint) || /\.mp4(?:\?|$)/i.test(endpoint)) {
-              src = endpoint;
-            } else {
-              var r = await fetch(endpoint, {
-                headers: { Accept: "application/json,text/plain,*/*" }
-              });
-              if (!r.ok) throw new Error("HTTP " + r.status);
-              var raw = await r.text();
-              var payload;
-              try {
-                payload = JSON.parse(raw);
-              } catch (e) {
-                payload = raw;
-              }
-              src = extractVideoUrl(payload);
-            }
-            if (src) {
-              renderVideo(src);
-              return;
-            }
-          } catch (e) {
-            console.warn(e);
-          }
-        }
-        if (p.url && /^https?:\/\//i.test(p.url)) {
-          renderIframe(p.url);
+        savePref(p, "iframe");
+        if (!p || !p.url || !/^https?:\/\//i.test(String(p.url))) {
+          box.innerHTML =
+            '<div class="player-empty"><span class="kx-empty-ico">!</span><span class="kx-load-text">Este reproductor no tiene un enlace válido.</span></div>';
           return;
         }
-        // fallback: intentar direct si mode iframe falló
-        if (endpoint && mode !== "direct") {
-          try {
-            await play(p, "direct", btn);
-            return;
-          } catch (_) {}
-        }
         box.innerHTML =
-          '<div class="player-empty"><span class="kx-empty-ico">!</span><span class="kx-load-text">No se pudo iniciar este servidor.<br>Prueba otro.</span></div>';
+          '<div class="player-loading"><span class="kx-spin"></span><span class="kx-load-text">Abriendo reproductor…</span></div>';
+        renderIframe(p.url);
       }
 
-      function onServerPick(i, mode, btn) {
+      function onServerPick(i, btn) {
         if (i == null || isNaN(i) || !players[i]) return;
-        mode = mode || "iframe";
         var dd = btn && btn.closest ? btn.closest(".kx-dd") : null;
         if (dd) {
           var val = dd.querySelector(".kx-dd-value");
@@ -2055,7 +1782,7 @@
           var b = dd.querySelector(".kx-dd-btn");
           if (b) b.classList.add("kx-dd-value-only");
         }
-        play(players[i], mode, btn);
+        play(players[i], btn);
       }
       window.__kxPlayServer = onServerPick;
 
@@ -2078,30 +1805,28 @@
           } else if (activeFrame) {
             try { activeFrame.src = activeFrame.src; } catch (_) {}
           } else if (players.length) {
-            var first = normals.length ? normals[0] : players[0];
-            play(first, isNormalPlayer(first) ? "iframe" : "direct", null);
+            var first = players[0];
+            play(first, null);
           }
           window.setTimeout(function () { reloadPlayerBtn.classList.remove("is-loading"); }, 900);
         });
       }
 
-      $all(".kx-chip, .kx-chip-proxy").forEach(function (btn) {
+      $all(".kx-chip-proxy").forEach(function (btn) {
         btn.onclick = function (e) {
           if (btn.classList.contains("kx-lang-hide")) return;
           if (e) e.stopPropagation();
-          var i = Number(btn.dataset.i);
-          var mode = btn.dataset.mode || "iframe";
-          onServerPick(i, mode, btn);
+          onServerPick(Number(btn.dataset.i), btn);
         };
       });
 
       if (window.__kxPick) {
         var pk = window.__kxPick;
         window.__kxPick = null;
-        onServerPick(pk.i, pk.mode, pk.btn);
+        onServerPick(pk.i, pk.btn);
       }
 
-      // Auto: preferido → primer normal → primer directo
+      // Auto: UPNShare preferido en anime; si no, primer servidor del idioma.
       function pickUpnShare(list) {
         if (!list || !list.length) return null;
         for (var ui = 0; ui < list.length; ui++) {
@@ -2132,22 +1857,10 @@
       }
 
       var auto = null;
-      var autoMode = "iframe";
 
       // Anime (4/5): preferir UPNShare solo en esta sesión (no localStorage)
       if (isAnimeSourceId(sourceId)) {
-        auto =
-          pickUpnShare(normals) ||
-          pickUpnShare(players) ||
-          pickUpnShare(directs);
-        if (auto) {
-          autoMode =
-            normals.indexOf(auto) >= 0
-              ? "iframe"
-              : isDirectPlayer(auto)
-                ? "direct"
-                : "iframe";
-        }
+        auto = pickUpnShare(players);
       }
       // Primer servidor del idioma (sin pisar preferencia anime/UPN si ya hay auto)
       function firstOfLang(list, key) {
@@ -2160,25 +1873,10 @@
       }
       // Solo si aún no hay auto (UPN anime se respeta)
       if (!auto) {
-        auto =
-          firstOfLang(normals, preferredLangForAuto) ||
-          firstOfLang(directs, preferredLangForAuto) ||
-          normals[0] ||
-          directs[0] ||
-          players[0];
-        if (auto) {
-          autoMode =
-            isDirectPlayer(auto) && !isNormalPlayer(auto) ? "direct" : "iframe";
-          if (normals.indexOf(auto) >= 0) autoMode = "iframe";
-          else if (directs.indexOf(auto) >= 0) autoMode = "direct";
-        }
+        auto = firstOfLang(players, preferredLangForAuto) || players[0];
       }
       var autoIdx = players.indexOf(auto);
-      var autoBtn = $(
-        '.kx-chip-proxy[data-i="' + autoIdx + '"][data-mode="' + autoMode + '"]'
-      ) || $(
-        '.kx-chip[data-i="' + autoIdx + '"][data-mode="' + autoMode + '"]'
-      ) || $('.kx-chip-proxy[data-i="' + autoIdx + '"]') || $('.kx-chip[data-i="' + autoIdx + '"]');
+      var autoBtn = $('.kx-chip-proxy[data-i="' + autoIdx + '"]');
       if (autoBtn) {
         var dd = autoBtn.closest(".kx-dd");
         if (dd) {
@@ -2188,7 +1886,7 @@
           if (b) b.classList.add("kx-dd-value-only");
         }
       }
-      if (auto) play(auto, autoMode, autoBtn);
+      if (auto) play(auto, autoBtn);
       else box.innerHTML = '<div class="player-empty"><span class="kx-empty-ico">▶</span><span class="kx-load-text">Selecciona un servidor.</span></div>';
     } catch (e) {
       $("#view").innerHTML =
