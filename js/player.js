@@ -1,6 +1,6 @@
 /**
  * Kinox — reproductor
- * Series: interfaz tipo MovieZone (player + episodios, Reproductores / Directos)
+ * Series: interfaz tipo MovieZone (player + episodios, selector unificado de reproductores)
  * Películas: layout simple mejorado
  */
 (function () {
@@ -95,9 +95,9 @@
   }
 
   function langShort(key) {
-    if (key === "latino") return "LAT";
-    if (key === "castellano") return "ESP";
-    if (key === "subtitulado") return "SUB";
+    if (key === "latino") return "LATINO";
+    if (key === "castellano") return "CASTELLANO";
+    if (key === "subtitulado") return "SUBTITULADO";
     if (key === "otros") return "OTROS";
     return "TODOS";
   }
@@ -1505,34 +1505,44 @@
           style.textContent =
             ".kx-player-wrap{position:relative;width:100%;isolation:isolate}" +
             ".kx-player-wrap .kx-player,.kx-player-wrap .mz-player{width:100%}" +
-            ".kx-player-hud{position:absolute;top:10px;left:10px;z-index:6;" +
-            "display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;" +
-            "pointer-events:none;max-width:calc(100% - 20px)}" +
+            ".kx-player-hud{position:absolute;top:12px;left:12px;z-index:8;" +
+            "display:flex;flex-wrap:wrap;align-items:flex-start;gap:9px;" +
+            "pointer-events:none;max-width:calc(100% - 24px)}" +
             ".kx-player-hud *{pointer-events:auto}" +
             ".kx-dd{position:relative;display:inline-flex;z-index:8}" +
-            ".kx-dd-btn .kx-dd-icon{font-size:1.05rem;line-height:1;display:inline-flex;align-items:center}" +".kx-dd-btn{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;" +
-            "border:1px solid rgba(255,255,255,.22);background:rgba(8,12,22,.88);color:#e2e8f0;" +
-            "font:inherit;font-weight:700;font-size:.82rem;cursor:pointer;backdrop-filter:blur(10px);" +
-            "-webkit-backdrop-filter:blur(10px);box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:220px}" +
-            ".kx-dd-btn:hover,.kx-dd.open .kx-dd-btn{border-color:rgba(139,92,246,.65)}" +
-            ".kx-dd-btn .kx-dd-label{opacity:.75;font-size:.72rem;font-weight:800;letter-spacing:.04em}" +".kx-dd-btn.kx-dd-value-only .kx-dd-label{display:none}" +".kx-dd-btn.kx-dd-value-only .kx-dd-value{max-width:160px;font-weight:800}" +
-            ".kx-dd-btn .kx-dd-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}" +
-            ".kx-dd-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:200px;max-width:min(280px,80vw);" +
-            "max-height:240px;overflow-y:auto;padding:6px;border-radius:12px;" +
-            "border:1px solid rgba(56,189,248,.4);background:rgba(11,28,36,.97);" +
-            "box-shadow:0 12px 40px rgba(0,0,0,.55);display:none;z-index:9;" +
-            "scrollbar-width:thin}" +
+            ".kx-dd-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;" +
+            "min-width:112px;max-width:220px;padding:8px 11px 9px;border-radius:13px;" +
+            "border:1px solid rgba(255,255,255,.17);background:linear-gradient(145deg,rgba(19,22,39,.96),rgba(5,8,18,.9));" +
+            "color:#f8fafc;font:inherit;font-weight:700;cursor:pointer;backdrop-filter:blur(16px);" +
+            "-webkit-backdrop-filter:blur(16px);box-shadow:0 9px 26px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.08);" +
+            "transition:border-color .18s ease,background .18s ease,transform .18s ease}" +
+            ".kx-dd-btn:hover,.kx-dd.open .kx-dd-btn{border-color:rgba(167,139,250,.65);background:linear-gradient(145deg,rgba(35,29,61,.97),rgba(9,12,25,.94));}" +
+            ".kx-dd-btn .kx-dd-label{display:block;opacity:.68;color:#c4b5fd;font-size:.57rem;font-weight:900;letter-spacing:.16em;line-height:1}" +
+            ".kx-dd-btn .kx-dd-main{display:flex;align-items:center;gap:7px;min-width:0;width:100%}" +
+            ".kx-dd-btn .kx-dd-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;font-size:1rem;line-height:1}" +
+            ".kx-dd-btn .kx-dd-value{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px;color:#fff;font-size:.78rem;font-weight:850;letter-spacing:.015em}" +
+            ".kx-dd-btn .kx-dd-chevron{margin-left:auto;color:#a5acc0;font-size:.82rem;line-height:1;transition:transform .18s ease}" +
+            ".kx-dd.open .kx-dd-chevron{transform:rotate(180deg);color:#c4b5fd}" +
+            ".kx-dd-menu{position:absolute;top:calc(100% + 8px);left:0;min-width:210px;max-width:min(290px,82vw);" +
+            "max-height:260px;overflow-y:auto;padding:6px;border-radius:14px;" +
+            "border:1px solid rgba(167,139,250,.34);background:linear-gradient(150deg,rgba(20,22,40,.99),rgba(8,11,22,.98));" +
+            "box-shadow:0 18px 48px rgba(0,0,0,.62),inset 0 1px 0 rgba(255,255,255,.06);display:none;z-index:12;" +
+            "scrollbar-width:thin;scrollbar-color:rgba(167,139,250,.4) transparent}" +
             ".kx-dd.open .kx-dd-menu{display:block}" +
             ".kx-dd-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;" +
-            "text-align:left;padding:10px 12px;border:0;border-radius:8px;background:transparent;" +
-            "color:#e2e8f0;font:inherit;font-weight:700;font-size:.86rem;cursor:pointer}" +
-            ".kx-dd-menu button:hover,.kx-dd-menu button.active{background:rgba(15,23,42,.95)}" +
-            ".kx-dd-menu button .kx-dd-meta{font-size:.72rem;opacity:.7;font-weight:600}" +
+            "text-align:left;padding:10px 11px;border:0;border-radius:9px;background:transparent;" +
+            "color:#e7eaf3;font:inherit;font-weight:750;font-size:.82rem;cursor:pointer;transition:background .16s ease,color .16s ease}" +
+            ".kx-dd-menu button:hover,.kx-dd-menu button.active{background:linear-gradient(90deg,rgba(139,92,246,.22),rgba(59,130,246,.08));color:#fff}" +
+            ".kx-dd-menu button .kx-dd-meta{font-size:.68rem;opacity:.65;font-weight:650}" +
             ".kx-dd-menu button.kx-lang-hide{display:none!important}" +
-            ".kx-dd-empty{padding:10px 12px;color:#64748b;font-size:.82rem}" +
+            ".kx-dd-empty{padding:10px 12px;color:#94a3b8;font-size:.8rem}" +
             ".kx-block--servers-hidden{display:none!important}" +
-            "@media(max-width:600px){.kx-player-hud{top:6px;left:6px;gap:6px}" +
-            ".kx-dd-btn{padding:6px 10px;font-size:.78rem}}";
+            "@media(max-width:600px){.kx-player-hud{top:8px;left:8px;gap:6px;max-width:calc(100% - 16px)}" +
+            ".kx-dd-btn{min-width:98px;padding:7px 9px 8px;border-radius:11px}" +
+            ".kx-dd-btn .kx-dd-label{font-size:.52rem}" +
+            ".kx-dd-btn .kx-dd-icon{font-size:.9rem}" +
+            ".kx-dd-btn .kx-dd-value{max-width:116px;font-size:.72rem}" +
+            ".kx-dd-menu{min-width:190px;max-height:220px}}";
           document.head.appendChild(style);
         }
 
@@ -1583,16 +1593,18 @@
           btn.setAttribute("aria-haspopup", "listbox");
           btn.setAttribute("aria-expanded", "false");
           btn.innerHTML =
-            (cfg.icon
-              ? '<span class="kx-dd-icon">' + cfg.icon + "</span>"
-              : "") +
             '<span class="kx-dd-label">' +
             esc(cfg.label) +
             "</span>" +
+            '<span class="kx-dd-main">' +
+            (cfg.icon
+              ? '<span class="kx-dd-icon">' + cfg.icon + "</span>"
+              : "") +
             '<span class="kx-dd-value">' +
             esc(cfg.valueText || "—") +
             "</span>" +
-            "<span>▾</span>";
+            '<span class="kx-dd-chevron" aria-hidden="true">⌄</span>' +
+            "</span>";
           var menu = document.createElement("div");
           menu.className = "kx-dd-menu";
           menu.setAttribute("role", "listbox");
@@ -1670,17 +1682,31 @@
               })
             : null;
 
-        // —— Servidores ——
-        var srvMenuHtml = normals.length
-          ? normals
+        // —— Reproductores: servidores normales + directos en un solo selector ——
+        // Evita mostrar un tercer control "DIRECTO —" vacío y conserva las
+        // fuentes directas disponibles dentro del menú principal.
+        var serverChoices = [];
+        var seenServerIndexes = {};
+        normals.concat(directs).forEach(function (p) {
+          var idx = players.indexOf(p);
+          if (idx < 0 || seenServerIndexes[idx]) return;
+          seenServerIndexes[idx] = true;
+          serverChoices.push(p);
+        });
+
+        var srvMenuHtml = serverChoices.length
+          ? serverChoices
               .map(function (p) {
                 var idx = players.indexOf(p);
                 var lk = langKey(p);
                 var lang = langLabel(p);
+                var mode = isDirectPlayer(p) ? "direct" : "iframe";
                 return (
                   '<button type="button" class="kx-chip-proxy" data-i="' +
                   idx +
-                  '" data-mode="iframe" data-lang="' +
+                  '" data-mode="' +
+                  mode +
+                  '" data-lang="' +
                   lk +
                   '"><span>' +
                   esc(serverLabel(p)) +
@@ -1692,7 +1718,7 @@
                 );
               })
               .join("")
-          : '<div class="kx-dd-empty">Ninguno</div>';
+          : '<div class="kx-dd-empty">No hay reproductores disponibles</div>';
 
         function firstLabel(list, key) {
           if (!list || !list.length) return "—";
@@ -1703,7 +1729,7 @@
           }
           return serverLabel(list[0]);
         }
-        var srvInit = firstLabel(normals, preferred);
+        var srvInit = firstLabel(serverChoices, preferred);
         var srvDd = makeDropdown({
           id: "kxSrvDd",
           label: "SERVIDOR",
@@ -1711,45 +1737,6 @@
           valueText: srvInit,
           menuHtml: srvMenuHtml
         });
-        if (srvInit && srvInit !== "—") {
-          srvDd.btn.classList.add("kx-dd-value-only");
-        }
-
-        // —— Directos ——
-        var dirMenuHtml = directs.length
-          ? directs
-              .map(function (p) {
-                var idx = players.indexOf(p);
-                var lk = langKey(p);
-                var lang = langLabel(p);
-                return (
-                  '<button type="button" class="kx-chip-proxy" data-i="' +
-                  idx +
-                  '" data-mode="direct" data-lang="' +
-                  lk +
-                  '"><span>' +
-                  esc(serverLabel(p)) +
-                  "</span>" +
-                  (lang
-                    ? '<span class="kx-dd-meta">' + esc(lang) + "</span>"
-                    : "") +
-                  "</button>"
-                );
-              })
-              .join("")
-          : '<div class="kx-dd-empty">Ninguno</div>';
-
-        var dirInit = firstLabel(directs, preferred);
-        var dirDd = makeDropdown({
-          id: "kxDirDd",
-          label: "DIRECTO",
-          icon: "⚡",
-          valueText: dirInit,
-          menuHtml: dirMenuHtml
-        });
-        if (dirInit && dirInit !== "—") {
-          dirDd.btn.classList.add("kx-dd-value-only");
-        }
 
         // Ocultar bloques inferiores
         if (srvEl) {
@@ -1762,7 +1749,7 @@
         }
 
         function applyLang(key) {
-          $all("#kxSrvDd .kx-chip-proxy[data-lang], #kxDirDd .kx-chip-proxy[data-lang]").forEach(
+          $all("#kxSrvDd .kx-chip-proxy[data-lang]").forEach(
             function (btn) {
               var lk = btn.getAttribute("data-lang") || "otros";
               var show = key === "all" || lk === key;
@@ -1778,10 +1765,8 @@
               else b.classList.remove("active");
             });
           }
-          var sLab = firstLabel(normals, key);
-          var dLab = firstLabel(directs, key);
-          setDdValue(srvDd, sLab, { valueOnly: sLab && sLab !== "—" });
-          setDdValue(dirDd, dLab, { valueOnly: dLab && dLab !== "—" });
+          var sLab = firstLabel(serverChoices, key);
+          setDdValue(srvDd, sLab);
         }
 
         if (langDd) {
@@ -1802,7 +1787,7 @@
             e.stopPropagation();
             var i = Number(t.getAttribute("data-i"));
             var mode = t.getAttribute("data-mode") || "iframe";
-            setDdValue(dd, serverLabel(players[i]), { valueOnly: true });
+            setDdValue(dd, serverLabel(players[i]));
             closeAllDd();
             if (typeof window.__kxPlayServer === "function") {
               window.__kxPlayServer(i, mode, t);
@@ -1812,7 +1797,6 @@
           });
         }
         bindPick(srvDd);
-        bindPick(dirDd);
 
         document.addEventListener("click", function () {
           closeAllDd();

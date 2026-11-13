@@ -2235,3 +2235,134 @@ footer a:hover{color:#fff}
   .kx-ep-view .kx-playback-controls .kx-ep-mobile { order: 1 !important; }
   .kx-ep-view .kx-playback-controls .kx-block { order: 2 !important; }
 }
+
+/* KINOX — controles premium del reproductor (idioma + servidor). */
+.kx-player-hud {
+  gap: 9px !important;
+  max-width: calc(100% - 24px) !important;
+}
+.kx-player-hud .kx-dd {
+  z-index: 10 !important;
+}
+.kx-player-hud .kx-dd-btn {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 4px !important;
+  min-width: 112px !important;
+  max-width: 220px !important;
+  padding: 8px 11px 9px !important;
+  border: 1px solid rgba(255,255,255,.17) !important;
+  border-radius: 13px !important;
+  background: linear-gradient(145deg,rgba(19,22,39,.96),rgba(5,8,18,.90)) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 9px 26px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.08) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  transition: border-color .18s ease, background .18s ease, transform .18s ease !important;
+}
+.kx-player-hud .kx-dd-btn:hover,
+.kx-player-hud .kx-dd.open .kx-dd-btn {
+  border-color: rgba(167,139,250,.65) !important;
+  background: linear-gradient(145deg,rgba(35,29,61,.97),rgba(9,12,25,.94)) !important;
+}
+.kx-player-hud .kx-dd-btn .kx-dd-label {
+  display: block !important;
+  color: #c4b5fd !important;
+  opacity: .72 !important;
+  font-size: .57rem !important;
+  font-weight: 900 !important;
+  letter-spacing: .16em !important;
+  line-height: 1 !important;
+}
+.kx-player-hud .kx-dd-btn .kx-dd-main {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+.kx-player-hud .kx-dd-btn .kx-dd-icon {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1rem !important;
+  line-height: 1 !important;
+}
+.kx-player-hud .kx-dd-btn .kx-dd-value {
+  display: block !important;
+  min-width: 0 !important;
+  max-width: 150px !important;
+  overflow: hidden !important;
+  color: #fff !important;
+  font-size: .78rem !important;
+  font-weight: 850 !important;
+  letter-spacing: .015em !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.kx-player-hud .kx-dd-btn .kx-dd-chevron {
+  margin-left: auto !important;
+  color: #a5acc0 !important;
+  font-size: .82rem !important;
+  line-height: 1 !important;
+  transition: transform .18s ease, color .18s ease !important;
+}
+.kx-player-hud .kx-dd.open .kx-dd-chevron {
+  transform: rotate(180deg) !important;
+  color: #c4b5fd !important;
+}
+.kx-player-hud .kx-dd-menu {
+  top: calc(100% + 8px) !important;
+  min-width: 210px !important;
+  padding: 6px !important;
+  border: 1px solid rgba(167,139,250,.34) !important;
+  border-radius: 14px !important;
+  background: linear-gradient(150deg,rgba(20,22,40,.99),rgba(8,11,22,.98)) !important;
+  box-shadow: 0 18px 48px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.06) !important;
+  backdrop-filter: blur(18px) !important;
+}
+.kx-player-hud .kx-dd-menu button {
+  padding: 10px 11px !important;
+  border-radius: 9px !important;
+  color: #e7eaf3 !important;
+  font-size: .82rem !important;
+  transition: background .16s ease, color .16s ease !important;
+}
+.kx-player-hud .kx-dd-menu button:hover,
+.kx-player-hud .kx-dd-menu button.active {
+  background: linear-gradient(90deg,rgba(139,92,246,.22),rgba(59,130,246,.08)) !important;
+  color: #fff !important;
+}
+.kx-player-hud .kx-dd-menu button .kx-dd-meta {
+  color: #c4b5fd !important;
+  font-size: .68rem !important;
+}
+@media (max-width: 600px) {
+  .kx-player-hud {
+    top: 8px !important;
+    left: 8px !important;
+    gap: 6px !important;
+    max-width: calc(100% - 16px) !important;
+  }
+  .kx-player-hud .kx-dd-btn {
+    min-width: 98px !important;
+    padding: 7px 9px 8px !important;
+    border-radius: 11px !important;
+  }
+  .kx-player-hud .kx-dd-btn .kx-dd-label {
+    font-size: .52rem !important;
+  }
+  .kx-player-hud .kx-dd-btn .kx-dd-icon {
+    font-size: .9rem !important;
+  }
+  .kx-player-hud .kx-dd-btn .kx-dd-value {
+    max-width: 116px !important;
+    font-size: .72rem !important;
+  }
+  .kx-player-hud .kx-dd-menu {
+    min-width: 190px !important;
+    max-height: 220px !important;
+  }
+}
